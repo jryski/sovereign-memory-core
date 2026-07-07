@@ -17,7 +17,7 @@ Claims without evidence do not count.
 
 - [ ] Repo contains every live schema object needed to recreate the system.
 - [ ] Live DB object inventory matches repo migrations or documented intentional drift.
-- [ ] Migrations are mirrored outside Supabase.
+- [ ] Migrations are mirrored outside the hosting provider.
 - [ ] Restore into vanilla Postgres has been rehearsed.
 - [ ] Data exports exist in human-readable formats.
 - [ ] Provider-exit test has a date, evidence, and findings.
@@ -46,32 +46,32 @@ Claims without evidence do not count.
 - [ ] Hot index or equivalent attention layer avoids loading the entire store.
 - [ ] Hot-topic promotion has deterministic rules.
 - [ ] Semantic/vector recall is treated as cache or assistive retrieval, not canon.
-- [ ] Cutover probes prove important facts can be recalled after migration.
+- [ ] Cutover probes prove important facts can be recalled after import or migration.
 - [ ] Failure to recall critical facts creates an actionable remediation item.
 
-## 5. Migration off MCP memory/wiki
+## 5. Source import and authoritative cutover
 
-- [ ] Legacy source inventory complete.
-- [ ] Freeze or watermark recorded.
+- [ ] Source inventory complete.
+- [ ] Freeze or watermark recorded where the source can change.
 - [ ] Raw exports preserved with file hashes.
-- [ ] Every source row has a manifest decision.
+- [ ] Every source item has a manifest decision.
 - [ ] HOUSE/VAULT/HOLD/EVIDENCE classification complete.
 - [ ] Import counts match manifest counts.
 - [ ] Payload hashes verify.
 - [ ] Readiness checks pass.
 - [ ] Critical cutover probes pass.
-- [ ] Legacy MCP paths remain readable during rollback window.
-- [ ] Jesse explicitly approves Supabase-authoritative cutover.
+- [ ] Prior sources remain readable during rollback window where feasible.
+- [ ] Owner explicitly approves authoritative cutover.
 
 ## 6. Trust boundaries and security
 
-- [ ] Security model states the real boundary is the credential/connector.
-- [ ] Service-role blast radius is documented.
+- [ ] Security model states the real boundary is the credential/connector/API surface.
+- [ ] Broad credential blast radius is documented.
 - [ ] No anon/authenticated/PUBLIC grants leak on protected objects.
 - [ ] Views use `security_invoker` where appropriate.
 - [ ] SECURITY DEFINER functions pin `search_path`.
 - [ ] Private schemas have no unintended grants.
-- [ ] Narrow-role/API-hardening path is designed and prioritized.
+- [ ] Least-privilege API or role hardening path is designed and prioritized.
 - [ ] Sensitive domains are separated by schema, project, or credential as appropriate.
 
 ## 7. VAULT readiness
@@ -101,7 +101,7 @@ Claims without evidence do not count.
 - [ ] Replies have deterministic references.
 - [ ] Message retrieval uses ordering/sequence, not semantic search.
 - [ ] Cross-model reviews preserve disagreement without treating models as authority.
-- [ ] Warden/ATLAS coordination has an operating rule for schema changes.
+- [ ] Peer-review operating rule exists for schema changes.
 
 ## 10. Repo quality
 
@@ -115,24 +115,24 @@ Claims without evidence do not count.
 
 ## Current blockers to 10/10
 
-1. Live migration/cutover objects are not yet committed as repo SQL.
+1. Live source-import/cutover objects are not yet committed as reusable repo SQL.
 2. No executable validation bundle for full cutover readiness.
 3. No stored provider-exit evidence artifact in repo.
-4. Narrow-role/API hardening is designed conceptually but not implemented.
+4. Least-privilege access hardening is designed conceptually but not implemented.
 5. UI/review workflow is split to a new repo and not yet complete.
-6. Warden review of this hardening pass is pending.
+6. Peer review of the hardening pass is pending.
 
 ## Target definition of done
 
-`sovereign-memory-core` reaches 10/10 when a new approved assistant can:
+`sovereign-memory-core` reaches 10/10 when a new approved operator can:
 
 1. clone the repo;
 2. apply migrations to a fresh Postgres/Supabase project;
 3. run acceptance tests;
-4. import or reconcile legacy MCP memory/wiki exports;
+4. import or reconcile records from an existing source;
 5. verify payload hashes and readiness checks;
 6. run cutover probes;
 7. restore from backup into vanilla Postgres;
 8. prove service boundaries and grant posture;
 9. boot with `session_boot()`;
-10. continue work without relying on vendor-native memory or legacy MCP memory/wiki paths.
+10. continue work without relying on vendor-native memory or any prior non-authoritative source.
