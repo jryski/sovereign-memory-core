@@ -44,8 +44,14 @@ create index if not exists idx_source_manifest_quote_hash
   on source_manifest(source_quote_hash)
   where source_quote_hash is not null;
 
+-- Recreate views because locator-aware review_queue inserts columns into the
+-- visible review surface; CREATE OR REPLACE VIEW cannot change existing column
+-- order/names in-place.
+drop view if exists source_readiness;
+drop view if exists source_manifest_review_queue;
+
 -- Review queue now exposes candidate-level locator/hash posture.
-create or replace view source_manifest_review_queue with (security_invoker=true) as
+create view source_manifest_review_queue with (security_invoker=true) as
   select
     sib.id as batch_id,
     ss.source_key,
@@ -76,7 +82,7 @@ create or replace view source_manifest_review_queue with (security_invoker=true)
 
 -- Readiness now blocks import/HOLD candidates that cannot be verified against
 -- a candidate-level locator plus quote hash.
-create or replace view source_readiness with (security_invoker=true) as
+create view source_readiness with (security_invoker=true) as
   with batches as (
     select b.id as batch_id, ss.source_key, b.batch_key, b.status,
            b.source_item_count, b.exported_item_count
