@@ -66,6 +66,24 @@ from (values
   ('source_quote_hash_algorithm')
 ) as v(column_name);
 
+insert into source_import_validation_results(check_group, object_name, state, severity, fatal, remediation)
+select 'required_column',
+       'cutover_probes.'||column_name,
+       case when exists (
+         select 1 from information_schema.columns c
+         where c.table_schema='public'
+           and c.table_name='cutover_probes'
+           and c.column_name=v.column_name
+       ) then 'pass' else 'fail' end,
+       'required',
+       true,
+       'Run sql/06_cutover_probe_categories.sql when richer probe hardening is expected.' as remediation
+from (values
+  ('probe_category'),
+  ('expected_behavior'),
+  ('expected_evidence_required')
+) as v(column_name);
+
 -- ---- function search_path posture ------------------------------------------
 insert into source_import_validation_results(check_group, object_name, state, severity, fatal, remediation)
 select 'function_posture',
@@ -116,8 +134,8 @@ order by check_group, object_name;
 
 -- ---- smoke test --------------------------------------------------------------
 -- This section proves the contract can stage, manifest, review, freeze, score,
--- block premature readiness, then pass readiness after blockers are resolved.
--- It rolls back all fixture rows.
+-- block premature readiness, enforce locators and richer probes, then pass
+-- readiness after blockers are resolved. It rolls back all fixture rows.
 
 begin;
 
@@ -235,15 +253,42 @@ with agent as (
 ), freeze_step as (
   select source_freeze_batch(batch.id, batch.created_by, jsonb_build_object('fixture', true, 'count', 5), 'validation fixture') as result
   from batch
-), probe as (
-  insert into cutover_probes(batch_id, probe_key, probe_type, severity, prompt, expect_substring)
-  select batch.id, 'fixture-alpha-decision', 'project-state', 'critical', 'What did project alpha decide?', 'boring durable schema'
+), probes as (
+  insert into cutover_probes(
+    batch_id,
+    probe_key,
+    probe_type,
+    probe_category,
+    severity,
+    prompt,
+    expect_substring,
+    avoid_substring,
+    expected_behavior,
+    expected_evidence_required
+  )
+  select batch.id, p.probe_key, p.probe_type, p.probe_category, p.severity::cutover_probe_severity,
+         p.prompt, p.expect_substring, p.avoid_substring, p.expected_behavior, p.expected_evidence_required
   from batch cross join freeze_step
-  returning id
-), run as (
+  cross join (values
+    ('fixture-positive-alpha', 'project-state', 'positive', 'critical', 'What did project alpha decide?', 'boring durable schema', null, 'Return the known project decision.', false),
+    ('fixture-negative-unknown', 'unknown-avoidance', 'negative', 'critical', 'What is the launch date for missing project omega?', 'unknown', 'January 1', 'Say unknown or insufficient evidence; do not invent a date.', false),
+    ('fixture-conflict-status', 'conflict', 'conflict', 'critical', 'Is the maybe-stale status confirmed?', 'needs review', null, 'Surface the unresolved status instead of flattening it into confirmed truth.', false),
+    ('fixture-stale-state', 'stale-avoidance', 'stale_state', 'critical', 'What should happen to stale project state?', 'hold', null, 'Avoid promoting stale or uncertain state as current.', false),
+    ('fixture-evidence-request', 'evidence', 'evidence_request', 'critical', 'Show evidence for the project alpha decision.', 'evidence', null, 'Return the answer with supporting evidence.', true)
+  ) as p(probe_key, probe_type, probe_category, severity, prompt, expect_substring, avoid_substring, expected_behavior, expected_evidence_required)
+  returning id, probe_category
+), runs as (
   insert into cutover_runs(probe_id, runner_agent, matched, observed_answer, notes)
-  select probe.id, batch.created_by, true, 'Use the boring durable schema.', 'validation fixture'
-  from probe cross join batch
+  select probes.id, batch.created_by, true,
+         case probes.probe_category
+           when 'positive' then 'Use the boring durable schema.'
+           when 'negative' then 'Unknown: insufficient evidence.'
+           when 'conflict' then 'This status needs review and should not be treated as confirmed.'
+           when 'stale_state' then 'Hold stale or uncertain state until reviewed.'
+           when 'evidence_request' then 'Evidence: fixture source locator supports the decision.'
+         end,
+         'validation fixture'
+  from probes cross join batch
   returning id
 )
 select count(*) as fixture_rows_created
@@ -320,11 +365,33 @@ where b.batch_key='fixture-batch-001';
 
 insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
 select 'smoke_test',
-       'cutover_scorecard_fixture',
-       case when probes_defined=1 and probes_run=1 and probes_passed=1 and critical_misses=0 then 'pass' else 'fail' end,
+       'probe_category_fixture',
+       case when count(distinct probe_category)=5 then 'pass' else 'fail' end,
        'required',
        true,
-       'Cutover scorecard should reflect one passing critical probe.'
+       'Fixture should define all five cutover probe categories.'
+from cutover_probes cp
+join source_import_batches b on b.id=cp.batch_id
+where b.batch_key='fixture-batch-001';
+
+insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+select 'smoke_test',
+       'cutover_scorecard_fixture',
+       case when probes_defined=5
+              and positive_probes=1
+              and negative_probes=1
+              and conflict_probes=1
+              and stale_state_probes=1
+              and evidence_request_probes=1
+              and probes_run=5
+              and probes_passed=5
+              and critical_misses=0
+              and critical_not_run=0
+              and critical_all_pass
+         then 'pass' else 'fail' end,
+       'required',
+       true,
+       'Cutover scorecard should reflect five passing critical probe categories.' as remediation
 from cutover_scorecard cs
 join source_import_batches b on b.id=cs.batch_id
 where b.batch_key='fixture-batch-001';

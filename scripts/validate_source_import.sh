@@ -12,6 +12,7 @@ set -euo pipefail
 # - The script creates the Supabase-compatible `extensions` schema and shim roles
 #   (`anon`, `authenticated`, `service_role`) if they do not already exist.
 # - If sql/05_candidate_locators.sql exists, the script applies it before validation.
+# - If sql/06_cutover_probe_categories.sql exists, the script applies it before validation.
 # - The validation fixture rolls back its own staged data.
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
@@ -50,6 +51,11 @@ echo "==> Applying source import/cutover layer"
 if [[ -f "${ROOT_DIR}/sql/05_candidate_locators.sql" ]]; then
   echo "==> Applying candidate locator/quote-hash layer"
   "${PSQL[@]}" -f "${ROOT_DIR}/sql/05_candidate_locators.sql"
+fi
+
+if [[ -f "${ROOT_DIR}/sql/06_cutover_probe_categories.sql" ]]; then
+  echo "==> Applying richer cutover probe category layer"
+  "${PSQL[@]}" -f "${ROOT_DIR}/sql/06_cutover_probe_categories.sql"
 fi
 
 echo "==> Running source import validation bundle"

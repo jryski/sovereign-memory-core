@@ -192,6 +192,59 @@ Run the validation helper again after this migration. Expected behavior adds:
 - fixture import/HOLD candidates carry locator + quote hash;
 - readiness includes `candidate_locators_and_quote_hashes`.
 
+## Step 9B: Richer cutover probe categories
+Apply `06_cutover_probe_categories.sql` as migration `cutover_probe_categories_v1` after
+Step 9A.
+
+This step hardens cutover verification so a batch cannot look ready merely because positive
+retrieval probes pass. A trustworthy cutover must also prove the system can avoid invention,
+surface unresolved conflicts, avoid stale state, and provide evidence when asked.
+
+Probe categories:
+
+| Category | Purpose |
+|---|---|
+| `positive` | Proves expected recall for known imported material. |
+| `negative` | Proves the system says unknown/insufficient evidence rather than inventing. |
+| `conflict` | Proves tensions are surfaced rather than silently flattened. |
+| `stale_state` | Proves superseded or uncertain state does not outrank current reviewed state. |
+| `evidence_request` | Proves the system can return or cite supporting evidence on demand. |
+
+Additional fields:
+
+| Field | Purpose |
+|---|---|
+| `probe_category` | One of the five allowed categories above. |
+| `expected_behavior` | Human-readable expected behavior, useful for review and runner integration. |
+| `expected_evidence_required` | Boolean flag for probes where supporting evidence is mandatory. |
+
+Readiness effect:
+
+- a batch must define active probes across all five categories before cutover;
+- every active critical probe must have a latest passing run;
+- `cutover_scorecard` exposes category counts, `critical_not_run`, and
+  `critical_all_pass` so misses cannot hide behind aggregate pass percentage.
+
+- DONE, probe category checks:
+```sql
+select 'probe_category', count(*)::text from information_schema.columns
+  where table_schema='public' and table_name='cutover_probes' and column_name='probe_category'
+union all select 'critical_all_pass', count(*)::text from information_schema.columns
+  where table_schema='public' and table_name='cutover_scorecard' and column_name='critical_all_pass'
+union all select 'category_gate', count(*)::text from source_readiness
+  where check_key='cutover_probe_category_coverage'
+union all select 'critical_gate', count(*)::text from source_readiness
+  where check_key='critical_cutover_probes_all_pass';
+```
+Expect: all counts are 1 or greater where the view has rows.
+
+Run the validation helper again after this migration. Expected behavior adds:
+
+- richer probe columns pass;
+- fixture defines all five categories;
+- fixture scorecard shows five passing critical probes;
+- readiness includes category coverage and critical all-pass gates.
+
 ## Step 10: Source-control your migrations (not optional)
 Hosted `supabase_migrations.schema_migrations` is NOT source control; if the project
 dies, your schema dies with it. Set up per docs/05 section 1: export every migration to
@@ -217,6 +270,7 @@ run the exit-test checks.
 | 8 | Money guards (if needed) | fail/pass/pass triple |
 | 9 | Source import/cutover foundation | validation bundle passes |
 | 9A | Candidate locator/quote-hash hardening | locator readiness gate passes |
+| 9B | Richer cutover probe hardening | category coverage + critical all-pass gates |
 | 10-11 | Survivability | repo checksum + restore rehearsal |
 
 Stop building after step 11. Use it before adding higher-level automation.
