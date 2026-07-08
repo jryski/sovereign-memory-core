@@ -108,7 +108,7 @@ values ('Ballpark is around $5k','shared','system',0.5,'{"financial_unverified":
 ```
 Then perimeter: `select assert_perimeter_closed();`
 
-## Step 9: Source import and authoritative cutover layer
+## Step 9: Source import and authoritative cutover foundation
 Apply `04_source_import.sql` as migration `source_import_v1`.
 
 This step installs the generic source-import contract used by adapters and future tools.
@@ -121,10 +121,10 @@ DATABASE_URL="postgres://postgres:postgres@localhost:5432/postgres" \
   bash scripts/validate_source_import.sh
 ```
 
-The helper creates local compatibility shims (`extensions`, `anon`, `authenticated`),
-applies `01_core.sql`, applies `04_source_import.sql`, and runs the rollback validation
-bundle. Use it for local review only; production/Supabase deployments should still apply
-DDL through migrations.
+The helper creates local compatibility shims (`extensions`, `anon`, `authenticated`,
+`service_role`), applies `01_core.sql`, applies `04_source_import.sql`, and runs the
+rollback validation bundle. Use it for local review only; production/Supabase deployments
+should still apply DDL through migrations.
 
 - DONE, object/perimeter checks:
 ```sql
@@ -173,7 +173,7 @@ run the exit-test checks.
 | 5-6 | Contract installed, assistants booting | fresh-session boot test |
 | 7 | Vault (if needed) | zero grant leaks, audit firing |
 | 8 | Money guards (if needed) | fail/pass/pass triple |
-| 9 | Source import/cutover contract | validation bundle passes |
+| 9 | Source import/cutover foundation | validation bundle passes |
 | 10-11 | Survivability | repo checksum + restore rehearsal |
 
 Stop building after step 11. Use it before adding higher-level automation.
