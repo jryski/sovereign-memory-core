@@ -6,8 +6,8 @@ Status date: 2026-07-07
 
 | Dimension | Current | Target | Notes |
 |---|---:|---:|---|
-| Core schema concept | 9/10 | 10/10 | Strong baseline for memory, wiki, hot index, provenance, supersession, and operating-doc integrity. |
-| Production/repo alignment | 6/10 | 10/10 | Live deployments can contain source-import and cutover controls that are not yet captured in repo SQL. |
+| Core schema concept | 9/10 | 10/10 | Strong baseline for memory, wiki, attention index, provenance, supersession, and operating-doc integrity. |
+| Repo/deployment alignment | 6/10 | 10/10 | Deployments can evolve beyond repo SQL; drift must be captured without embedding one deployment's inventory in the reusable repo. |
 | Source import/cutover readiness | 6/10 | 10/10 | Manifest, readiness, export, and cutover objects need a complete reusable package. |
 | Security posture | 8/10 | 10/10 | Security model is honest; next step is least-privilege access hardening beyond broad credential operation. |
 | Survivability | 7/10 | 10/10 | Backup/restore guidance exists; needs executable scripts, evidence records, and periodic verification. |
@@ -24,60 +24,73 @@ The repository currently contains:
 - Architecture, security, agent operations, implementation, operations, and pattern docs
 - A verified baseline claim against vanilla PostgreSQL 16
 
-## Confirmed live deployment divergence pattern
+## Drift policy
 
-A live deployment may include additional objects that are not yet represented in the reusable repo baseline. In the current reference deployment, examples include:
+This repository should not carry a detailed inventory of any one private deployment. That information belongs in that deployment's own wiki, issue tracker, or operations log.
 
-### Public tables/views
+The repo should instead provide a repeatable drift ledger template that any deployment can fill in.
 
-- `migration_manifest_v1`
-- `migration_manifest_review_queue`
-- `migration_readiness_v1`
-- `migration_export_house_v1`
-- `migration_export_hold_v1`
-- `migration_export_evidence_v1`
-- `migration_freeze_control`
-- `cutover_probe`
-- `cutover_run`
-- `cutover_scorecard`
-- `model_channel`
-- `model_notebook`
-- `review_queue`
-- `skill_registry`
-- `failed_embeds`
-- `cookbook_recipes`
+### Drift ledger template
 
-### Public functions
+```text
+deployment_name:
+review_date:
+reviewed_by:
+repo_ref:
+database_ref:
 
-- `activate_migration_freeze_v1`
-- `release_migration_freeze_v1`
-- `enforce_migration_freeze_v1`
-- `export_house_chunk_v1`
-- `export_evidence_chunk_v1`
-- `promote_memory`
-- `reject_memory`
-- `correct_memory`
-- `match_memories`
-- `match_wiki`
-- `embed_pending`
+object_inventory_method:
+  tables_query:
+  routines_query:
+  grants_query:
 
-### Vault additions
+repo_objects_missing_from_deployment:
+  - object:
+    expected_from:
+    severity:
+    action:
 
-- `vault_private.api_version`
-- `vault_internal.resolve_subject`
+deployment_objects_missing_from_repo:
+  - object:
+    object_type:
+    schema:
+    generic_core_candidate: yes/no
+    deployment_specific: yes/no
+    reason:
+    action:
+
+semantic_drift:
+  - object_or_doc:
+    repo_behavior:
+    deployment_behavior:
+    risk:
+    action:
+
+known_waivers:
+  - item:
+    reason:
+    owner:
+    review_by:
+
+result:
+  status: aligned / intentional-drift / action-required
+  next_action:
+```
 
 ## Interpretation
 
 The repo is a solid baseline blueprint, but the reusable source-import/cutover layer is not yet fully represented as versioned SQL and docs. That layer should be generic enough to support many source types, not just any one user's current migration path.
+
+Deployment-specific inventories should be maintained outside this public/reusable status document.
 
 ## 10/10 blockers
 
 1. Source-import/cutover SQL not yet captured in repo.
 2. No complete source-import/cutover runbook until `docs/07-source-import-cutover.md`.
 3. No automated validation script that runs all readiness checks against a live DB.
-4. No repository-stored evidence record of latest backup/restore rehearsal.
+4. No repository-stored evidence template for backup/restore rehearsal.
 5. Broad credential operation remains the practical trust boundary; least-privilege access hardening is not yet implemented.
-6. Production object drift can exist between live DB and repo baseline.
+6. Drift ledger process is documented here but not yet backed by an executable inventory check.
 7. Review queue and promotion workflow need stronger docs and UI support.
 8. No formal release tag declaring a known-good schema version.
 
