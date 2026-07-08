@@ -414,19 +414,56 @@ create or replace view cutover_scorecard with (security_invoker=true) as
   group by cp.batch_id;
 
 -- ---- grant perimeter ---------------------------------------------------------
-revoke all on source_systems from public, anon, authenticated;
-revoke all on source_import_batches from public, anon, authenticated;
-revoke all on source_items from public, anon, authenticated;
-revoke all on source_payload_evidence from public, anon, authenticated;
-revoke all on source_manifest from public, anon, authenticated;
-revoke all on cutover_probes from public, anon, authenticated;
-revoke all on cutover_runs from public, anon, authenticated;
-revoke all on source_manifest_review_queue from public, anon, authenticated;
-revoke all on source_readiness from public, anon, authenticated;
-revoke all on cutover_scorecard from public, anon, authenticated;
+revoke all on source_systems from public;
+revoke all on source_import_batches from public;
+revoke all on source_items from public;
+revoke all on source_payload_evidence from public;
+revoke all on source_manifest from public;
+revoke all on cutover_probes from public;
+revoke all on cutover_runs from public;
+revoke all on source_manifest_review_queue from public;
+revoke all on source_readiness from public;
+revoke all on cutover_scorecard from public;
 
-revoke execute on function source_freeze_batch(uuid,text,jsonb,text) from public, anon, authenticated;
-revoke execute on function source_manifest_payload_drift(uuid) from public, anon, authenticated;
-revoke execute on function source_mark_batch_ready(uuid,text) from public, anon, authenticated;
+revoke execute on function source_freeze_batch(uuid,text,jsonb,text) from public;
+revoke execute on function source_manifest_payload_drift(uuid) from public;
+revoke execute on function source_mark_batch_ready(uuid,text) from public;
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname='anon') then
+    revoke all on source_systems from anon;
+    revoke all on source_import_batches from anon;
+    revoke all on source_items from anon;
+    revoke all on source_payload_evidence from anon;
+    revoke all on source_manifest from anon;
+    revoke all on cutover_probes from anon;
+    revoke all on cutover_runs from anon;
+    revoke all on source_manifest_review_queue from anon;
+    revoke all on source_readiness from anon;
+    revoke all on cutover_scorecard from anon;
+
+    revoke execute on function source_freeze_batch(uuid,text,jsonb,text) from anon;
+    revoke execute on function source_manifest_payload_drift(uuid) from anon;
+    revoke execute on function source_mark_batch_ready(uuid,text) from anon;
+  end if;
+
+  if exists (select 1 from pg_roles where rolname='authenticated') then
+    revoke all on source_systems from authenticated;
+    revoke all on source_import_batches from authenticated;
+    revoke all on source_items from authenticated;
+    revoke all on source_payload_evidence from authenticated;
+    revoke all on source_manifest from authenticated;
+    revoke all on cutover_probes from authenticated;
+    revoke all on cutover_runs from authenticated;
+    revoke all on source_manifest_review_queue from authenticated;
+    revoke all on source_readiness from authenticated;
+    revoke all on cutover_scorecard from authenticated;
+
+    revoke execute on function source_freeze_batch(uuid,text,jsonb,text) from authenticated;
+    revoke execute on function source_manifest_payload_drift(uuid) from authenticated;
+    revoke execute on function source_mark_batch_ready(uuid,text) from authenticated;
+  end if;
+end $$;
 
 -- End of source import contract.
