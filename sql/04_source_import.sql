@@ -63,7 +63,7 @@ create table if not exists source_systems (
   adapter_name    text,
   adapter_version text,
   description     text,
-  owner           text not null default 'shared' check (owner in ('alex','sam','shared')), -- CUSTOMIZE from 01_core.sql
+  owner           text not null default 'shared', -- optional source-scope label; canonical target rows enforce ownership
   visibility      text not null default 'shared' check (visibility in ('shared','private')),
   active          boolean not null default true,
   metadata        jsonb not null default '{}',
@@ -147,6 +147,7 @@ create unique index if not exists source_payload_evidence_natural_key
 create table if not exists source_manifest (
   id                         uuid primary key default gen_random_uuid(),
   source_item_id              uuid not null references source_items(id) on delete cascade,
+  manifest_key                text not null default 'item', -- stable adapter key for one source item -> many candidates
   action                      source_item_action not null default 'hold',
   target_zone                 source_target_zone not null default 'HOLD',
   review_state                source_review_state not null default 'unreviewed',
@@ -172,7 +173,7 @@ create table if not exists source_manifest (
   metadata                    jsonb not null default '{}',
   created_at                  timestamptz not null default now(),
   updated_at                  timestamptz not null default now(),
-  unique (source_item_id),
+  unique (source_item_id, manifest_key),
   constraint source_manifest_action_zone check (
     (action='import' and target_zone in ('HOUSE','VAULT')) or
     (action='hold' and target_zone='HOLD') or
@@ -185,6 +186,7 @@ create table if not exists source_manifest (
 );
 
 create index if not exists idx_source_manifest_action_review on source_manifest(action, review_state);
+create index if not exists idx_source_manifest_item on source_manifest(source_item_id);
 create index if not exists idx_source_manifest_zone on source_manifest(target_zone);
 create index if not exists idx_source_manifest_topic on source_manifest(topic_key);
 
@@ -228,10 +230,10 @@ begin
 end; $$;
 
 create or replace function source_manifest_payload_drift(p_batch_id uuid)
-returns table(source_item_id uuid, source_item_key text, reviewed_hash text, current_hash text, review_state source_review_state)
+returns table(source_manifest_id uuid, source_item_id uuid, source_item_key text, manifest_key text, reviewed_hash text, current_hash text, review_state source_review_state)
 language sql stable security definer set search_path to 'public'
 as $$
-  select si.id, si.source_item_key, sm.source_payload_hash_at_review, si.payload_hash, sm.review_state
+  select sm.id, si.id, si.source_item_key, sm.manifest_key, sm.source_payload_hash_at_review, si.payload_hash, sm.review_state
   from source_manifest sm
   join source_items si on si.id = sm.source_item_id
   where si.batch_id = p_batch_id
@@ -273,6 +275,8 @@ create or replace view source_manifest_review_queue with (security_invoker=true)
     sib.batch_key,
     si.id as source_item_id,
     si.source_item_key,
+    sm.id as source_manifest_id,
+    sm.manifest_key,
     si.source_container,
     si.title,
     sm.action,
@@ -288,7 +292,7 @@ create or replace view source_manifest_review_queue with (security_invoker=true)
   join source_systems ss on ss.id = sib.source_system_id
   where sm.review_state in ('unreviewed','needs_review')
      or (sm.action='hold' and sm.review_state not in ('waived','rejected'))
-  order by si.created_at asc;
+  order by si.created_at asc, sm.manifest_key asc;
 
 create or replace view source_readiness with (security_invoker=true) as
   with batches as (
@@ -299,8 +303,9 @@ create or replace view source_readiness with (security_invoker=true) as
   ), counts as (
     select b.batch_id,
       (select count(*) from source_items si where si.batch_id=b.batch_id) as staged_items,
-      (select count(*) from source_items si left join source_manifest sm on sm.source_item_id=si.id
-        where si.batch_id=b.batch_id and sm.id is null) as unmanifested_items,
+      (select count(*) from source_items si
+        where si.batch_id=b.batch_id
+          and not exists (select 1 from source_manifest sm where sm.source_item_id=si.id)) as unmanifested_items,
       (select count(*) from source_manifest sm join source_items si on si.id=sm.source_item_id
         where si.batch_id=b.batch_id and sm.review_state in ('unreviewed','needs_review')) as review_pending,
       (select count(*) from source_manifest sm join source_items si on si.id=sm.source_item_id
@@ -327,7 +332,7 @@ create or replace view source_readiness with (security_invoker=true) as
   select b.batch_id, b.source_key, b.batch_key, 'no_unmanifested_items',
          case when c.unmanifested_items=0 then 'pass' else 'fail' end,
          'blocker',
-         'Create a manifest row for every staged source item.'
+         'Create at least one manifest row for every staged source item, even if the item is excluded.'
   from batches b join counts c using (batch_id)
   union all
   select b.batch_id, b.source_key, b.batch_key, 'review_queue_clear_or_waived',
