@@ -20,6 +20,7 @@ See:
 - [`STATUS.md`](STATUS.md) for current completeness and readiness.
 - [`docs/07-source-import-cutover.md`](docs/07-source-import-cutover.md) for the source import and authoritative cutover plan.
 - [`docs/08-readiness-scorecard.md`](docs/08-readiness-scorecard.md) for the 10/10 checklist.
+- [`docs/09-source-adapters.md`](docs/09-source-adapters.md) for real-world source adapter patterns.
 
 ## Why this exists
 
@@ -58,6 +59,7 @@ docs/05-operations.md           backups, restore test, provider-exit test, drift
 docs/06-patterns.md             transferable design patterns
 docs/07-source-import-cutover.md source import and authoritative cutover plan
 docs/08-readiness-scorecard.md  10/10 readiness checklist
+docs/09-source-adapters.md      real-world import source adapter matrix
 ```
 
 ## Quick start for a fresh deployment
@@ -74,7 +76,7 @@ docs/08-readiness-scorecard.md  10/10 readiness checklist
 Do not cut over by assumption.
 
 The prior source might be a file wiki, exported chat history, notes app, spreadsheet,
-database, vendor export, or another memory system. The cutover must be evidence based:
+database, vendor export, AI project export, connector-backed memory store, or another memory system. The cutover must be evidence based:
 
 1. Freeze or watermark the old source.
 2. Export raw source records or documents.
@@ -86,7 +88,7 @@ database, vendor export, or another memory system. The cutover must be evidence 
 8. Leave the prior source readable until rollback confidence is high.
 9. Declare Sovereign Memory authoritative only after the scorecard passes.
 
-See `docs/07-source-import-cutover.md`.
+See `docs/07-source-import-cutover.md` and `docs/09-source-adapters.md`.
 
 ## Non-goals
 
