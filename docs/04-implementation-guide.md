@@ -122,9 +122,9 @@ DATABASE_URL="postgres://postgres:postgres@localhost:5432/postgres" \
 ```
 
 The helper creates local compatibility shims (`extensions`, `anon`, `authenticated`,
-`service_role`), applies `01_core.sql`, applies `04_source_import.sql`, and runs the
-rollback validation bundle. Use it for local review only; production/Supabase deployments
-should still apply DDL through migrations.
+`service_role`), applies `01_core.sql`, applies `04_source_import.sql`, applies optional
+follow-on SQL layers if present, and runs the rollback validation bundle. Use it for local
+review only; production/Supabase deployments should still apply DDL through migrations.
 
 - DONE, object/perimeter checks:
 ```sql
@@ -147,9 +147,50 @@ Expected behavior:
 - function posture passes;
 - grant posture passes;
 - fixture smoke test returns readiness rows;
-- fixture scorecard shows one passing critical probe;
+- fixture scorecard shows passing critical probes;
 - fixture rows are rolled back;
 - any required validation failure raises an error so CI fails.
+
+## Step 9A: Candidate locators and quote hashes
+Apply `05_candidate_locators.sql` as migration `candidate_locators_v1` after Step 9.
+
+This step hardens `source_manifest` so each manifest candidate can be tied back to the
+specific source span that supports it. Whole-item payload preservation is still required,
+but it is not enough for large containers such as AI conversation exports where one source
+item can yield multiple candidate memories, wiki pages, tasks, decisions, or evidence rows.
+
+Candidate locator fields:
+
+| Field | Purpose |
+|---|---|
+| `source_locator` | Structured pointer into the source item, stored as JSONB so adapters can describe paths, message ids, turn ranges, byte offsets, or other source-specific spans. |
+| `source_quote` | Optional extracted support text for human review. Keep it short; use locator + hash when storing raw text would be excessive. |
+| `source_quote_hash` | Hash of the extracted supporting quote/span so offset or encoding drift can be detected. |
+| `source_quote_hash_algorithm` | Hash algorithm label, default `sha256`. |
+
+Readiness effect:
+
+- active import/HOLD candidates must carry a non-empty `source_locator` and a
+  `source_quote_hash`;
+- excluded candidates may still be evidence-preserved without becoming importable truth;
+- `source_manifest_review_queue` exposes locator/hash posture for reviewers.
+
+- DONE, candidate locator checks:
+```sql
+select 'source_locator', count(*)::text from information_schema.columns
+  where table_schema='public' and table_name='source_manifest' and column_name='source_locator'
+union all select 'source_quote_hash', count(*)::text from information_schema.columns
+  where table_schema='public' and table_name='source_manifest' and column_name='source_quote_hash'
+union all select 'locator_gate', count(*)::text from source_readiness
+  where check_key='candidate_locators_and_quote_hashes';
+```
+Expect: source_locator 1 / source_quote_hash 1 / locator_gate >= 0 on an empty system.
+
+Run the validation helper again after this migration. Expected behavior adds:
+
+- candidate locator columns pass;
+- fixture import/HOLD candidates carry locator + quote hash;
+- readiness includes `candidate_locators_and_quote_hashes`.
 
 ## Step 10: Source-control your migrations (not optional)
 Hosted `supabase_migrations.schema_migrations` is NOT source control; if the project
@@ -175,6 +216,7 @@ run the exit-test checks.
 | 7 | Vault (if needed) | zero grant leaks, audit firing |
 | 8 | Money guards (if needed) | fail/pass/pass triple |
 | 9 | Source import/cutover foundation | validation bundle passes |
+| 9A | Candidate locator/quote-hash hardening | locator readiness gate passes |
 | 10-11 | Survivability | repo checksum + restore rehearsal |
 
 Stop building after step 11. Use it before adding higher-level automation.
