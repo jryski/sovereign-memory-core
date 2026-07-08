@@ -1,6 +1,7 @@
 -- ============================================================================
 -- SOVEREIGN MEMORY :: RICHER CUTOVER PROBE CATEGORIES
 -- Target: Postgres 15+ / Supabase. Run after sql/04_source_import.sql.
+-- Docs: docs/04-implementation-guide.md Step 9B.
 --
 -- Purpose:
 --   Harden cutover verification beyond positive retrieval checks.
