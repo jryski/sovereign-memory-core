@@ -176,7 +176,7 @@ create table if not exists source_manifest (
   constraint source_manifest_action_zone check (
     (action='import' and target_zone in ('HOUSE','VAULT')) or
     (action='hold' and target_zone='HOLD') or
-    (action='exclude') or
+    (action='exclude' and target_zone='EVIDENCE') or
     (action='evidence' and target_zone='EVIDENCE')
   ),
   constraint source_manifest_review_required_target check (
@@ -287,7 +287,7 @@ create or replace view source_manifest_review_queue with (security_invoker=true)
   join source_import_batches sib on sib.id = si.batch_id
   join source_systems ss on ss.id = sib.source_system_id
   where sm.review_state in ('unreviewed','needs_review')
-     or sm.action='hold'
+     or (sm.action='hold' and sm.review_state not in ('waived','rejected'))
   order by si.created_at asc;
 
 create or replace view source_readiness with (security_invoker=true) as
@@ -304,7 +304,7 @@ create or replace view source_readiness with (security_invoker=true) as
       (select count(*) from source_manifest sm join source_items si on si.id=sm.source_item_id
         where si.batch_id=b.batch_id and sm.review_state in ('unreviewed','needs_review')) as review_pending,
       (select count(*) from source_manifest sm join source_items si on si.id=sm.source_item_id
-        where si.batch_id=b.batch_id and sm.action='hold' and sm.review_state <> 'waived') as unwaived_hold,
+        where si.batch_id=b.batch_id and sm.action='hold' and sm.review_state not in ('waived','rejected')) as unwaived_hold,
       (select count(*) from source_manifest_payload_drift(b.batch_id)) as payload_drift,
       (select count(*) from source_manifest sm join source_items si on si.id=sm.source_item_id
         where si.batch_id=b.batch_id and sm.action='import' and sm.review_state='approved' and sm.target_table is null) as approved_import_without_target
