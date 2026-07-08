@@ -10,7 +10,7 @@ set -euo pipefail
 # Notes:
 # - This is intended for a disposable local database.
 # - The script creates the Supabase-compatible `extensions` schema and shim roles
-#   (`anon`, `authenticated`) if they do not already exist.
+#   (`anon`, `authenticated`, `service_role`) if they do not already exist.
 # - The validation fixture rolls back its own staged data.
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
@@ -33,6 +33,9 @@ begin
   end if;
   if not exists (select 1 from pg_roles where rolname='authenticated') then
     create role authenticated nologin;
+  end if;
+  if not exists (select 1 from pg_roles where rolname='service_role') then
+    create role service_role nologin;
   end if;
 end $$;
 SQL
