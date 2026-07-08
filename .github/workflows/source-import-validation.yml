@@ -14,21 +14,6 @@ jobs:
   validate-source-import:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
 
@@ -36,10 +21,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install psql client
+      - name: Start local Postgres
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo systemctl start postgresql.service
+          sudo -u postgres psql -v ON_ERROR_STOP=1 <<'SQL'
+          alter user postgres with password 'postgres';
+          SQL
+          until pg_isready -h localhost -p 5432 -U postgres; do sleep 1; done
 
       - name: Validate source import/cutover layer
         run: bash scripts/validate_source_import.sh
