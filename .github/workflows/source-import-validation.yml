@@ -5,6 +5,7 @@ on:
     paths:
       - "sql/01_core.sql"
       - "sql/04_source_import.sql"
+      - "sql/05_candidate_locators.sql"
       - "sql/validation/source_import_readiness.sql"
       - "scripts/validate_source_import.sh"
       - "docs/04-implementation-guide.md"

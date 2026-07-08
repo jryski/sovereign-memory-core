@@ -47,6 +47,25 @@ from (
 ) as v(function_name, ok, remediation)
 cross join lateral (select case when ok then 'pass' else 'fail' end as state) s;
 
+insert into source_import_validation_results(check_group, object_name, state, severity, fatal, remediation)
+select 'required_column',
+       'source_manifest.'||column_name,
+       case when exists (
+         select 1 from information_schema.columns c
+         where c.table_schema='public'
+           and c.table_name='source_manifest'
+           and c.column_name=v.column_name
+       ) then 'pass' else 'fail' end,
+       'required',
+       true,
+       'Run sql/05_candidate_locators.sql when candidate locator hardening is expected.' as remediation
+from (values
+  ('source_locator'),
+  ('source_quote'),
+  ('source_quote_hash'),
+  ('source_quote_hash_algorithm')
+) as v(column_name);
+
 -- ---- function search_path posture ------------------------------------------
 insert into source_import_validation_results(check_group, object_name, state, severity, fatal, remediation)
 select 'function_posture',
@@ -139,9 +158,48 @@ with agent as (
   select id, 'raw_payload', 'fixture://'||source_item_key||'.json', payload_hash, 128, source_item_key
   from items
   returning id
+), manifest_source as (
+  select
+    id,
+    source_item_key,
+    payload_hash,
+    case source_item_key
+      when 'item-house' then 'decision: Use the boring durable schema.'
+      when 'item-vault' then 'health: review required'
+      when 'item-hold' then 'status: probably current?'
+      when 'item-evidence' then 'note: model review'
+      when 'item-exclude' then 'duplicate: true'
+    end as quote_text,
+    jsonb_build_object(
+      'scheme','fixture-json',
+      'path', jsonb_build_array('fixture', source_item_key),
+      'span', jsonb_build_object('kind','synthetic-fixture')
+    ) as locator
+  from items
 ), manifest as (
-  insert into source_manifest(source_item_id, action, target_zone, review_state, target_table, topic_key, workstream, suggested_summary, source_payload_hash_at_review, review_notes)
+  insert into source_manifest(
+    source_item_id,
+    manifest_key,
+    source_locator,
+    source_quote,
+    source_quote_hash,
+    source_quote_hash_algorithm,
+    action,
+    target_zone,
+    review_state,
+    target_table,
+    topic_key,
+    workstream,
+    suggested_summary,
+    source_payload_hash_at_review,
+    review_notes
+  )
   select id,
+         'candidate:'||source_item_key,
+         locator,
+         quote_text,
+         encode(digest(quote_text,'sha256'),'hex'),
+         'sha256',
          case source_item_key
            when 'item-house' then 'import'::source_item_action
            when 'item-vault' then 'import'::source_item_action
@@ -172,7 +230,7 @@ with agent as (
          'Fixture summary: '||source_item_key,
          payload_hash,
          'Fixture manifest row'
-  from items
+  from manifest_source
   returning id
 ), freeze_step as (
   select source_freeze_batch(batch.id, batch.created_by, jsonb_build_object('fixture', true, 'count', 5), 'validation fixture') as result
@@ -243,6 +301,22 @@ select 'smoke_test',
        remediation
 from source_readiness
 where batch_key='fixture-batch-001';
+
+insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+select 'smoke_test',
+       'candidate_locator_fixture',
+       case when count(*) filter (
+          where action in ('import','hold')
+            and source_locator <> '{}'::jsonb
+            and source_quote_hash is not null
+       ) = 3 then 'pass' else 'fail' end,
+       'required',
+       true,
+       'Import/HOLD fixture candidates should carry source locators and quote hashes.'
+from source_manifest sm
+join source_items si on si.id=sm.source_item_id
+join source_import_batches b on b.id=si.batch_id
+where b.batch_key='fixture-batch-001';
 
 insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
 select 'smoke_test',

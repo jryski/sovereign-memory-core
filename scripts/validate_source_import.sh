@@ -11,6 +11,7 @@ set -euo pipefail
 # - This is intended for a disposable local database.
 # - The script creates the Supabase-compatible `extensions` schema and shim roles
 #   (`anon`, `authenticated`, `service_role`) if they do not already exist.
+# - If sql/05_candidate_locators.sql exists, the script applies it before validation.
 # - The validation fixture rolls back its own staged data.
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
@@ -45,6 +46,11 @@ echo "==> Applying Tier 1 core"
 
 echo "==> Applying source import/cutover layer"
 "${PSQL[@]}" -f "${ROOT_DIR}/sql/04_source_import.sql"
+
+if [[ -f "${ROOT_DIR}/sql/05_candidate_locators.sql" ]]; then
+  echo "==> Applying candidate locator/quote-hash layer"
+  "${PSQL[@]}" -f "${ROOT_DIR}/sql/05_candidate_locators.sql"
+fi
 
 echo "==> Running source import validation bundle"
 "${PSQL[@]}" -f "${ROOT_DIR}/sql/validation/source_import_readiness.sql"
