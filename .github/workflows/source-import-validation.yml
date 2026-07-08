@@ -1,0 +1,38 @@
+name: Source Import Validation
+
+on:
+  pull_request:
+    paths:
+      - "sql/01_core.sql"
+      - "sql/04_source_import.sql"
+      - "sql/validation/source_import_readiness.sql"
+      - "scripts/validate_source_import.sh"
+      - "docs/04-implementation-guide.md"
+      - ".github/workflows/source-import-validation.yml"
+  workflow_dispatch:
+
+jobs:
+  validate-source-import:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+
+    steps:
+      - name: Quiet checkout
+        run: |
+          git init -q .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
+
+      - name: Start local Postgres
+        run: |
+          sudo systemctl start postgresql.service
+          sudo -u postgres psql -v ON_ERROR_STOP=1 <<'SQL'
+          alter user postgres with password 'postgres';
+          SQL
+          until pg_isready -h localhost -p 5432 -U postgres; do sleep 1; done
+
+      - name: Validate source import/cutover layer
+        run: bash scripts/validate_source_import.sh

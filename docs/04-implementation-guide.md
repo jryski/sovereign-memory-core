@@ -108,7 +108,50 @@ values ('Ballpark is around $5k','shared','system',0.5,'{"financial_unverified":
 ```
 Then perimeter: `select assert_perimeter_closed();`
 
-## Step 9: Source-control your migrations (not optional)
+## Step 9: Source import and authoritative cutover foundation
+Apply `04_source_import.sql` as migration `source_import_v1`.
+
+This step installs the generic source-import contract used by adapters and future tools.
+It should not be customized for a single prior source system.
+
+For disposable local validation, run the bundled helper from a fresh local database:
+
+```bash
+DATABASE_URL="postgres://postgres:postgres@localhost:5432/postgres" \
+  bash scripts/validate_source_import.sh
+```
+
+The helper creates local compatibility shims (`extensions`, `anon`, `authenticated`,
+`service_role`), applies `01_core.sql`, applies `04_source_import.sql`, and runs the
+rollback validation bundle. Use it for local review only; production/Supabase deployments
+should still apply DDL through migrations.
+
+- DONE, object/perimeter checks:
+```sql
+select 'perimeter' as t, assert_perimeter_closed() as v
+union all select 'source_systems', count(*)::text from information_schema.tables
+  where table_schema='public' and table_name='source_systems'
+union all select 'source_readiness', count(*)::text from information_schema.views
+  where table_schema='public' and table_name='source_readiness'
+union all select 'cutover_scorecard', count(*)::text from information_schema.views
+  where table_schema='public' and table_name='cutover_scorecard';
+```
+Expect: perimeter OK / source_systems 1 / source_readiness 1 / cutover_scorecard 1.
+
+- DONE, validation bundle:
+```sql
+\i sql/validation/source_import_readiness.sql
+```
+Expected behavior:
+- required objects pass;
+- function posture passes;
+- grant posture passes;
+- fixture smoke test returns readiness rows;
+- fixture scorecard shows one passing critical probe;
+- fixture rows are rolled back;
+- any required validation failure raises an error so CI fails.
+
+## Step 10: Source-control your migrations (not optional)
 Hosted `supabase_migrations.schema_migrations` is NOT source control; if the project
 dies, your schema dies with it. Set up per docs/05 section 1: export every migration to
 a git repo now, and adopt the rule that every future `apply_migration` gets its SQL
@@ -117,7 +160,7 @@ mirrored to the repo in the same session.
   `select version, name from supabase_migrations.schema_migrations order by version;`
   and the concatenation md5 matches the file (docs/05 has the exact query).
 
-## Step 10: First backup + restore rehearsal
+## Step 11: First backup + restore rehearsal
 Per docs/05 sections 2-3: take a pg_dump, restore it into a scratch vanilla Postgres,
 run the exit-test checks.
 - DONE: restore succeeds; row counts match; session_boot() runs on vanilla Postgres.
@@ -131,6 +174,7 @@ run the exit-test checks.
 | 5-6 | Contract installed, assistants booting | fresh-session boot test |
 | 7 | Vault (if needed) | zero grant leaks, audit firing |
 | 8 | Money guards (if needed) | fail/pass/pass triple |
-| 9-10 | Survivability | repo checksum + restore rehearsal |
+| 9 | Source import/cutover foundation | validation bundle passes |
+| 10-11 | Survivability | repo checksum + restore rehearsal |
 
-Stop building after step 10. Use it for a month before adding anything.
+Stop building after step 11. Use it before adding higher-level automation.
