@@ -148,7 +148,8 @@ Expected behavior:
 - grant posture passes;
 - fixture smoke test returns readiness rows;
 - fixture scorecard shows one passing critical probe;
-- fixture rows are rolled back.
+- fixture rows are rolled back;
+- any required validation failure raises an error so CI fails.
 
 ## Step 10: Source-control your migrations (not optional)
 Hosted `supabase_migrations.schema_migrations` is NOT source control; if the project

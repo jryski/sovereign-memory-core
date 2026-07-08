@@ -8,8 +8,20 @@
 
 set search_path to public, extensions;
 
+create temp table if not exists source_import_validation_results (
+  check_group text not null,
+  object_name text not null,
+  state text not null check (state in ('pass','warn','fail')),
+  severity text not null default 'required',
+  fatal boolean not null default true,
+  remediation text not null
+) on commit preserve rows;
+
+truncate source_import_validation_results;
+
 -- ---- object inventory --------------------------------------------------------
-select 'required_object' as check_group, object_name, state, remediation
+insert into source_import_validation_results(check_group, object_name, state, severity, fatal, remediation)
+select 'required_object', object_name, state, 'required', true, remediation
 from (
   values
     ('source_systems',              to_regclass('public.source_systems') is not null,              'Run sql/04_source_import.sql'),
@@ -23,25 +35,39 @@ from (
     ('cutover_runs',                to_regclass('public.cutover_runs') is not null,                'Run sql/04_source_import.sql'),
     ('cutover_scorecard',           to_regclass('public.cutover_scorecard') is not null,           'Run sql/04_source_import.sql')
 ) as v(object_name, ok, remediation)
-cross join lateral (select case when ok then 'pass' else 'fail' end as state) s
-order by object_name;
+cross join lateral (select case when ok then 'pass' else 'fail' end as state) s;
+
+insert into source_import_validation_results(check_group, object_name, state, severity, fatal, remediation)
+select 'required_function', function_name, state, 'required', true, remediation
+from (
+  values
+    ('source_freeze_batch',            to_regprocedure('public.source_freeze_batch(uuid,text,jsonb,text)') is not null, 'Run sql/04_source_import.sql'),
+    ('source_manifest_payload_drift',  to_regprocedure('public.source_manifest_payload_drift(uuid)') is not null,       'Run sql/04_source_import.sql'),
+    ('source_mark_batch_ready',        to_regprocedure('public.source_mark_batch_ready(uuid,text)') is not null,        'Run sql/04_source_import.sql')
+) as v(function_name, ok, remediation)
+cross join lateral (select case when ok then 'pass' else 'fail' end as state) s;
 
 -- ---- function search_path posture ------------------------------------------
-select 'function_posture' as check_group,
-       p.proname as object_name,
-       case when array_to_string(coalesce(p.proconfig,'{}'::text[]), ',') like '%search_path=public%' then 'pass' else 'fail' end as state,
-       'SECURITY DEFINER functions must pin search_path.' as remediation
+insert into source_import_validation_results(check_group, object_name, state, severity, fatal, remediation)
+select 'function_posture',
+       p.proname,
+       case when array_to_string(coalesce(p.proconfig,'{}'::text[]), ',') like '%search_path=public%' then 'pass' else 'fail' end,
+       'required',
+       true,
+       'SECURITY DEFINER functions must pin search_path.'
 from pg_proc p
 join pg_namespace n on n.oid=p.pronamespace
 where n.nspname='public'
-  and p.proname in ('source_freeze_batch','source_manifest_payload_drift','source_mark_batch_ready')
-order by p.proname;
+  and p.proname in ('source_freeze_batch','source_manifest_payload_drift','source_mark_batch_ready');
 
 -- ---- grant posture -----------------------------------------------------------
-select 'grant_posture' as check_group,
-       'table_or_view_grants' as object_name,
-       case when count(*)=0 then 'pass' else 'fail' end as state,
-       'Revoke table/view privileges from PUBLIC, anon, and authenticated.' as remediation
+insert into source_import_validation_results(check_group, object_name, state, severity, fatal, remediation)
+select 'grant_posture',
+       'table_or_view_grants',
+       case when count(*)=0 then 'pass' else 'fail' end,
+       'required',
+       true,
+       'Revoke table/view privileges from PUBLIC, anon, and authenticated.'
 from information_schema.role_table_grants
 where table_schema='public'
   and table_name in (
@@ -51,10 +77,13 @@ where table_schema='public'
   )
   and grantee in ('PUBLIC','anon','authenticated');
 
-select 'grant_posture' as check_group,
-       'function_execute_grants' as object_name,
-       case when count(*)=0 then 'pass' else 'fail' end as state,
-       'Revoke function execute privileges from PUBLIC, anon, and authenticated.' as remediation
+insert into source_import_validation_results(check_group, object_name, state, severity, fatal, remediation)
+select 'grant_posture',
+       'function_execute_grants',
+       case when count(*)=0 then 'pass' else 'fail' end,
+       'required',
+       true,
+       'Revoke function execute privileges from PUBLIC, anon, and authenticated.'
 from pg_proc p
 join pg_namespace n on n.oid=p.pronamespace and n.nspname='public'
 cross join lateral aclexplode(coalesce(p.proacl, acldefault('f',p.proowner))) acl
@@ -62,11 +91,25 @@ where p.proname in ('source_freeze_batch','source_manifest_payload_drift','sourc
   and acl.privilege_type='EXECUTE'
   and acl.grantee::regrole::text in ('anon','authenticated','-');
 
+select check_group, object_name, state, severity, remediation
+from source_import_validation_results
+order by check_group, object_name;
+
 -- ---- smoke test --------------------------------------------------------------
 -- This section proves the contract can stage, manifest, review, freeze, score,
--- and block readiness. It rolls back all fixture rows.
+-- block premature readiness, then pass readiness after blockers are resolved.
+-- It rolls back all fixture rows.
 
 begin;
+
+create temp table source_import_fixture_results (
+  check_group text not null,
+  object_name text not null,
+  state text not null check (state in ('pass','warn','fail')),
+  severity text not null default 'required',
+  fatal boolean not null default true,
+  remediation text not null
+) on commit drop;
 
 with agent as (
   select agent_id from trusted_agents where active order by case when agent_id='system' then 0 else 1 end, agent_id limit 1
@@ -84,11 +127,11 @@ with agent as (
   select batch.id, x.item_key, x.container, x.kind, x.title, encode(digest(x.payload,'sha256'),'hex'), length(x.payload)
   from batch
   cross join (values
-    ('item-house','chatgpt/project-alpha','conversation','Project alpha decision','{"kind":"conversation","decision":"Use the boring durable schema."}'),
-    ('item-vault','chatgpt/project-health','conversation','Sensitive health note','{"kind":"conversation","health":"review required"}'),
-    ('item-hold','claude/project-alpha','conversation','Maybe stale status','{"kind":"conversation","status":"probably current?"}'),
-    ('item-evidence','model/channel','message','Peer review note','{"kind":"message","note":"model review"}'),
-    ('item-exclude','chatgpt/project-alpha','conversation','Duplicate throwaway chat','{"kind":"conversation","duplicate":true}')
+    ('item-house','fixture/project-alpha','conversation','Project alpha decision','{"kind":"conversation","decision":"Use the boring durable schema."}'),
+    ('item-vault','fixture/project-health','conversation','Sensitive health note','{"kind":"conversation","health":"review required"}'),
+    ('item-hold','fixture/project-alpha','conversation','Maybe stale status','{"kind":"conversation","status":"probably current?"}'),
+    ('item-evidence','fixture/channel','message','Peer review note','{"kind":"message","note":"model review"}'),
+    ('item-exclude','fixture/project-alpha','conversation','Duplicate throwaway chat','{"kind":"conversation","duplicate":true}')
   ) as x(item_key, container, kind, title, payload)
   returning id, source_item_key, payload_hash
 ), evidence as (
@@ -145,20 +188,112 @@ with agent as (
   from probe cross join batch
   returning id
 )
-select 'smoke_test' as check_group,
-       check_key as object_name,
+select count(*) as fixture_rows_created
+from manifest;
+
+do $$
+declare
+  v_batch_id uuid;
+  v_agent text;
+begin
+  select b.id, b.created_by
+    into v_batch_id, v_agent
+  from source_import_batches b
+  where b.batch_key='fixture-batch-001';
+
+  begin
+    perform source_mark_batch_ready(v_batch_id, v_agent);
+    insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+    values ('smoke_test', 'source_mark_batch_ready_blocks_unresolved', 'fail', 'required', true,
+            'source_mark_batch_ready should reject batches with unresolved readiness blockers.');
+  exception
+    when others then
+      insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+      values (
+        'smoke_test',
+        'source_mark_batch_ready_blocks_unresolved',
+        case when sqlerrm like 'source_mark_batch_ready:%blocker%' then 'pass' else 'fail' end,
+        'required',
+        true,
+        'source_mark_batch_ready should reject batches with unresolved readiness blockers.'
+      );
+  end;
+end $$;
+
+update source_manifest sm
+set review_state = case
+      when sm.action='hold' then 'waived'::source_review_state
+      when sm.review_state='needs_review' then 'approved'::source_review_state
+      else sm.review_state
+    end,
+    reviewed_by = b.created_by,
+    reviewed_at = now()
+from source_items si
+join source_import_batches b on b.id=si.batch_id
+where sm.source_item_id=si.id
+  and b.batch_key='fixture-batch-001'
+  and sm.review_state in ('needs_review','unreviewed');
+
+insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+select 'smoke_test',
+       check_key,
        state,
+       severity,
+       severity='blocker',
        remediation
 from source_readiness
-where batch_key='fixture-batch-001'
-order by check_key;
+where batch_key='fixture-batch-001';
 
-select 'smoke_test' as check_group,
-       'cutover_scorecard_fixture' as object_name,
-       case when probes_defined=1 and probes_run=1 and probes_passed=1 and critical_misses=0 then 'pass' else 'fail' end as state,
-       'Cutover scorecard should reflect one passing critical probe.' as remediation
+insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+select 'smoke_test',
+       'cutover_scorecard_fixture',
+       case when probes_defined=1 and probes_run=1 and probes_passed=1 and critical_misses=0 then 'pass' else 'fail' end,
+       'required',
+       true,
+       'Cutover scorecard should reflect one passing critical probe.'
 from cutover_scorecard cs
 join source_import_batches b on b.id=cs.batch_id
 where b.batch_key='fixture-batch-001';
 
+insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+select 'smoke_test',
+       'source_mark_batch_ready_after_resolution',
+       case when source_mark_batch_ready(b.id, b.created_by)='ready' then 'pass' else 'fail' end,
+       'required',
+       true,
+       'source_mark_batch_ready should mark the batch ready after blockers are resolved.'
+from source_import_batches b
+where b.batch_key='fixture-batch-001';
+
+select check_group, object_name, state, severity, remediation
+from source_import_fixture_results
+order by check_group, object_name;
+
+do $$
+declare
+  fail_count integer;
+begin
+  select count(*) into fail_count
+  from source_import_fixture_results
+  where fatal and state='fail';
+
+  if fail_count > 0 then
+    raise exception 'source import fixture validation failed: % failing check(s)', fail_count;
+  end if;
+end $$;
+
 rollback;
+
+-- ---- fatal assertion ---------------------------------------------------------
+do $$
+declare
+  fail_count integer;
+begin
+  select count(*) into fail_count
+  from source_import_validation_results
+  where fatal and state='fail';
+
+  if fail_count > 0 then
+    raise exception 'source import validation failed: % failing check(s)', fail_count;
+  end if;
+end $$;
