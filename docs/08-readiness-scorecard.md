@@ -91,8 +91,10 @@ Claims without evidence do not count.
 - [ ] Restore rehearsal documented and repeated after schema overhauls.
 - [ ] Weekly ops ritual exists and is usable by any approved assistant.
 - [ ] Migration drift check exists.
-- [ ] Failed embeddings, hot-touch backlog, review queue, and overdue deadlines are surfaced.
-- [ ] Incident runbook exists for bad writes, leaked credentials, failed restore, and integrity mismatch.
+- [ ] Derived-index backlog, attention backlog, review queue, and overdue deadlines are surfaced.
+- [ ] Bulk transfers avoid model context and tool stdin when server-side staging or file transfer is available.
+- [ ] Bulk transfers are verified by counts and checksums before import or promotion.
+- [ ] Incident runbook exists for bad writes, leaked credentials, failed restore, integrity mismatch, and corrupted transfer.
 
 ## 9. Multi-model coordination
 
@@ -106,7 +108,7 @@ Claims without evidence do not count.
 ## 10. Repo quality
 
 - [ ] README distinguishes core repo from UI repo.
-- [ ] STATUS file tracks repo/live divergence.
+- [ ] STATUS file tracks repo/live divergence without embedding one deployment's private inventory.
 - [ ] All SQL is versioned and idempotent or clearly migration-scoped.
 - [ ] Acceptance tests are copy-pasteable or scriptable.
 - [ ] Every high-risk claim is either tested or downgraded.
@@ -120,7 +122,7 @@ Claims without evidence do not count.
 3. No stored provider-exit evidence artifact in repo.
 4. Least-privilege access hardening is designed conceptually but not implemented.
 5. UI/review workflow is split to a new repo and not yet complete.
-6. Peer review of the hardening pass is pending.
+6. Peer review of the SQL implementation is pending.
 
 ## Target definition of done
 
