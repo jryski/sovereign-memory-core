@@ -136,11 +136,12 @@ create table if not exists source_payload_evidence (
   size_bytes          bigint check (size_bytes is null or size_bytes >= 0),
   content_preview     text,
   metadata            jsonb not null default '{}',
-  created_at          timestamptz not null default now(),
-  unique (source_item_id, evidence_kind, coalesce(location,''), coalesce(payload_hash,''))
+  created_at          timestamptz not null default now()
 );
 
 create index if not exists idx_source_payload_evidence_item on source_payload_evidence(source_item_id);
+create unique index if not exists source_payload_evidence_natural_key
+  on source_payload_evidence(source_item_id, evidence_kind, coalesce(location,''), coalesce(payload_hash,''));
 
 -- ---- manifest decisions -----------------------------------------------------
 create table if not exists source_manifest (
