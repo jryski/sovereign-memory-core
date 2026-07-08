@@ -131,13 +131,13 @@ with agent as (
          'Fixture manifest row'
   from items
   returning id
-), freeze as (
+), freeze_step as (
   select source_freeze_batch(batch.id, batch.created_by, jsonb_build_object('fixture', true, 'count', 5), 'validation fixture') as result
   from batch
 ), probe as (
   insert into cutover_probes(batch_id, probe_key, probe_type, severity, prompt, expect_substring)
   select batch.id, 'fixture-alpha-decision', 'project-state', 'critical', 'What did project alpha decide?', 'boring durable schema'
-  from batch
+  from batch cross join freeze_step
   returning id
 ), run as (
   insert into cutover_runs(probe_id, runner_agent, matched, observed_answer, notes)
