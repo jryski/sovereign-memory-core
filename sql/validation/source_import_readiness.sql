@@ -6,6 +6,8 @@
 -- and rolls back so it can be used repeatedly on a local validation database.
 -- ============================================================================
 
+set search_path to public, extensions;
+
 -- ---- object inventory --------------------------------------------------------
 select 'required_object' as check_group, object_name, state, remediation
 from (
