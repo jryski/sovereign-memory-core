@@ -90,5 +90,19 @@ When `DATABASE_URL` is set, the validator also runs
 `sql/validation/load_chat_mine_package.sql`. That rollback-only smoke path loads the
 package into `source_systems`, `source_import_batches`, `source_items`,
 `source_payload_evidence`, `source_manifest`, and `cutover_probes`, verifies the expected
-row counts and one-to-many candidate relationship, and then rolls back. Use only a local
-or disposable database; the script does not target Supabase itself.
+row counts, payload hashes, manifest uniqueness, one-to-many candidate relationship,
+locator/hash posture, five probe categories, and expected `source_readiness` states. It
+then rolls back and verifies no fixture rows remain.
+
+Run the complete local/disposable path after applying the core schema:
+
+```bash
+export DATABASE_URL="postgres://postgres:postgres@localhost:5432/postgres"
+bash scripts/validate_source_import.sh
+bash scripts/validate_chat_mine_export.sh
+```
+
+**Safety warning:** use only a fresh local or otherwise disposable database. Do not point
+this command at production or live Supabase. The smoke path is intentionally
+rollback-only, never calls `source_mark_batch_ready`, and does not mark the fixture batch
+ready, cut over, or authoritative.
