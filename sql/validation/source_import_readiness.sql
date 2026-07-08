@@ -75,7 +75,7 @@ with agent as (
   returning id
 ), batch as (
   insert into source_import_batches(source_system_id, batch_key, source_item_count, exported_item_count, created_by)
-  select sys.id, 'fixture-batch-001', 4, 4, agent.agent_id from sys cross join agent
+  select sys.id, 'fixture-batch-001', 5, 5, agent.agent_id from sys cross join agent
   returning id, created_by
 ), items as (
   insert into source_items(batch_id, source_item_key, source_container, source_kind, title, payload_hash, payload_size_bytes)
@@ -85,7 +85,8 @@ with agent as (
     ('item-house','chatgpt/project-alpha','conversation','Project alpha decision','{"kind":"conversation","decision":"Use the boring durable schema."}'),
     ('item-vault','chatgpt/project-health','conversation','Sensitive health note','{"kind":"conversation","health":"review required"}'),
     ('item-hold','claude/project-alpha','conversation','Maybe stale status','{"kind":"conversation","status":"probably current?"}'),
-    ('item-evidence','model/channel','message','Peer review note','{"kind":"message","note":"model review"}')
+    ('item-evidence','model/channel','message','Peer review note','{"kind":"message","note":"model review"}'),
+    ('item-exclude','chatgpt/project-alpha','conversation','Duplicate throwaway chat','{"kind":"conversation","duplicate":true}')
   ) as x(item_key, container, kind, title, payload)
   returning id, source_item_key, payload_hash
 ), evidence as (
@@ -100,6 +101,7 @@ with agent as (
            when 'item-house' then 'import'::source_item_action
            when 'item-vault' then 'import'::source_item_action
            when 'item-hold' then 'hold'::source_item_action
+           when 'item-exclude' then 'exclude'::source_item_action
            else 'evidence'::source_item_action
          end,
          case source_item_key
@@ -112,6 +114,7 @@ with agent as (
            when 'item-house' then 'approved'::source_review_state
            when 'item-vault' then 'needs_review'::source_review_state
            when 'item-hold' then 'needs_review'::source_review_state
+           when 'item-exclude' then 'rejected'::source_review_state
            else 'approved'::source_review_state
          end,
          case source_item_key
@@ -127,7 +130,7 @@ with agent as (
   from items
   returning id
 ), freeze as (
-  select source_freeze_batch(batch.id, batch.created_by, jsonb_build_object('fixture', true, 'count', 4), 'validation fixture') as result
+  select source_freeze_batch(batch.id, batch.created_by, jsonb_build_object('fixture', true, 'count', 5), 'validation fixture') as result
   from batch
 ), probe as (
   insert into cutover_probes(batch_id, probe_key, probe_type, severity, prompt, expect_substring)
