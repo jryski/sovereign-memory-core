@@ -114,6 +114,18 @@ Apply `04_source_import.sql` as migration `source_import_v1`.
 This step installs the generic source-import contract used by adapters and future tools.
 It should not be customized for a single prior source system.
 
+For disposable local validation, run the bundled helper from a fresh local database:
+
+```bash
+DATABASE_URL="postgres://postgres:postgres@localhost:5432/postgres" \
+  bash scripts/validate_source_import.sh
+```
+
+The helper creates local compatibility shims (`extensions`, `anon`, `authenticated`),
+applies `01_core.sql`, applies `04_source_import.sql`, and runs the rollback validation
+bundle. Use it for local review only; production/Supabase deployments should still apply
+DDL through migrations.
+
 - DONE, object/perimeter checks:
 ```sql
 select 'perimeter' as t, assert_perimeter_closed() as v
