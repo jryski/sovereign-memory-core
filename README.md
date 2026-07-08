@@ -21,6 +21,7 @@ See:
 - [`docs/07-source-import-cutover.md`](docs/07-source-import-cutover.md) for the source import and authoritative cutover plan.
 - [`docs/08-readiness-scorecard.md`](docs/08-readiness-scorecard.md) for the 10/10 checklist.
 - [`docs/09-source-adapters.md`](docs/09-source-adapters.md) for real-world source adapter patterns.
+- [`docs/10-chat-mine-source-import-exporter.md`](docs/10-chat-mine-source-import-exporter.md) for the first internal Chat-Mine producer slice.
 
 ## Why this exists
 
@@ -60,6 +61,7 @@ docs/06-patterns.md             transferable design patterns
 docs/07-source-import-cutover.md source import and authoritative cutover plan
 docs/08-readiness-scorecard.md  10/10 readiness checklist
 docs/09-source-adapters.md      real-world import source adapter matrix
+docs/10-chat-mine-source-import-exporter.md  internal Chat-Mine package exporter
 ```
 
 ## Quick start for a fresh deployment
