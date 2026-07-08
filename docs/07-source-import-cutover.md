@@ -28,6 +28,7 @@ The same cutover discipline applies regardless of source.
 6. **No silent overwrite.** Corrections supersede. Imported conflicts are surfaced.
 7. **Cutover by tests, not vibes.** Readiness checks and recall probes must pass before the new store is declared authoritative.
 8. **Rollback remains possible.** Prior sources remain readable until the new store has passed a confidence window.
+9. **Bulk data must not transit model context.** Stage large exports server-side or as files, then verify transfer with row counts and checksums.
 
 ## Target architecture after cutover
 
@@ -122,6 +123,8 @@ Export data in a format that can be verified outside the original system.
 - Store export metadata: source, batch, timestamp, tool, row count, hash algorithm.
 - Do not normalize while exporting.
 - Do not rely on semantic search output as an export. Export the source records.
+- Do not relay bulk source data through model context, chat transcripts, or tool stdin when a server-side export or file transfer is available.
+- Verify exports and transfers by item count plus checksum before import.
 
 ### Required export evidence
 
@@ -135,6 +138,8 @@ export_sha256:
 payload_hash_algorithm:
 exported_at:
 exported_by:
+transfer_method:
+transfer_verified_by:
 notes:
 ```
 
@@ -307,7 +312,7 @@ Recommended gates:
 - no unmanifested source items;
 - readiness checks pass;
 - critical cutover probes pass;
-- no unexplained failed embeddings or pending attention backlog;
+- no unexplained derived-index backlog or pending attention backlog;
 - review queue is understood;
 - backup and restore evidence exists;
 - cross-model review complete where applicable;
