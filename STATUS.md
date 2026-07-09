@@ -27,6 +27,7 @@ The repository currently contains:
 - Source-import validation with fatal blocker enforcement and rollback fixtures
 - First internal Chat-Mine producer slice with deterministic package validation and a rollback loader smoke path
 - Architecture, security, agent operations, implementation, operations, and pattern docs
+- Roadmap, ADR, contribution, security, support, issue template, and PR template scaffolding
 - A verified baseline claim against vanilla PostgreSQL 16
 
 ## Drift policy
@@ -91,6 +92,10 @@ internal producer aligned with that contract, not a public interchange protocol.
 The next gap is operational adoption: real source adapters, review UI, Hermes orchestration,
 and dry runs against representative exports. Those layers must preserve the core review and
 conflict posture rather than bypassing it.
+
+Repository coordination should use `docs/roadmap.md`, `docs/project-management.md`, and
+`docs/adr/` so roadmap, issues, PRs, milestones, decisions, and releases remain visible outside
+any single chat transcript.
 
 Deployment-specific inventories should be maintained outside this public/reusable status document.
 
