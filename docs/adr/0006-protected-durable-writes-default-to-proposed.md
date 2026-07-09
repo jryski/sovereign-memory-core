@@ -12,7 +12,7 @@ Agents can help draft memory updates, but protected durable scopes need a conser
 
 For protected durable scopes, agent-initiated writes default to proposed unless the human explicitly requested that exact write in the current turn.
 
-This reflects the Warden/ECHO seq 140 ruling summarized in issue #34.
+This reflects the durable-write policy ruling recorded in issue #34.
 
 ## Consequences
 

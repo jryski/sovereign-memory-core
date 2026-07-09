@@ -39,17 +39,7 @@ Examples:
 
 Open draft PRs for coordination. Mark a PR ready only after the stated validation has passed.
 
-Each PR should include:
-
-```md
-## Summary
-## Issues addressed
-## Files changed
-## Validation run
-## Public-safety checks
-## Supabase/live-state note
-## Remaining follow-ups
-```
+Use [.github/pull_request_template.md](.github/pull_request_template.md) as the source of truth for PR body structure. In short, every PR should explain what changed, what issue it addresses, which files changed, what validation ran, what public-safety checks passed, whether any live state was touched, and what remains.
 
 ## Validation expectations
 

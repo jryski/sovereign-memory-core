@@ -83,6 +83,8 @@ Documented labels:
 
 This PR documents the taxonomy only. Creating or updating labels, milestones, and Projects can be done later through GitHub when explicitly approved.
 
+Issue templates may reference labels before those labels exist in GitHub. The taxonomy should be created in GitHub before template frontmatter labels are expected to apply reliably. GitHub's default label may be `good first issue`, while this taxonomy proposes `good-first-issue`; reconcile that naming in the future label-creation task rather than changing labels in this PR.
+
 ## Issue practice
 
 Issues should state:
@@ -98,15 +100,7 @@ Research issues should also state what evidence would make the research actionab
 
 ## PR practice
 
-Each PR should include:
-
-- summary
-- issues addressed
-- files changed
-- validation run
-- public-safety checks
-- Supabase/live-state note
-- remaining follow-ups
+Use [.github/pull_request_template.md](../.github/pull_request_template.md) as the source of truth for PR body structure.
 
 Draft PRs are appropriate for coordination. Ready-for-review means the author believes validation is complete for the stated scope.
 
@@ -115,3 +109,13 @@ Draft PRs are appropriate for coordination. Ready-for-review means the author be
 Use [docs/adr/0000-template.md](adr/0000-template.md) for decisions that affect architecture, trust posture, conformance, or contribution rules.
 
 ADRs should be short. They record decisions and consequences; they do not replace implementation docs.
+
+## Operational setup follow-ups
+
+Documented but intentionally deferred:
+
+- create actual GitHub labels, milestones, and the `SMP Roadmap` Project board;
+- decide LICENSE and contribution terms;
+- add `scripts/public_safety_check.sh`;
+- add a markdown link-check script or CI job;
+- add an ADR index later if ADR count grows.
