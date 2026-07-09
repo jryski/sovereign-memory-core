@@ -25,6 +25,8 @@ See:
 - [`docs/roadmap.md`](docs/roadmap.md) for milestones, release targets, and track separation.
 - [`docs/project-management.md`](docs/project-management.md) for the GitHub-native operating model.
 - [`STATUS.md`](STATUS.md) for current completeness and readiness.
+- [`docs/publication/smp-custody-layer.md`](docs/publication/smp-custody-layer.md) for the Draft 0.3 SMP custody-layer specification.
+- [`docs/publication/smp-conformance-gap-audit.md`](docs/publication/smp-conformance-gap-audit.md) for the Draft 0.3 conformance gap audit.
 - [`docs/07-source-import-cutover.md`](docs/07-source-import-cutover.md) for the source import and authoritative cutover plan.
 - [`docs/08-readiness-scorecard.md`](docs/08-readiness-scorecard.md) for the 10/10 checklist.
 - [`docs/09-source-adapters.md`](docs/09-source-adapters.md) for real-world source adapter patterns.
@@ -76,6 +78,8 @@ docs/07-source-import-cutover.md source import and authoritative cutover plan
 docs/08-readiness-scorecard.md  10/10 readiness checklist
 docs/09-source-adapters.md      real-world import source adapter matrix
 docs/10-chat-mine-source-import-exporter.md  internal Chat-Mine package exporter
+docs/publication/smp-custody-layer.md        Draft 0.3 custody-layer specification
+docs/publication/smp-conformance-gap-audit.md Draft 0.3 conformance gap audit
 docs/roadmap.md                 milestones, release targets, and tracks
 docs/project-management.md      GitHub-native roadmap, labels, issues, and ADR model
 docs/adr/                       architecture decision records
