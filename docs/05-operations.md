@@ -64,7 +64,7 @@ pg_restore -d "postgresql://postgres:x@localhost:55432/postgres" --no-owner back
 
 Pass criteria on the scratch database:
 1. Row counts per table match the source at dump time.
-2. `select session_boot('alex');` executes (proves the function surface is vanilla-
+2. `select session_boot('example-user');` executes (proves the function surface is vanilla-
    Postgres portable).
 3. Any payload-hash joins (vault `source_link` vs recomputed sha256) return zero
    mismatches.
