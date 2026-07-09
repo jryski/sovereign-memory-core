@@ -71,12 +71,12 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 | R3 | EXCLUDE candidates MUST NOT become memory. | Partial | Exclusion accounting exists; add direct negative promotion test. |
 | R4 | EVIDENCE candidates MUST NOT normalize into memory fact. | Partial | Evidence posture exists; add direct negative promotion test. |
 | R5 | Promotion requires explicit review decision by principal/delegate. | Gap | Review UI/workflow is future work; current loader is dry-run/rollback only. |
-| R6 | No import path may auto-promote to authority. | Covered | Current loader proof does not mark batch ready/cutover/authoritative. Add regression test if not already explicit. |
+| R6 | No import path may auto-promote to authority. | Partial | Current loader proof does not mark batch ready/cutover/authoritative; broader import-path promotion guards still need direct regression coverage. |
 | H1 | Evidence fields SHOULD include payload hash, package checksum, source key, locator, quote, quote hash, algorithm, manifest key, source system, batch, timestamps. | Partial | Many fields exist; full SHOULD list needs schema inventory. |
 | H2 | Source-text candidates MUST carry source quote and quote hash. | Covered | Candidate quote hashes are validated; mutation tests cover hash mismatches. |
 | H3 | Quote hash proves custody, not correctness. | Informative/doctrine | No test required beyond docs clarity. |
 | E1 | Store treats emitter output as proposed input. | Partial | Source manifest/review posture exists; direct store-level guard is future review workflow. |
-| E2 | Structurally valid package alone MUST NOT promote candidate. | Covered | Loader dry-run never marks authoritative; negative tests protect validation but not truth promotion. |
+| E2 | Structurally valid package alone MUST NOT promote candidate. | Partial | Loader dry-run never marks authoritative; broader store-level truth-promotion guards remain future review workflow work. |
 | C1 | Adapter profile maps source item identity, raw preservation, hashes, candidates, provenance, timestamps, conflicts, review states, unsupported fields, round-trip/export, probes. | Future profile | Create adapter profile template. |
 | C2 | Adapter profile declares lossiness. | Future profile | Add required section to adapter profile template. |
 | C3 | Non-round-tripped fields must be declared, not silently dropped. | Future profile | Needs round-trip fixture/profile tests. |
@@ -85,7 +85,7 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 | CNF3 | Store-conformant enforces I1, I3, I5 on ingest. | Partial | I1 mostly covered; I3/I5 general enforcement gaps remain. |
 | CNF4 | Promoted-record in-place mutation structurally impossible or content-hash audited. | Gap | A prior review identified silent content-update risk in deployment-style wiki pages; repo needs source-import/store audit decision. |
 | CNF5 | Cutover-conformant executes full lifecycle and records probe results, review decisions, cutover declaration. | Gap | Full lifecycle beyond dry-run/readiness not complete. |
-| CT1 | Third-party verification can confirm all source items accounted for. | Covered | Fixture/readiness validation covers current source-import package paths. |
+| CT1 | Third-party verification can confirm all source items accounted for. | Partial | Fixture/readiness validation covers current source-import package paths; full third-party/offline verification is not complete. |
 | CT2 | Third-party verification can confirm consequential imported facts trace to evidence. | Partial | Evidence tracing exists; consequential-domain enforcement is partial. |
 | CT3 | Third-party verification can confirm conflicts/stale claims preserved. | Partial | Probe categories exist; fixture coverage should be expanded. |
 | CT4 | Third-party verification can confirm agent-generated content not promoted as human authority. | Gap | Needs explicit attribution/provenance fixture and negative test. |
