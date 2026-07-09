@@ -25,6 +25,9 @@ if [[ -n "${DATABASE_URL:-}" ]]; then
     -v package_json="${PACKAGE_JSON}" \
     -f "${ROOT_DIR}/sql/validation/load_chat_mine_package.sql"
   echo "PASS: Chat-Mine package loads into the core schema and rolls back"
+  python3 "${ROOT_DIR}/scripts/test_chat_mine_loader_negative.py" \
+    "${GENERATED}" \
+    "${ROOT_DIR}/sql/validation/load_chat_mine_package.sql"
 fi
 
 echo "PASS: Chat-Mine package generation is deterministic and matches the fixture"

@@ -106,3 +106,9 @@ bash scripts/validate_chat_mine_export.sh
 this command at production or live Supabase. The smoke path is intentionally
 rollback-only, never calls `source_mark_batch_ready`, and does not mark the fixture batch
 ready, cut over, or authoritative.
+
+When `DATABASE_URL` is set, the same command also runs five negative SQL corruption
+cases covering payload-evidence hash linkage, candidate quote hashes, import/HOLD
+locators, per-item manifest-key uniqueness, and probe-category coverage. Every case must
+fail and leave zero fixture source rows. The negative runner refuses any database URL
+whose host is not `localhost`, `127.0.0.1`, or `::1`.
