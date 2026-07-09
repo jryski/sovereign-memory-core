@@ -9,11 +9,13 @@ This repository is the **core database/schema and operations package**. The brow
 ## Current status
 
 This repo contains the baseline core schema, vault schema, provenance guards, security model,
-agent operating contract, build guide, and operations guide.
+agent operating contract, build guide, operations guide, and the merged source-import/cutover
+foundation.
 
-A live deployment may evolve beyond the baseline scripts with source-import, migration,
-readiness, and cutover controls. Those controls should be reconciled back into this repo before
-that deployment is treated as reproducible from source.
+The core now includes generic source staging, manifest review, candidate-level provenance,
+readiness checks, and richer cutover probes. The Chat-Mine exporter is the first small internal
+producer aligned with that contract; it is not a public interchange protocol. Review UI, Hermes
+orchestration, adapters for real source exports, and operational dry runs remain future work.
 
 See:
 
@@ -42,7 +44,9 @@ See:
 | Tier 1: Shared knowledge base | Memories, wiki pages, attention index, deadlines, doc integrity, agent registry, and coordination channel | `sql/01_core.sql` |
 | Tier 2: Private vault (optional) | Locked schemas for identity / health / finance with temporal truth, preserve-then-normalize import, and an audit change log | `sql/02_vault.sql` |
 | Provenance guards (optional) | Triggers that reject financial figures lacking a real source | `sql/03_provenance_guards.sql` |
-| Source import/cutover controls | Manifest, freeze or watermark controls, export views, readiness checks, and cutover probes for adopting Sovereign Memory as authoritative | pending reconciliation |
+| Source import/cutover foundation | Source registry, import batches, raw evidence, manifest review, readiness checks, and cutover scorecards | `sql/04_source_import.sql` |
+| Candidate provenance | Candidate-level source locators, support quotes, and quote hashes for one-item-to-many-candidate imports | `sql/05_candidate_locators.sql` |
+| Richer cutover probes | Positive, negative, conflict, stale-state, and evidence-request probe categories | `sql/06_cutover_probe_categories.sql` |
 
 ## Repo map
 
@@ -52,6 +56,9 @@ STATUS.md                       current readiness and repo/live divergence
 sql/01_core.sql                 Tier 1, one idempotent script
 sql/02_vault.sql                Tier 2 private schemas + audit trail
 sql/03_provenance_guards.sql    financial provenance enforcement
+sql/04_source_import.sql        source-import and cutover foundation
+sql/05_candidate_locators.sql   candidate locators and quote hashes
+sql/06_cutover_probe_categories.sql  richer cutover probe categories
 docs/01-architecture.md         concepts, zones, multi-agent model
 docs/02-security-model.md       the actual security boundary, and the traps
 docs/03-agent-operations.md     operating contract and assistant setup
@@ -112,8 +119,12 @@ The baseline SQL scripts were applied end to end on vanilla PostgreSQL 16 with s
 session_boot, supersede + audit, delete-guard rejection, channel round trip, vault audit
 triggers with zero grant leaks, and the provenance fail/pass/pass triple.
 
-An active production system can contain additional migration/cutover objects not yet fully
-reconciled into this repo. `STATUS.md` tracks that type of gap.
+The source-import/cutover suite also verifies required objects, security-definer search paths,
+grant posture, fixture rollback, and fatal readiness blockers. Candidate locator/quote-hash
+coverage and all five richer cutover probe categories are included in that gate. The first
+internal Chat-Mine producer slice additionally validates deterministic package output,
+one-source-item-to-many-candidate mapping, candidate quote hashes, and a rollback-only load into
+the merged core schema.
 
 ## License / provenance
 
