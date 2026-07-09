@@ -30,8 +30,8 @@ The merged foundation is known to include:
 - rollback-only loader proof;
 - negative package mutation tests;
 - negative SQL corruption tests;
-- shared non-local database refusal for source-import validation, plus the existing Chat-Mine
-  negative-loader refusal;
+- shared non-local database refusal for source-import and Chat-Mine package validation, plus the
+  existing Chat-Mine negative-loader refusal;
 - current tracked-file public-readiness scrub.
 
 This foundation strongly covers custody rails. It does **not** yet cover the entire Draft 0.3 normative surface.
