@@ -10,6 +10,8 @@ on:
       - "sql/validation/source_import_readiness.sql"
       - "sql/validation/load_chat_mine_package.sql"
       - "scripts/validate_source_import.sh"
+      - "scripts/lib/safe_database_target.sh"
+      - "scripts/test_safe_database_target.sh"
       - "scripts/export_chat_mine_package.py"
       - "scripts/validate_chat_mine_export.sh"
       - "scripts/validate_chat_mine_package.py"
@@ -46,6 +48,9 @@ jobs:
 
       - name: Validate source import/cutover layer
         run: bash scripts/validate_source_import.sh
+
+      - name: Validate database target guard
+        run: bash scripts/test_safe_database_target.sh
 
       - name: Validate Chat-Mine source-import package
         run: bash scripts/validate_chat_mine_export.sh

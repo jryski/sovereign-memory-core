@@ -22,6 +22,8 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
 fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${ROOT_DIR}/scripts/lib/safe_database_target.sh"
+require_safe_database_url "${DATABASE_URL}"
 PSQL=(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1)
 
 echo "==> Preparing local Postgres compatibility shims"
