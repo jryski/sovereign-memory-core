@@ -86,6 +86,10 @@ compares output with the checked-in expected package, and independently verifies
 - one source item producing multiple candidates;
 - active starter probes across all five merged probe categories.
 
+The same command also generates seven temporary corrupted packages and proves the
+validator rejects quote-hash, package-checksum, payload-hash, locator, candidate-hash,
+manifest-key uniqueness, and probe-category failures with the expected diagnostic.
+
 When `DATABASE_URL` is set, the validator also runs
 `sql/validation/load_chat_mine_package.sql`. That rollback-only smoke path loads the
 package into `source_systems`, `source_import_batches`, `source_items`,

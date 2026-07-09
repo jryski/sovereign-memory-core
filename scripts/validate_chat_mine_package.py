@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -46,15 +47,26 @@ def validate_candidate(
     messages: list[dict[str, Any]],
 ) -> None:
     key = candidate["manifest_key"]
+    action = candidate["action"]
     require(
-        candidate["target_zone"] in ACTION_ZONES.get(candidate["action"], set()),
+        candidate["target_zone"] in ACTION_ZONES.get(action, set()),
         f"{key}: action/target_zone does not satisfy source_manifest",
     )
     require(
         "source_payload_hash_at_review" not in candidate,
         f"{key}: producer must not claim an unperformed review",
     )
-    locator = candidate["source_locator"]
+    locator = candidate.get("source_locator")
+    if action in {"import", "hold"}:
+        require(
+            isinstance(locator, dict) and bool(locator),
+            f"{key}: import/HOLD candidate requires source_locator",
+        )
+        require(
+            bool(candidate.get("source_quote_hash")),
+            f"{key}: import/HOLD candidate requires source_quote_hash",
+        )
+    require(isinstance(locator, dict) and bool(locator), f"{key}: source_locator is required")
     message = messages[locator["message_index"]]
     require(message["message_id"] == locator["message_id"], f"{key}: locator mismatch")
     quote = message["content"][
@@ -66,7 +78,7 @@ def validate_candidate(
         f"{key}: unsupported quote hash algorithm",
     )
     require(
-        sha256_hex(quote.encode("utf-8")) == candidate["source_quote_hash"],
+        sha256_hex(quote.encode("utf-8")) == candidate.get("source_quote_hash"),
         f"{key}: quote hash mismatch",
     )
 
@@ -98,7 +110,10 @@ def validate_package(package: dict[str, Any]) -> None:
         item_keys.add(item_key)
 
         payload = canonical_bytes(item["raw_payload"])
-        require(sha256_hex(payload) == item["payload_hash"], f"{item_key}: payload hash")
+        require(
+            sha256_hex(payload) == item["payload_hash"],
+            f"{item_key}: payload hash mismatch",
+        )
         require(len(payload) == item["payload_size_bytes"], f"{item_key}: payload size")
         evidence = item["payload_evidence"]
         require(len(evidence) > 0, f"{item_key}: missing payload evidence")
@@ -141,8 +156,12 @@ def main() -> None:
     parser.add_argument("package", type=Path)
     args = parser.parse_args()
 
-    package = json.loads(args.package.read_text(encoding="utf-8"))
-    validate_package(package)
+    try:
+        package = json.loads(args.package.read_text(encoding="utf-8"))
+        validate_package(package)
+    except (IndexError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        print(f"FAIL: {error}", file=sys.stderr)
+        raise SystemExit(1) from None
     print(
         f"PASS: {len(package['source_items'])} source item(s), "
         f"{sum(len(item['manifest_candidates']) for item in package['source_items'])} "

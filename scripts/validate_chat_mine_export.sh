@@ -14,6 +14,7 @@ python3 "${ROOT_DIR}/scripts/export_chat_mine_package.py" "${FIXTURE}" "${SECOND
 cmp "${GENERATED}" "${SECOND}"
 cmp "${GENERATED}" "${EXPECTED}"
 python3 "${ROOT_DIR}/scripts/validate_chat_mine_package.py" "${GENERATED}"
+python3 "${ROOT_DIR}/scripts/test_chat_mine_package_negative.py" "${GENERATED}"
 
 if [[ -n "${DATABASE_URL:-}" ]]; then
   PACKAGE_JSON="$(
