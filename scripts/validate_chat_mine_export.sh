@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${ROOT_DIR}/scripts/lib/safe_database_target.sh"
 FIXTURE="${ROOT_DIR}/fixtures/chat_mine/sample_chat_export.json"
 EXPECTED="${ROOT_DIR}/fixtures/chat_mine/expected_source_import_package.json"
 GENERATED="$(mktemp)"
@@ -17,6 +18,7 @@ python3 "${ROOT_DIR}/scripts/validate_chat_mine_package.py" "${GENERATED}"
 python3 "${ROOT_DIR}/scripts/test_chat_mine_package_negative.py" "${GENERATED}"
 
 if [[ -n "${DATABASE_URL:-}" ]]; then
+  require_safe_database_url "${DATABASE_URL}"
   PACKAGE_JSON="$(
     python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1])), separators=(",",":"), sort_keys=True))' \
       "${GENERATED}"

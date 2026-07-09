@@ -147,5 +147,13 @@ the merged core schema.
 
 ## License / provenance
 
-Published as a generic reference implementation. Use freely. No warranty; read
-`docs/02-security-model.md` before putting anything sensitive in it.
+This repository is public for review and internal development, but the final license and
+contribution terms are not yet settled.
+
+Do not assume permission for production, commercial, hosted-service, enterprise,
+embedded-product, or redistributed use until a LICENSE and commercial-use policy are added.
+
+Personal review, evaluation, and discussion are welcome while the project resolves its license
+posture in issue #38.
+
+No warranty; read `docs/02-security-model.md` before putting anything sensitive in it.

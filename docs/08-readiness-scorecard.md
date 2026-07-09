@@ -117,12 +117,13 @@ Claims without evidence do not count.
 
 ## Current blockers to 10/10
 
-1. Live source-import/cutover objects are not yet committed as reusable repo SQL.
-2. No executable validation bundle for full cutover readiness.
+1. Source-import/cutover foundation is committed, but full Draft 0.3 lifecycle coverage is incomplete: REVIEWED, PARALLEL, AUTHORITATIVE, explicit authority declaration, and offline third-party verification remain gaps.
+2. Executable validation covers current source-import/cutover rails, candidate locators, quote hashes, rollback loader proof, and richer probe categories, but does not yet prove full SMP Draft 0.3 conformance.
 3. No stored provider-exit evidence artifact in repo.
 4. Least-privilege access hardening is designed conceptually but not implemented.
 5. UI/review workflow is split to a new repo and not yet complete.
-6. Peer review of the SQL implementation is pending.
+6. Peer review of the SQL implementation is ongoing.
+7. License and contribution posture remains unresolved in #38.
 
 ## Target definition of done
 
