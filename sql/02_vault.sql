@@ -70,7 +70,7 @@ create table if not exists vault_private.normalization_queue (
 -- ---- identity_private ----------------------------------------------------------
 create table if not exists identity_private.person (
   id             uuid primary key default gen_random_uuid(),
-  stable_key     text not null unique,     -- e.g. 'alex'
+  stable_key     text not null unique,     -- e.g. 'example-user'
   legal_name     text not null,
   preferred_name text,
   date_of_birth  date,
@@ -118,7 +118,7 @@ create table if not exists identity_private.relation (
 create table if not exists identity_private.capability_assignment (
   id                uuid primary key default gen_random_uuid(),
   principal_kind    text not null,         -- 'person' | 'agent'
-  principal_key     text not null,         -- 'alex' | 'alex-claude'
+  principal_key     text not null,         -- 'example-user' | 'example-user-claude'
   domain_name       text not null,         -- 'health' | 'finance' | ...
   capability_name   text not null,         -- 'read' | 'write' | 'approve'
   subject_person_id uuid references identity_private.person(id),  -- scope, null = all

@@ -4,7 +4,8 @@ A personal, self-hosted memory and knowledge layer for AI assistants, built on p
 (reference deployment: Supabase). It gives every AI you use one shared, verifiable source of
 truth that **you** own, instead of a per-vendor memory silo.
 
-This repository is the **core database/schema and operations package**. The browser UI lives separately at `jryski/Personal-Wiki-Memory-UI`.
+This repository is the **core database/schema and operations package**. Any browser UI
+should live in a separate application repository.
 
 ## Current status
 
@@ -102,7 +103,7 @@ See `docs/07-source-import-cutover.md` and `docs/09-source-adapters.md`.
 ## Non-goals
 
 - Not a RAG framework, not an agent framework, not a product. It is a data layer with rules.
-- No browser UI in this repo. UI development belongs in `jryski/Personal-Wiki-Memory-UI`.
+- No browser UI in this repo. UI development belongs in a separate application repository.
 - Vector search is optional and treated as regenerable cache, never as the system of record.
 
 ## Requirements
@@ -128,5 +129,5 @@ the merged core schema.
 
 ## License / provenance
 
-Extracted from a private working system, genericized. Use freely. No warranty; read
+Published as a generic reference implementation. Use freely. No warranty; read
 `docs/02-security-model.md` before putting anything sensitive in it.

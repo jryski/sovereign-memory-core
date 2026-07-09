@@ -11,14 +11,14 @@ stays private. Everything is exportable, restorable, and verifiable by checksum.
 ## Concepts
 
 ### Principals and agents
-- A **principal** is a human ('alex', 'sam') or the collective ('shared').
-- An **agent** is one assistant surface serving one principal ('alex-claude', 'sam-chatgpt'),
+- A **principal** is a human ('example-user', 'example-partner') or the collective ('shared').
+- An **agent** is one assistant surface serving one principal ('example-user-claude', 'example-partner-chatgpt'),
   registered in `trusted_agents`. Every write is stamped with its agent. An unregistered
   or retired agent cannot write at all (FK + active check in `remember()` and friends).
 
 ### Two dimensions on every fact
-- `owner` = who the fact is **about** (alex | sam | shared). Joint life (finances, kids,
-  house, calendar) is `shared`.
+- `owner` = who the fact is **about** (example-user | example-partner | shared).
+  Joint or team context is `shared`.
 - `visibility` = who may **see** it (shared by default | private).
 - Visibility rule: a row is visible to viewer V when `visibility='shared' OR owner=V`.
 - Constraint: a `shared`-owned row can never be `private` (a secret must belong to someone).
@@ -27,15 +27,15 @@ Examples:
 
 | Fact | owner | visibility |
 |---|---|---|
-| Joint mortgage terms | shared | shared |
-| Alex's lab results | alex | shared (his, both can see) |
-| Sam's book club notes | sam | shared |
-| Alex's gift plan for Sam | alex | private (only Alex's assistants see it) |
+| Shared project decision | shared | shared |
+| Example User's working note | example-user | shared |
+| Example Partner's reading list | example-partner | shared |
+| Example User's private draft | example-user | private |
 
 ### The three storage shapes (Tier 1)
 1. **memories** — atomic facts. Append-mostly. Carry provenance columns, optional
    `due_date` (deadline mechanism), and a `supersedes` chain for corrections.
-2. **wiki_pages** — durable documents at a path (`projects/kitchen-reno`,
+2. **wiki_pages** — durable documents at a path (`projects/example-project`,
    `_system/ai-instructions`). One `active` row per path (partial unique index);
    edits supersede. Page metadata lives in `frontmatter` jsonb.
 3. **memory_hot_index** — the attention layer. A capped (15 per owner) list of "hot"
@@ -111,7 +111,7 @@ second copy of the sensitive data).
              │  Rules: triggers, checks, perimeter, audit  │
              └────────▲──────────▲──────────▲──────────────┘
                       │          │          │  service-role connector(s)
-               Alex's Claude  Alex's GPT  Sam's Claude   ... any future model
+               Example User's Claude  Example User's GPT  Example Partner's Claude   ... any future model
 ```
 
 - Every assistant boots from the same state and writes under its own agent_id.
