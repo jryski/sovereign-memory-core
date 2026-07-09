@@ -8,8 +8,14 @@ on:
       - "sql/05_candidate_locators.sql"
       - "sql/06_cutover_probe_categories.sql"
       - "sql/validation/source_import_readiness.sql"
+      - "sql/validation/load_chat_mine_package.sql"
       - "scripts/validate_source_import.sh"
+      - "scripts/export_chat_mine_package.py"
+      - "scripts/validate_chat_mine_export.sh"
+      - "scripts/validate_chat_mine_package.py"
+      - "fixtures/chat_mine/**"
       - "docs/04-implementation-guide.md"
+      - "docs/10-chat-mine-source-import-exporter.md"
       - ".github/workflows/source-import-validation.yml"
   workflow_dispatch:
 
@@ -38,3 +44,6 @@ jobs:
 
       - name: Validate source import/cutover layer
         run: bash scripts/validate_source_import.sh
+
+      - name: Validate Chat-Mine source-import package
+        run: bash scripts/validate_chat_mine_export.sh
