@@ -20,8 +20,8 @@ Create a Supabase project (free tier fine). Record the project ref. Connect your
 - DONE: `select 1;` returns via the connector.
 
 ## Step 1: Customize the script
-In `sql/01_core.sql`, replace principals `alex`/`sam` in: the `trusted_agents` seed,
-and every `check (... in ('alex','sam','shared'))` (memories, wiki_pages,
+In `sql/01_core.sql`, replace principals `example-user`/`example-partner` in: the `trusted_agents` seed,
+and every `check (... in ('example-user','example-partner','shared'))` (memories, wiki_pages,
 memory_hot_index, memory_hot_staging, household_channel). Single person? Use one name;
 keep 'shared'.
 - DONE: `grep -c "CUSTOMIZE"` locations all edited (5 check constraints + seed block).
@@ -42,7 +42,7 @@ Expect: perimeter OK / agents >= 3 / instructions 1 / integrity match.
 ```sql
 select remember('Test fact: the build works.','system','system/build-smoke',
                 'system','shared', p_summary=>'build smoke test');
-select session_boot('alex');   -- your principal
+select session_boot('example-user');   -- your principal
 ```
 - DONE: session_boot returns the topic staged or hot; health.memories_visible >= 1.
 - Second call of remember with the same topic_key should return and `hot_touch` should
@@ -74,7 +74,7 @@ Per docs/03 B and C: connector + bootstrap for each person's Claude and/or ChatG
 Apply `02_vault.sql` as migration `vault_v1`. Seed your people:
 ```sql
 insert into identity_private.person(stable_key, legal_name) values
-  ('alex','<full name>'), ('sam','<full name>') on conflict do nothing;
+  ('example-user','<full name>'), ('example-partner','<full name>') on conflict do nothing;
 insert into health_private.patient(person_id)
   select id from identity_private.person on conflict do nothing;
 ```
@@ -94,6 +94,7 @@ Expect: schemas 5 / grants_leak 0 / audit_triggers >= 12.
 
 ## Step 8 (optional): Provenance guards
 Apply `03_provenance_guards.sql` as migration `provenance_guards_v1`.
+The monetary values and citation below are synthetic test data.
 - DONE, all three behaviors:
 ```sql
 -- 1) unsourced money MUST FAIL:

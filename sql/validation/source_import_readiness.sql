@@ -165,7 +165,7 @@ with agent as (
   from batch
   cross join (values
     ('item-house','fixture/project-alpha','conversation','Project alpha decision','{"kind":"conversation","decision":"Use the boring durable schema."}'),
-    ('item-vault','fixture/project-health','conversation','Sensitive health note','{"kind":"conversation","health":"review required"}'),
+    ('item-vault','fixture/restricted-example','conversation','Restricted example note','{"kind":"conversation","restricted":"review required"}'),
     ('item-hold','fixture/project-alpha','conversation','Maybe stale status','{"kind":"conversation","status":"probably current?"}'),
     ('item-evidence','fixture/channel','message','Peer review note','{"kind":"message","note":"model review"}'),
     ('item-exclude','fixture/project-alpha','conversation','Duplicate throwaway chat','{"kind":"conversation","duplicate":true}')
@@ -183,7 +183,7 @@ with agent as (
     payload_hash,
     case source_item_key
       when 'item-house' then 'decision: Use the boring durable schema.'
-      when 'item-vault' then 'health: review required'
+      when 'item-vault' then 'restricted: review required'
       when 'item-hold' then 'status: probably current?'
       when 'item-evidence' then 'note: model review'
       when 'item-exclude' then 'duplicate: true'

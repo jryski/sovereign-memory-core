@@ -4,7 +4,7 @@
 -- MCP apply_migration). Safe to re-run.
 --
 -- CUSTOMIZE BEFORE RUNNING (search for "CUSTOMIZE"):
---   1. Principals: 'alex' and 'sam' are placeholders for the humans.
+--   1. Principals: 'example-user' and 'example-partner' are placeholders for the humans.
 --   2. trusted_agents seed rows: one row per (human x assistant surface).
 -- ============================================================================
 
@@ -25,8 +25,8 @@ end $$;
 -- Every writer must be a registered agent. This is the accountability anchor:
 -- each stored fact is stamped with WHICH assistant wrote it.
 create table if not exists trusted_agents (
-  agent_id     text primary key,          -- e.g. 'alex-claude'
-  principal    text not null check (principal in ('alex','sam','shared')),  -- CUSTOMIZE
+  agent_id     text primary key,          -- e.g. 'example-user-claude'
+  principal    text not null check (principal in ('example-user','example-partner','shared')),  -- CUSTOMIZE
   display_name text,
   model        text,                      -- 'claude' | 'gpt' | ...
   surface      text,                      -- 'claude-app' | 'chatgpt' | 'api' | 'migration'
@@ -36,16 +36,16 @@ create table if not exists trusted_agents (
 );
 
 insert into trusted_agents(agent_id, principal, display_name, model, surface) values
-  ('alex-claude',  'alex',   'Alex Claude',   'claude', 'claude-app'),   -- CUSTOMIZE
-  ('alex-chatgpt', 'alex',   'Alex ChatGPT',  'gpt',    'chatgpt'),      -- CUSTOMIZE
-  ('sam-claude',   'sam',    'Sam Claude',    'claude', 'claude-app'),   -- CUSTOMIZE
-  ('sam-chatgpt',  'sam',    'Sam ChatGPT',   'gpt',    'chatgpt'),      -- CUSTOMIZE
+  ('example-user-claude',  'example-user',   'Example User Claude',   'claude', 'claude-app'),   -- CUSTOMIZE
+  ('example-user-chatgpt', 'example-user',   'Example User ChatGPT',  'gpt',    'chatgpt'),      -- CUSTOMIZE
+  ('example-partner-claude',   'example-partner',    'Example Partner Claude',    'claude', 'claude-app'),   -- CUSTOMIZE
+  ('example-partner-chatgpt',  'example-partner',    'Example Partner ChatGPT',   'gpt',    'chatgpt'),      -- CUSTOMIZE
   ('system',       'shared', 'System / Setup','-',      'migration')
 on conflict (agent_id) do nothing;
 
 -- ---- core tables -----------------------------------------------------------
 -- Two dimensions on every fact:
---   owner      = who the fact is ABOUT ('alex' | 'sam' | 'shared')
+--   owner      = who the fact is ABOUT ('example-user' | 'example-partner' | 'shared')
 --   visibility = who may SEE it ('shared' default | 'private')
 -- A row is visible to viewer V when visibility='shared' OR owner=V.
 create table if not exists memories (
@@ -53,7 +53,7 @@ create table if not exists memories (
   content      text not null,
   tags         text[] not null default '{}',
   workstream   text,                       -- coarse topic bucket, e.g. 'finance'
-  owner        text not null check (owner in ('alex','sam','shared')),      -- CUSTOMIZE
+  owner        text not null check (owner in ('example-user','example-partner','shared')),      -- CUSTOMIZE
   visibility   text not null default 'shared' check (visibility in ('shared','private')),
   source_kind  source_kind not null default 'manual',
   source_agent text not null references trusted_agents(agent_id),
@@ -77,7 +77,7 @@ create table if not exists wiki_pages (
   content      text not null,
   tags         text[] not null default '{}',
   workstream   text,
-  owner        text not null check (owner in ('alex','sam','shared')),      -- CUSTOMIZE
+  owner        text not null check (owner in ('example-user','example-partner','shared')),      -- CUSTOMIZE
   visibility   text not null default 'shared' check (visibility in ('shared','private')),
   source_kind  source_kind not null default 'manual',
   source_agent text not null references trusted_agents(agent_id),
@@ -99,7 +99,7 @@ create table if not exists memory_hot_index (
   id           uuid primary key default gen_random_uuid(),
   memory_id    uuid not null references memories(id) on delete cascade,
   topic_key    text not null,              -- slug: workstream/kebab-noun
-  owner        text not null check (owner in ('alex','sam','shared')),      -- CUSTOMIZE
+  owner        text not null check (owner in ('example-user','example-partner','shared')),      -- CUSTOMIZE
   visibility   text not null default 'shared' check (visibility in ('shared','private')),
   summary      text not null,
   workstream   text,
@@ -111,7 +111,7 @@ create table if not exists memory_hot_index (
 );
 
 create table if not exists memory_hot_staging (
-  owner      text not null check (owner in ('alex','sam','shared')),        -- CUSTOMIZE
+  owner      text not null check (owner in ('example-user','example-partner','shared')),        -- CUSTOMIZE
   topic_key  text not null,
   first_seen timestamptz not null default now(),
   memory_id  uuid not null references memories(id) on delete cascade,
@@ -146,7 +146,7 @@ create table if not exists audit_log (
 create table if not exists household_channel (
   seq             bigint generated always as identity primary key,
   from_agent      text not null references trusted_agents(agent_id),
-  to_principal    text not null check (to_principal in ('alex','sam','shared')), -- CUSTOMIZE
+  to_principal    text not null check (to_principal in ('example-user','example-partner','shared')), -- CUSTOMIZE
   kind            text not null check (kind in ('task','todo','reminder','note')),
   subject         text not null,
   body            text,

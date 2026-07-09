@@ -1,14 +1,14 @@
 {
   "source_system": {
-    "source_key": "chat-mine-fixture",
-    "display_name": "Chat-Mine fixture export",
+    "source_key": "example-chat-export",
+    "display_name": "Example Chat Export",
     "source_type": "ai-export",
-    "description": "Small internal fixture for Chat-Mine producer alignment.",
+    "description": "Entirely synthetic fixture for internal Chat-Mine producer alignment.",
     "owner": "shared",
     "visibility": "shared"
   },
   "batch": {
-    "batch_key": "chat-mine-fixture-2026-07-08",
+    "batch_key": "example-chat-export-2026-07-08",
     "export_started_at": "2026-07-08T16:00:00Z",
     "export_completed_at": "2026-07-08T16:00:01Z",
     "watermark": {
@@ -18,8 +18,8 @@
   },
   "conversations": [
     {
-      "conversation_id": "conversation-001",
-      "title": "Project Atlas deployment notes",
+      "conversation_id": "example-conversation-001",
+      "title": "Synthetic Example Project deployment notes",
       "created_at": "2026-07-08T15:00:00Z",
       "updated_at": "2026-07-08T15:30:00Z",
       "participants": [
@@ -28,52 +28,52 @@
       ],
       "messages": [
         {
-          "message_id": "message-001",
+          "message_id": "example-message-001",
           "role": "user",
           "created_at": "2026-07-08T15:00:00Z",
-          "content": "Project Atlas deploys on Friday at 14:00 UTC. Keep the rollback checklist in the operations wiki."
+          "content": "Synthetic Example Project has a test deployment proposed for Friday at 14:00 UTC. Keep the example rollback checklist in the operations wiki."
         },
         {
-          "message_id": "message-002",
+          "message_id": "example-message-002",
           "role": "assistant",
           "created_at": "2026-07-08T15:01:00Z",
-          "content": "Noted. I will treat Friday at 14:00 UTC as the proposed deployment time and preserve the rollback checklist request."
+          "content": "Noted. I will preserve Friday at 14:00 UTC as a synthetic proposal and retain the example rollback checklist request."
         },
         {
-          "message_id": "message-003",
+          "message_id": "example-message-003",
           "role": "user",
           "created_at": "2026-07-08T15:30:00Z",
-          "content": "There is also an older note saying the deploy is Thursday. Do not choose between them until the team confirms."
+          "content": "A synthetic older note says the test deployment is Thursday. Do not choose between the two example dates."
         }
       ],
       "manifest_candidates": [
         {
-          "manifest_key": "atlas-deployment-time",
-          "message_id": "message-001",
-          "source_quote": "Project Atlas deploys on Friday at 14:00 UTC.",
+          "manifest_key": "example-project-deployment-time",
+          "message_id": "example-message-001",
+          "source_quote": "Synthetic Example Project has a test deployment proposed for Friday at 14:00 UTC.",
           "action": "import",
           "target_zone": "HOUSE",
           "review_state": "unreviewed",
           "target_table": "memories",
-          "topic_key": "projects/atlas/deployment-time",
-          "suggested_summary": "Project Atlas is proposed to deploy Friday at 14:00 UTC.",
-          "suggested_content": "Project Atlas deploys on Friday at 14:00 UTC.",
-          "transformation_version": "chat-mine-fixture-v1",
+          "topic_key": "projects/example-project/deployment-time",
+          "suggested_summary": "Synthetic Example Project has a test deployment proposed for Friday at 14:00 UTC.",
+          "suggested_content": "Synthetic Example Project has a test deployment proposed for Friday at 14:00 UTC.",
+          "transformation_version": "example-chat-export-v1",
           "metadata": {
             "producer_posture": "candidate_only"
           }
         },
         {
-          "manifest_key": "atlas-deployment-conflict",
-          "message_id": "message-003",
-          "source_quote": "There is also an older note saying the deploy is Thursday.",
+          "manifest_key": "example-project-deployment-conflict",
+          "message_id": "example-message-003",
+          "source_quote": "A synthetic older note says the test deployment is Thursday.",
           "action": "hold",
           "target_zone": "HOLD",
           "review_state": "needs_review",
-          "topic_key": "projects/atlas/deployment-time",
-          "suggested_summary": "An older note conflicts with the proposed Friday deployment time.",
-          "suggested_content": "An older note says Project Atlas deploys Thursday.",
-          "transformation_version": "chat-mine-fixture-v1",
+          "topic_key": "projects/example-project/deployment-time",
+          "suggested_summary": "A synthetic older note conflicts with the example Friday deployment proposal.",
+          "suggested_content": "A synthetic older note says the test deployment is Thursday.",
+          "transformation_version": "example-chat-export-v1",
           "review_notes": "Conflict is preserved for human review; the exporter does not choose a winner.",
           "metadata": {
             "producer_posture": "unresolved_conflict"
@@ -84,56 +84,56 @@
   ],
   "cutover_probes": [
     {
-      "probe_key": "atlas-positive-deployment-time",
+      "probe_key": "example-project-positive-deployment-time",
       "probe_type": "project-state",
       "probe_category": "positive",
       "severity": "critical",
-      "prompt": "What is the proposed Project Atlas deployment time?",
+      "prompt": "What is the proposed Example Project deployment time?",
       "expected_behavior": "Return Friday at 14:00 UTC as a reviewed proposal with source evidence.",
       "expected_evidence_required": true,
-      "expected_source_item_key": "conversation-001",
-      "expect_topic_key": "projects/atlas/deployment-time"
+      "expected_source_item_key": "example-conversation-001",
+      "expect_topic_key": "projects/example-project/deployment-time"
     },
     {
-      "probe_key": "atlas-negative-owner",
+      "probe_key": "example-project-negative-owner",
       "probe_type": "stale-avoidance",
       "probe_category": "negative",
       "severity": "critical",
-      "prompt": "Who approved the Project Atlas deployment?",
+      "prompt": "Who approved the Example Project deployment?",
       "expected_behavior": "State that the export does not identify an approver.",
       "expected_evidence_required": false
     },
     {
-      "probe_key": "atlas-conflicting-day",
+      "probe_key": "example-project-conflicting-day",
       "probe_type": "project-state",
       "probe_category": "conflict",
       "severity": "critical",
-      "prompt": "Which day is Project Atlas deploying?",
+      "prompt": "Which day is Example Project deploying?",
       "expected_behavior": "Surface the Friday and Thursday conflict without silently resolving it.",
       "expected_evidence_required": true,
-      "expected_source_item_key": "conversation-001",
-      "expect_topic_key": "projects/atlas/deployment-time"
+      "expected_source_item_key": "example-conversation-001",
+      "expect_topic_key": "projects/example-project/deployment-time"
     },
     {
-      "probe_key": "atlas-stale-deployment-note",
+      "probe_key": "example-project-stale-deployment-note",
       "probe_type": "stale-avoidance",
       "probe_category": "stale_state",
       "severity": "critical",
       "prompt": "Is the older Thursday deployment note authoritative?",
       "expected_behavior": "Do not present the older Thursday note as current confirmed state.",
       "expected_evidence_required": true,
-      "expected_source_item_key": "conversation-001"
+      "expected_source_item_key": "example-conversation-001"
     },
     {
-      "probe_key": "atlas-deployment-evidence",
+      "probe_key": "example-project-deployment-evidence",
       "probe_type": "evidence",
       "probe_category": "evidence_request",
       "severity": "critical",
-      "prompt": "Show the source evidence for the Project Atlas deployment schedule.",
+      "prompt": "Show the source evidence for the Example Project deployment schedule.",
       "expected_behavior": "Return the supporting chat spans and expose the unresolved conflict.",
       "expected_evidence_required": true,
-      "expected_source_item_key": "conversation-001",
-      "expect_topic_key": "projects/atlas/deployment-time"
+      "expected_source_item_key": "example-conversation-001",
+      "expect_topic_key": "projects/example-project/deployment-time"
     }
   ]
 }

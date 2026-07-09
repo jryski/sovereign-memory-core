@@ -12,7 +12,8 @@ deduplicate facts, resolve conflicts, run retrieval, or mark a batch ready for c
 `scripts/export_chat_mine_package.py` converts the small fixture at
 `fixtures/chat_mine/sample_chat_export.json` into a deterministic JSON package. Object
 keys, source items, candidates, and probes have stable ordering. JSON payloads use sorted
-keys and compact separators before SHA-256 hashing.
+keys and compact separators before SHA-256 hashing. The conversation, project, schedule,
+and conflict are entirely synthetic.
 
 The package has these top-level members:
 
