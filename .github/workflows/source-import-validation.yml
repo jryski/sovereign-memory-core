@@ -14,6 +14,7 @@ on:
       - "scripts/validate_chat_mine_export.sh"
       - "scripts/validate_chat_mine_package.py"
       - "scripts/test_chat_mine_loader_negative.py"
+      - "scripts/test_chat_mine_package_negative.py"
       - "fixtures/chat_mine/**"
       - "docs/04-implementation-guide.md"
       - "docs/10-chat-mine-source-import-exporter.md"

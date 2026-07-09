@@ -21,19 +21,19 @@ then bless it:
 select supersede_wiki('_system/ai-instructions', $DOC$
 # AI Operating Instructions
 
-This is the shared memory layer for Alex and Sam. Assistants using it: Alex's Claude,
-Alex's ChatGPT, Sam's Claude, Sam's ChatGPT. It is the single source of truth for the
+This is the shared memory layer for Example User and Example Partner. Assistants using it: Example User's Claude,
+Example User's ChatGPT, Example Partner's Claude, Example Partner's ChatGPT. It is the single source of truth for the
 household. No business content.
 
 ## Your identity
 Your settings tell you which person you serve. That gives you two values:
-- your VIEWER: 'alex' or 'sam' (used when you boot and read)
-- your SOURCE_AGENT: e.g. 'alex-claude' (stamped on everything you write)
+- your VIEWER: 'example-user' or 'example-partner' (used when you boot and read)
+- your SOURCE_AGENT: e.g. 'example-user-claude' (stamped on everything you write)
 Always boot and write as your own identity. Never impersonate another agent.
 
 ## Two dimensions on every fact
-- owner      = who the fact is ABOUT: 'alex', 'sam', or 'shared' (the joint life:
-               finances, legal, kids, household, calendar).
+- owner      = who the fact is ABOUT: 'example-user', 'example-partner', or 'shared'
+               (joint or team context).
 - visibility = who may SEE it: 'shared' (default) or 'private'.
 A row is visible to you when visibility='shared' OR owner = your viewer.
 Default everything to shared. Use private only for things meant for one person
@@ -53,10 +53,10 @@ If health.hot_touch_pending or health.proposed_for_review is nonzero, mention it
 ## 3. Storing (one call)
     select remember(
       p_content      => 'plain-language fact',
-      p_workstream   => 'finance',
-      p_topic_key    => 'finance/mortgage-refi',
+      p_workstream   => 'example-workstream',
+      p_topic_key    => 'example-workstream/example-topic',
       p_source_agent => '<your source_agent>',
-      p_owner        => 'shared',            -- alex | sam | shared
+      p_owner        => 'shared',            -- example-user | example-partner | shared
       p_summary      => 'short hot-list summary',
       p_tags         => array['decision'],
       p_visibility   => 'shared'             -- shared | private
@@ -82,7 +82,7 @@ bless_doc('that/path') so integrity matches again.
 
 ## 7. Household channel (tasks between assistants)
 Leave each other tasks, todos, reminders, notes:
-    select channel_send(p_from_agent=>'<your source_agent>', p_to_principal=>'sam',
+    select channel_send(p_from_agent=>'<your source_agent>', p_to_principal=>'example-partner',
       p_kind=>'reminder', p_subject=>'...', p_body=>'...',
       p_due_at=>'2026-08-01T09:00', p_add_to_calendar=>true);
 At boot, session_boot returns channel_inbox: open items addressed to you or shared.

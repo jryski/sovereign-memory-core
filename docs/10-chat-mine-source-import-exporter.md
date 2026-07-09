@@ -12,7 +12,8 @@ deduplicate facts, resolve conflicts, run retrieval, or mark a batch ready for c
 `scripts/export_chat_mine_package.py` converts the small fixture at
 `fixtures/chat_mine/sample_chat_export.json` into a deterministic JSON package. Object
 keys, source items, candidates, and probes have stable ordering. JSON payloads use sorted
-keys and compact separators before SHA-256 hashing.
+keys and compact separators before SHA-256 hashing. The conversation, project, schedule,
+and conflict are entirely synthetic.
 
 The package has these top-level members:
 
@@ -85,6 +86,10 @@ compares output with the checked-in expected package, and independently verifies
 - action and target-zone combinations accepted by `source_manifest`;
 - one source item producing multiple candidates;
 - active starter probes across all five merged probe categories.
+
+The same command also generates seven temporary corrupted packages and proves the
+validator rejects quote-hash, package-checksum, payload-hash, locator, candidate-hash,
+manifest-key uniqueness, and probe-category failures with the expected diagnostic.
 
 When `DATABASE_URL` is set, the validator also runs
 `sql/validation/load_chat_mine_package.sql`. That rollback-only smoke path loads the
