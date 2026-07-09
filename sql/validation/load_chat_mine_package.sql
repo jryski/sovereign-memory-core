@@ -168,7 +168,7 @@ select
   candidate->>'transformation_version',
   candidate->>'review_notes',
   candidate->'metadata',
-  candidate->'source_locator',
+  coalesce(candidate->'source_locator', '{}'::jsonb),
   candidate->>'source_quote',
   candidate->>'source_quote_hash',
   candidate->>'source_quote_hash_algorithm'
@@ -221,12 +221,17 @@ declare
   probe_count integer;
   payload_hash_mismatches integer;
   evidence_hash_mismatches integer;
+  candidate_quote_hash_mismatches integer;
   duplicate_manifest_keys integer;
   candidate_locator_gaps integer;
   active_probe_categories integer;
   package_probe_count integer;
   readiness_states jsonb;
 begin
+  select jsonb_array_length(payload->'cutover_probes')
+  into package_probe_count
+  from chat_mine_package_input;
+
   select count(*) into source_system_count from chat_mine_source_system_map;
   select count(*) into batch_count from chat_mine_batch_map;
   select count(*) into item_count from chat_mine_source_item_map;
@@ -241,7 +246,8 @@ begin
   join chat_mine_batch_map batch_map on batch_map.id=probe.batch_id;
 
   if source_system_count <> 1 or batch_count <> 1 or item_count <> 1
-     or evidence_count <> 1 or candidate_count <> 2 or probe_count <> 5 then
+     or evidence_count <> 1 or candidate_count <> 2
+     or probe_count <> package_probe_count then
     raise exception
       'Chat-Mine loader smoke mismatch: systems %, batches %, items %, evidence %, candidates %, probes %',
       source_system_count, batch_count, item_count, evidence_count, candidate_count, probe_count;
@@ -277,6 +283,22 @@ begin
     raise exception
       'Chat-Mine loader smoke hash mismatch: payload %, evidence %',
       payload_hash_mismatches, evidence_hash_mismatches;
+  end if;
+
+  select count(*) into candidate_quote_hash_mismatches
+  from source_manifest manifest
+  join chat_mine_source_item_map item_map on item_map.id=manifest.source_item_id
+  where manifest.source_quote is not null
+    and (
+      manifest.source_quote_hash_algorithm <> 'sha256'
+      or manifest.source_quote_hash is distinct from
+         encode(extensions.digest(manifest.source_quote, 'sha256'), 'hex')
+    );
+
+  if candidate_quote_hash_mismatches <> 0 then
+    raise exception
+      'Chat-Mine loader smoke found % candidate quote hash mismatch(es)',
+      candidate_quote_hash_mismatches;
   end if;
 
   if not exists (
@@ -317,10 +339,6 @@ begin
       'Chat-Mine loader smoke found % import/HOLD candidate locator gap(s)',
       candidate_locator_gaps;
   end if;
-
-  select jsonb_array_length(payload->'cutover_probes')
-  into package_probe_count
-  from chat_mine_package_input;
 
   select count(distinct probe.probe_category)
   into active_probe_categories
