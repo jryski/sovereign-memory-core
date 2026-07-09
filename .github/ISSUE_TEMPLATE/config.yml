@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Sensitive security issue
+    url: https://github.com/jryski/sovereign-memory-core/security/policy
+    about: Please do not put secrets, credentials, or private memory exports in public issues.

@@ -14,17 +14,22 @@ agent operating contract, build guide, operations guide, and the merged source-i
 foundation.
 
 The core now includes generic source staging, manifest review, candidate-level provenance,
-readiness checks, and richer cutover probes. The Chat-Mine exporter is the first small internal
-producer aligned with that contract; it is not a public interchange protocol. Review UI, Hermes
-orchestration, adapters for real source exports, and operational dry runs remain future work.
+readiness checks, and richer cutover probes. Chat-Mine is a research-grade emitter aligned with
+that contract; its current deterministic fixture does not prove mining quality on real,
+long-running conversations. Review UI, operator tooling, adapters for real source exports, and
+operational dry runs remain future work.
 
 See:
 
+- [`docs/00-north-star.md`](docs/00-north-star.md) for the trustworthy memory transfer doctrine and research boundaries.
+- [`docs/roadmap.md`](docs/roadmap.md) for milestones, release targets, and track separation.
+- [`docs/project-management.md`](docs/project-management.md) for the GitHub-native operating model.
 - [`STATUS.md`](STATUS.md) for current completeness and readiness.
 - [`docs/07-source-import-cutover.md`](docs/07-source-import-cutover.md) for the source import and authoritative cutover plan.
 - [`docs/08-readiness-scorecard.md`](docs/08-readiness-scorecard.md) for the 10/10 checklist.
 - [`docs/09-source-adapters.md`](docs/09-source-adapters.md) for real-world source adapter patterns.
 - [`docs/10-chat-mine-source-import-exporter.md`](docs/10-chat-mine-source-import-exporter.md) for the first internal Chat-Mine producer slice.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md), [`SECURITY.md`](SECURITY.md), and [`SUPPORT.md`](SUPPORT.md) for contribution, security, and support expectations.
 
 ## Why this exists
 
@@ -60,6 +65,7 @@ sql/03_provenance_guards.sql    financial provenance enforcement
 sql/04_source_import.sql        source-import and cutover foundation
 sql/05_candidate_locators.sql   candidate locators and quote hashes
 sql/06_cutover_probe_categories.sql  richer cutover probe categories
+docs/00-north-star.md           trustworthy memory transfer doctrine
 docs/01-architecture.md         concepts, zones, multi-agent model
 docs/02-security-model.md       the actual security boundary, and the traps
 docs/03-agent-operations.md     operating contract and assistant setup
@@ -70,6 +76,14 @@ docs/07-source-import-cutover.md source import and authoritative cutover plan
 docs/08-readiness-scorecard.md  10/10 readiness checklist
 docs/09-source-adapters.md      real-world import source adapter matrix
 docs/10-chat-mine-source-import-exporter.md  internal Chat-Mine package exporter
+docs/roadmap.md                 milestones, release targets, and tracks
+docs/project-management.md      GitHub-native roadmap, labels, issues, and ADR model
+docs/adr/                       architecture decision records
+CONTRIBUTING.md                 contribution and validation expectations
+SECURITY.md                     sensitive-reporting and live-state safety
+SUPPORT.md                      early-alpha support expectations
+.github/ISSUE_TEMPLATE/         issue templates
+.github/pull_request_template.md pull request checklist
 ```
 
 ## Quick start for a fresh deployment
