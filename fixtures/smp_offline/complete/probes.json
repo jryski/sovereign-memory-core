@@ -1,0 +1,7 @@
+{"probes":[
+  {"id":"positive-current","category":"positive","critical":true},
+  {"id":"negative-excluded","category":"negative","critical":true},
+  {"id":"conflict-preserved","category":"conflict","critical":true},
+  {"id":"stale-preserved","category":"stale_state","critical":true},
+  {"id":"evidence-trace","category":"evidence_request","critical":true}
+]}

@@ -39,7 +39,7 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 
 | ID | Draft 0.3 requirement | Current posture | Notes / follow-up |
 |---|---|---|---|
-| T1 | Package MUST declare `smp_version`. | Gap | Add package schema field and validation if not already present. |
+| T1 | Package MUST declare `smp_version`. | Partial | The offline plain-directory fixture declares and validates `smp_version`; other package profiles still need equivalent coverage. |
 | T2 | Principal or authorized delegate MAY declare authority. | Partial | Current cutover concepts exist, but authorization/delegation model is not fully specified or tested. |
 | T3 | Scope names the subset of memory a cutover covers. | Partial | Cutover machinery exists; explicit scope model and scope-by-scope migration should be checked. |
 | I1.1 | Raw source payload preserved before normalization/trust. | Covered | Source payload evidence and hashes are core to `sql/04_source_import.sql` and validation. |
@@ -85,11 +85,11 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 | CNF3 | Store-conformant enforces I1, I3, I5 on ingest. | Partial | I1 mostly covered; I3/I5 general enforcement gaps remain. |
 | CNF4 | Promoted-record in-place mutation structurally impossible or content-hash audited. | Gap | A prior review identified silent content-update risk in deployment-style wiki pages; repo needs source-import/store audit decision. |
 | CNF5 | Cutover-conformant executes full lifecycle and records probe results, review decisions, cutover declaration. | Gap | Full lifecycle beyond dry-run/readiness not complete. |
-| CT1 | Third-party verification can confirm all source items accounted for. | Partial | Fixture/readiness validation covers current source-import package paths; full third-party/offline verification is not complete. |
-| CT2 | Third-party verification can confirm consequential imported facts trace to evidence. | Partial | Evidence tracing exists; consequential-domain enforcement is partial. |
-| CT3 | Third-party verification can confirm conflicts/stale claims preserved. | Partial | Probe categories exist; fixture coverage should be expanded. |
-| CT4 | Third-party verification can confirm agent-generated content not promoted as human authority. | Gap | Needs explicit attribution/provenance fixture and negative test. |
-| CT5 | Verification possible offline without source/emitter cooperation. | Partial | Package/evidence/rollback fixtures move in this direction; full offline verifier not complete. |
+| CT1 | Third-party verification can confirm all source items accounted for. | Covered | The synthetic offline fixture reconciles every source item to exactly one disposition and reports unexplained items. |
+| CT2 | Third-party verification can confirm consequential imported facts trace to evidence. | Partial | The offline fixture checks tracing and rejects agent-authored consequential records; generalized store enforcement remains partial. |
+| CT3 | Third-party verification can confirm conflicts/stale claims preserved. | Covered | The offline fixture and verifier require preserved conflict and stale records. |
+| CT4 | Third-party verification can confirm agent-generated content not promoted as human authority. | Covered | The verifier checks provenance/authority alignment and includes a negative laundering test. |
+| CT5 | Verification possible offline without source/emitter cooperation. | Covered | `scripts/verify_smp_offline.py` uses only committed artifacts and the Python standard library; it makes no network or database calls. |
 | A1 | Agents may propose durable source-of-record changes but not promote without review. | Gap | Policy issue exists; repo docs and/or protected-path proposal posture needed. |
 | A2 | In-place source-of-record changes by an agent are content-hash audited when proposed/authoritative split is unavailable. | Gap | Possible phase-2 trigger; not implemented. |
 
@@ -120,9 +120,6 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
    - Decide whether promoted records are append-only, content-hash audited, or both.
    - Add negative tests for silent post-promotion edit.
 
-7. **Define offline verifier fixture**
-   - Given only package, manifest, evidence hashes, probe definitions/results, and cutover record, verify SMP-complete for a small scope.
-
 ## Practical alpha interpretation
 
 Draft 0.3 is ahead of the current implementation, but in a useful way. It should be treated as the target custody specification, while this audit prevents overclaiming.
@@ -142,5 +139,5 @@ It should not yet claim:
 - production-grade review workflow;
 - generalized consequential-domain enforcement;
 - complete adapter-profile support;
-- offline third-party verifier;
+- generalized offline verification across every adapter/profile (the repository includes one synthetic plain-directory profile fixture, not universal conformance);
 - solved Chat-Mine mining quality.

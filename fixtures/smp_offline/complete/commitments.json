@@ -1,0 +1,7 @@
+{"algorithm":"sha256","artifacts":{
+  "package.json":"486565cde2659497dd67fcd9517710d7a97b41572b24036427485388a2dccffd",
+  "manifest.json":"5e663f4a396dd7bef2ff420f6b062b94f4e9cbd8d3e554a454a87b2d5393e019",
+  "probes.json":"3d0e39720bb37a7d729bc7ed9f4d81e29edfe3a28fda6dafd7fb32848d0a43b3",
+  "probe-results.json":"2d54d2c6e43367e09364ace532a322e50cbc4c9103a24a69945e204e2742c0cf",
+  "cutover.json":"3e12b1569aa54f028615c516a0d0cd8c9492d560c11656fc98af5eb68796c233"
+}}

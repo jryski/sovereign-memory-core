@@ -132,6 +132,18 @@ See `docs/07-source-import-cutover.md` and `docs/09-source-adapters.md`.
 
 ## Verified baseline
 
+The synthetic Draft 0.3 custody fixture can be verified without a source system,
+emitter, database, or network connection:
+
+```bash
+python3 scripts/verify_smp_offline.py fixtures/smp_offline/complete
+python3 scripts/test_smp_offline_verifier.py
+```
+
+It uses a `plain-directory-json-v1` serialization profile. The profile demonstrates
+SMP custody semantics without declaring that profile—or an SMP-specific container—to
+be canonical.
+
 The baseline SQL scripts were applied end to end on vanilla PostgreSQL 16 with shim roles
 (`anon`, `authenticated`, `service_role`) and the acceptance tests in
 `docs/04-implementation-guide.md` were executed: perimeter assert, second-touch promotion,

@@ -1,0 +1,7 @@
+{"run_id":"synthetic-run-001","results":[
+  {"probe_id":"positive-current","status":"pass"},
+  {"probe_id":"negative-excluded","status":"pass"},
+  {"probe_id":"conflict-preserved","status":"pass"},
+  {"probe_id":"stale-preserved","status":"pass"},
+  {"probe_id":"evidence-trace","status":"pass"}
+]}

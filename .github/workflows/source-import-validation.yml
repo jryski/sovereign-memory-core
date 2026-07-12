@@ -16,6 +16,9 @@ on:
       - "scripts/test_chat_mine_loader_negative.py"
       - "scripts/test_chat_mine_package_negative.py"
       - "fixtures/chat_mine/**"
+      - "fixtures/smp_offline/**"
+      - "scripts/verify_smp_offline.py"
+      - "scripts/test_smp_offline_verifier.py"
       - "docs/04-implementation-guide.md"
       - "docs/10-chat-mine-source-import-exporter.md"
       - ".github/workflows/source-import-validation.yml"
@@ -49,3 +52,8 @@ jobs:
 
       - name: Validate Chat-Mine source-import package
         run: bash scripts/validate_chat_mine_export.sh
+
+      - name: Verify offline SMP custody fixture
+        run: |
+          python3 scripts/verify_smp_offline.py fixtures/smp_offline/complete
+          python3 scripts/test_smp_offline_verifier.py

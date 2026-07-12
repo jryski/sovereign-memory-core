@@ -1,0 +1,6 @@
+{
+  "scope": "synthetic-principal/example-memory",
+  "authority_declared_by": "synthetic-principal",
+  "probe_run_id": "synthetic-run-001",
+  "status": "authoritative"
+}

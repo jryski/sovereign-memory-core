@@ -1,0 +1,22 @@
+{
+  "smp_version": "0.3",
+  "profile": "plain-directory-json-v1",
+  "principal_id": "synthetic-principal",
+  "source_items": [
+    {"id": "item-current", "kind": "note"},
+    {"id": "item-conflict", "kind": "note"},
+    {"id": "item-stale", "kind": "note"},
+    {"id": "item-held", "kind": "assistant-output"},
+    {"id": "item-excluded", "kind": "noise"}
+  ],
+  "evidence": [
+    {"id": "ev-current", "source_item_id": "item-current", "payload": "Synthetic principal approved current preference.", "sha256": "dd4855c172171cb7f6bd971d5cb95ced400e37377f50be0d0c6a992556fc4550"},
+    {"id": "ev-conflict", "source_item_id": "item-conflict", "payload": "Synthetic source preserves a contradictory preference.", "sha256": "fc703ea03e924f82e32303cbc1fd02be6dcc33e0cf8562810c933e4c6af90276"},
+    {"id": "ev-stale", "source_item_id": "item-stale", "payload": "Synthetic source preserves an older superseded preference.", "sha256": "bbabcc720652fcf80c04941dda011706a4f9132dcc8c4e4be4d916e35ce72cd0"}
+  ],
+  "destination_records": [
+    {"id": "record-current", "source_item_id": "item-current", "evidence_id": "ev-current", "provenance_basis": "human_direct", "authority": "human", "consequential": true, "state": "current", "preserved": true},
+    {"id": "record-conflict", "source_item_id": "item-conflict", "evidence_id": "ev-conflict", "provenance_basis": "source_document", "authority": "source", "consequential": false, "state": "conflicted", "preserved": true},
+    {"id": "record-stale", "source_item_id": "item-stale", "evidence_id": "ev-stale", "provenance_basis": "source_document", "authority": "source", "consequential": false, "state": "stale", "preserved": true}
+  ]
+}

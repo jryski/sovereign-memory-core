@@ -1,0 +1,10 @@
+{
+  "frozen": true,
+  "entries": [
+    {"source_item_id": "item-current", "disposition": "import"},
+    {"source_item_id": "item-conflict", "disposition": "import"},
+    {"source_item_id": "item-stale", "disposition": "import"},
+    {"source_item_id": "item-held", "disposition": "hold"},
+    {"source_item_id": "item-excluded", "disposition": "exclude"}
+  ]
+}
