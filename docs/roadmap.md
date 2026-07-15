@@ -20,7 +20,7 @@ The project should not compete to become the winning memory-record format. It sh
 
 The repo is in `v0.1-alpha - Custody Foundation`.
 
-The custody rails are mostly implemented and are being documented, hardened, and organized for repeatable contribution. The local operator path is next: a contributor should be able to install, validate, import a fixture, run a rollback loader proof, and understand what is safe before touching any live system.
+The custody rails are mostly implemented and are being documented, hardened, and organized for repeatable contribution. The local operator path is next: a contributor should be able to install, validate, import a fixture, run a rollback loader proof, create a portable backup, restore it into an empty compatible target, and understand exactly what was or was not proven before touching any live system.
 
 ## What is done
 
@@ -40,7 +40,8 @@ The custody rails are mostly implemented and are being documented, hardened, and
 
 - Finish project organization, ADRs, and contribution paths.
 - Document durable-write policy for protected memory scopes.
-- Build the local operator flow: `smc doctor`, local Docker install, schema installer, validation runner, and safe database URL checks.
+- Build the local operator flow: `smc doctor`, local Docker install, schema installer, validation runner, safe database URL checks, clean restore verification, and custody receipt generation.
+- Reuse one versioned canonical-view and probe suite across installer verification, offline conformance, and Steward Pack validation.
 - Add review workflow for accept, hold, reject, and evidence display.
 - Define adapter profiles without making Chat-Mine quality claims.
 
@@ -48,7 +49,7 @@ The custody rails are mostly implemented and are being documented, hardened, and
 
 | Track | Purpose | Current posture |
 |---|---|---|
-| Alpha build | Make the custody layer installable, verifiable, reviewable, and recoverable by an operator. | Active near-term work. |
+| Alpha build | Make the custody layer installable, verifiable, reviewable, recoverable, and independently restorable by an operator. | Active near-term work. |
 | Publication | Explain SMP custody concepts, conformance gaps, and adoption path without overclaiming implementation completeness. | Drafting and review. |
 | Research | Improve Chat-Mine and other emitters through evaluation, not claims. | Explicitly separate from alpha build. |
 
@@ -82,7 +83,16 @@ Includes:
 - schema installer
 - validation runner
 - safe database URL checks
+- portable backup creation with SHA-256 manifest
+- clean restore into an empty compatible PostgreSQL target
+- canonical governed-state comparison
+- structural invariant and restored-instance conformance probes
+- three honest completion states: installed, backup created, custody verified
+- canonical JSON custody receipt with declared scope and exclusions
+- re-runnable `smc verify-exit`
 - operator documentation
+
+The custody gate is default-on but skippable on constrained hosts. A skip must record a degraded state and reason; it may never be reported as `custody verified`.
 
 ### v0.3-alpha - Review Workflow
 
@@ -93,6 +103,7 @@ Includes:
 - evidence display
 - candidate status transitions
 - basic review UI or CLI review
+- structurally separate candidate and authoritative retrieval paths
 
 ### v0.4-alpha - Adapter Profiles
 
@@ -110,6 +121,7 @@ Includes:
 Includes:
 
 - conformance fixture
+- offline custody receipt verifier fixture
 - public docs
 - license/IP checklist
 - history/privacy caveat
@@ -130,8 +142,8 @@ Includes:
 | Release | Target outcome |
 |---|---|
 | `v0.1-alpha` | Custody foundation can be reviewed and validated from the repo. |
-| `v0.2-alpha` | A local operator can install and validate the foundation without manually interpreting every SQL file. |
-| `v0.3-alpha` | Candidate review and promotion are visible, testable, and bounded. |
+| `v0.2-alpha` | A local operator can install, validate, back up, clean-restore, and produce an auditable custody receipt without manually interpreting every SQL file. |
+| `v0.3-alpha` | Candidate review and promotion are visible, testable, bounded, and structurally separate from authoritative retrieval. |
 | `v0.4-alpha` | External sources can declare profile, lossiness, and evidence posture. |
-| `v0.5-alpha` | The repo can support a public release candidate with clear conformance gaps. |
+| `v0.5-alpha` | The repo can support a public release candidate with clear conformance gaps and an offline verifier fixture. |
 | `v1.0` | SMP custody-layer reference behavior is stable enough for adoption testing. |

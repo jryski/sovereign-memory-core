@@ -31,6 +31,8 @@ See:
 - [`docs/08-readiness-scorecard.md`](docs/08-readiness-scorecard.md) for the 10/10 checklist.
 - [`docs/09-source-adapters.md`](docs/09-source-adapters.md) for real-world source adapter patterns.
 - [`docs/10-chat-mine-source-import-exporter.md`](docs/10-chat-mine-source-import-exporter.md) for the first internal Chat-Mine producer slice.
+- [`docs/11-installer-roadmap.md`](docs/11-installer-roadmap.md) for the future local/cloud installer and custody verification gate.
+- [`docs/12-custody-receipt.md`](docs/12-custody-receipt.md) for the clean restore, layered verification, and custody receipt contract.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md), [`SECURITY.md`](SECURITY.md), and [`SUPPORT.md`](SUPPORT.md) for contribution, security, and support expectations.
 
 ## Why this exists
@@ -78,6 +80,8 @@ docs/07-source-import-cutover.md source import and authoritative cutover plan
 docs/08-readiness-scorecard.md  10/10 readiness checklist
 docs/09-source-adapters.md      real-world import source adapter matrix
 docs/10-chat-mine-source-import-exporter.md  internal Chat-Mine package exporter
+docs/11-installer-roadmap.md    installer and productization roadmap
+docs/12-custody-receipt.md      clean restore and custody receipt contract
 docs/publication/smp-custody-layer.md        Draft 0.3 custody-layer specification
 docs/publication/smp-conformance-gap-audit.md Draft 0.3 conformance gap audit
 docs/roadmap.md                 milestones, release targets, and tracks
