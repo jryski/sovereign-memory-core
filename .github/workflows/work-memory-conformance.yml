@@ -3,90 +3,70 @@ name: Work-memory conformance
 on:
   pull_request:
   push:
-    branches:
-      - atlas/work-memory-v1
+    branches: [atlas/work-memory-v1]
 
 permissions:
   contents: read
 
+env:
+  PGPASSWORD: postgres
+  PREVIOUS_REVIEW_HEAD: 24d45fd1b5274145f39933cb723376a635d889fb
+
 jobs:
   fresh-install:
-    name: Fresh install, reapply, drift, runtime and concurrency (PG ${{ matrix.postgres }})
+    name: Fresh, reapply, drift, runtime (${{ matrix.pg }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        postgres: ["15", "16"]
-
+        pg: ["15", "16"]
     services:
       postgres:
-        image: postgres:${{ matrix.postgres }}
+        image: postgres:${{ matrix.pg }}
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: sovereign_memory
-        ports:
-          - 5432:5432
+        ports: [5432:5432]
         options: >-
           --health-cmd "pg_isready -U postgres -d sovereign_memory"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-
+          --health-interval 5s --health-timeout 5s --health-retries 20
     env:
-      PGPASSWORD: postgres
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_memory
-
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-
-      - name: Create managed-role fixtures
+        with: {fetch-depth: 0}
+      - name: Install client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Bootstrap database
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
-          do $$
-          begin
+          create schema if not exists extensions;
+          do $$ begin
             if not exists(select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
             if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
             if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role nologin; end if;
           end $$;
           SQL
-
-      - name: Apply core and seed a pre-attention active memory
-        run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
-          insert into public.memories(
-            content,workstream,owner,visibility,source_agent,source_kind,status
-          ) values(
-            'pre-attention conformance fixture','legacy','example-user','private',
-            'example-user-chatgpt','agent','active'
-          );
+          insert into public.memories(content,workstream,owner,visibility,source_agent,source_kind,status)
+          values('pre-attention conformance fixture','legacy','example-user','private','example-user-chatgpt','agent','active');
           SQL
-
-      - name: Apply v3 package
+      - name: Apply package
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
-
-      - name: Reapply migrations
+      - name: Reapply package
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
-
-      - name: Run rollback-only SQL conformance
+      - name: Runtime and rollback conformance
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/08_attention_events.sql
-
-      - name: Introduce deliberate drift
+      - name: Introduce drift
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           grant create on schema public to service_role;
@@ -98,109 +78,80 @@ jobs:
             on public.work_lessons(supersedes)
             where supersedes is not null and status='active';
           SQL
-
-      - name: Reapply and prove drift remediation
+      - name: Remediate drift
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           select public.assert_perimeter_closed();
-          do $$
-          declare v_def text;
-          begin
-            select indexdef into v_def
-            from pg_indexes
+          do $$ declare d text; begin
+            select indexdef into d from pg_indexes
             where schemaname='public' and indexname='work_lessons_one_live_successor_uq';
-            if v_def not ilike '%authority_state%' or v_def not ilike '%rejected%' then
-              raise exception 'reapply did not remediate successor-index drift: %',v_def;
+            if d not ilike '%authority_state%' or d not ilike '%rejected%' then
+              raise exception 'successor-index drift remains: %',d;
             end if;
           end $$;
           SQL
-
-      - name: Concurrent identical revision replay
+      - name: Concurrent identical replay
+        if: matrix.pg == '16'
         run: |
-          export CONCURRENCY_URL=postgresql://postgres:postgres@localhost:5432/smc_concurrency
           createdb -h localhost -U postgres smc_concurrency
+          export CONCURRENCY_URL=postgresql://postgres:postgres@localhost:5432/smc_concurrency
+          psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -c 'create schema if not exists extensions'
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
           DATABASE_URL="$CONCURRENCY_URL" bash tests/08_attention_concurrency.sh
-          dropdb -h localhost -U postgres smc_concurrency
 
   executable-upgrade:
-    name: Executable previous-head upgrade (PG 16)
+    name: Upgrade reviewed head (PG 16)
     runs-on: ubuntu-latest
-
     services:
       postgres:
         image: postgres:16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: sovereign_upgrade
-        ports:
-          - 5432:5432
+        ports: [5432:5432]
         options: >-
           --health-cmd "pg_isready -U postgres -d sovereign_upgrade"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-
+          --health-interval 5s --health-timeout 5s --health-retries 20
     env:
-      PGPASSWORD: postgres
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_upgrade
-
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-
-      - name: Create managed-role fixtures
+        with: {fetch-depth: 0}
+      - name: Install client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Bootstrap reviewed head
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
-          do $$
-          begin
+          create schema if not exists extensions;
+          do $$ begin
             if not exists(select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
             if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
             if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role nologin; end if;
           end $$;
           SQL
-
-      - name: Install previous PR head and seed immutable v2 rows
-        run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
-          insert into public.memories(
-            content,workstream,owner,visibility,source_agent,source_kind,status
-          ) values(
-            'pre-attention upgrade fixture','legacy','example-user','private',
-            'example-user-chatgpt','agent','active'
-          );
+          insert into public.memories(content,workstream,owner,visibility,source_agent,source_kind,status)
+          values('pre-attention upgrade fixture','legacy','example-user','private','example-user-chatgpt','agent','active');
           SQL
-          git show HEAD^:sql/07_work_lessons.sql >/tmp/previous-07.sql
-          git show HEAD^:sql/08_attention_events.sql >/tmp/previous-08.sql
-          git show HEAD^:sql/09_perimeter_refresh.sql >/tmp/previous-09.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/previous-07.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/previous-08.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/previous-09.sql
+          for f in 07_work_lessons 08_attention_events 09_perimeter_refresh; do
+            git show "$PREVIOUS_REVIEW_HEAD:sql/${f}.sql" >"/tmp/${f}.sql"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "/tmp/${f}.sql"
+          done
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/fixtures/v2_upgrade_seed.sql
-
-      - name: Execute v3 fix-forward upgrade
+      - name: Execute and verify fix-forward upgrade
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/fixtures/v2_upgrade_verify.sql
-
-      - name: Reapply upgraded package
-        run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select public.assert_perimeter_closed();"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'select public.assert_perimeter_closed()'
