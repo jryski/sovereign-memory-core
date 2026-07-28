@@ -61,6 +61,7 @@ See:
 | Richer cutover probes | Positive, negative, conflict, stale-state, and evidence-request probe categories | `sql/06_cutover_probe_categories.sql` |
 | Agent work memory | Proposed/accepted lesson lifecycle, typed evidence custody, append-only authority events, and deterministic behavioral boot fragment | `sql/07_work_lessons.sql` |
 | Attention events and projection | Append-only native observations, linked revisions and assignments, non-destructive topic indexing, and exact character-budget boot presentation | `sql/08_attention_events.sql` |
+| Perimeter refresh | Re-closes table, sequence, and function defaults after optional public-schema layers | `sql/09_perimeter_refresh.sql` |
 
 ## Repo map
 
@@ -75,6 +76,7 @@ sql/05_candidate_locators.sql   candidate locators and quote hashes
 sql/06_cutover_probe_categories.sql  richer cutover probe categories
 sql/07_work_lessons.sql         authority-gated work-memory contract
 sql/08_attention_events.sql     attention events, revisions, and boot projection
+sql/09_perimeter_refresh.sql    final perimeter closure after optional layers
 tests/07_work_lessons.sql       rollback-only work-memory conformance
 tests/08_attention_events.sql   rollback-only attention conformance
 docs/00-north-star.md           trustworthy memory transfer doctrine
@@ -108,9 +110,10 @@ SUPPORT.md                      early-alpha support expectations
 3. Optionally run `sql/02_vault.sql` and `sql/03_provenance_guards.sql`.
 4. Run `sql/04_source_import.sql` through `sql/06_cutover_probe_categories.sql` when source migration is required.
 5. Run `sql/07_work_lessons.sql` and `sql/08_attention_events.sql` for work memory and attention v2.
-6. Install the operating contract from `docs/03-agent-operations.md`.
-7. Run the acceptance tests in `docs/04-implementation-guide.md` plus `tests/07_work_lessons.sql` and `tests/08_attention_events.sql`.
-8. Run the backup and restore rehearsal in `docs/05-operations.md`.
+6. Run `sql/09_perimeter_refresh.sql` after the final optional public-schema layer.
+7. Install the operating contract from `docs/03-agent-operations.md`.
+8. Run the acceptance tests in `docs/04-implementation-guide.md` plus `tests/07_work_lessons.sql` and `tests/08_attention_events.sql`.
+9. Run the backup and restore rehearsal in `docs/05-operations.md`.
 
 For an existing deployment, read `docs/upgrades/work-memory-v2.md` first. The v2 SQL files describe the fresh-install target and are not blind production migrations.
 
@@ -149,7 +152,7 @@ See `docs/07-source-import-cutover.md` and `docs/09-source-adapters.md`.
 
 ## Verification
 
-The work-memory workflow runs the fresh-install core, SQL 07, SQL 08, and both rollback-only conformance suites against PostgreSQL 15 and 16. It also verifies the external perimeter and checks that no synthetic fixtures remain.
+The work-memory workflow runs the fresh-install core, SQL 07, SQL 08, the perimeter refresh, and both rollback-only conformance suites against PostgreSQL 15 and 16. It verifies the external perimeter and checks that no synthetic fixtures remain.
 
 Live deployments still require deployment-specific catalog, grant, viewer-isolation, backup, and restore checks. Passing portable CI is necessary but not proof that a particular production upgrade was applied correctly.
 
