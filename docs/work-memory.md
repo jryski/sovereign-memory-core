@@ -2,120 +2,139 @@
 
 ## Purpose
 
-Most assistant memory describes the principal, the world, or the work itself. Its purpose is continuity and personalization.
-
-**Work memory describes the agent's operating experience:** what it attempted, what worked, what failed, and what discipline should change as a result. Its purpose is performance improvement.
+Most assistant memory describes the principal, the world, or the work itself. **Work memory describes the agent's operating experience:** what it attempted, what worked, what failed, and what discipline should change as a result.
 
 These are different mechanisms and should not share a table.
 
-A work-memory implementation is provided in [`sql/07_work_lessons.sql`](../sql/07_work_lessons.sql).
+The portable implementation is in [`sql/07_work_lessons.sql`](../sql/07_work_lessons.sql). Rollback-only conformance checks are in [`tests/07_work_lessons.sql`](../tests/07_work_lessons.sql).
 
-## The behavioral rule
+## A stored lesson is not yet an instruction
 
-> A lesson that is only stored is a diary.
+A lesson moves through an explicit authority lifecycle:
 
-An active behavioral lesson must be included in the agent's boot or instruction payload. Otherwise the system records experience without changing behavior.
+1. **Proposed** — recorded for review, never boot-active.
+2. **Accepted** — reviewed through a sanctioned function and eligible for boot loading.
+3. **Rejected** — preserved as a reviewed proposal but not loaded.
+4. **Superseded** — replaced through append-preserving lineage, not rewritten in place.
 
-The portable SQL exposes `work_lessons_boot_fragment()`, which returns the active behavioral subset with deterministic ordering. A deployment integrates that fragment into its own session-boot contract.
+Only active, accepted `rule` and `prohibition` rows with at least one current, resolvable evidence relation may appear in the boot fragment.
+
+A shared runtime credential can enforce this workflow and preserve an audit trail, but it cannot cryptographically prove whether a human or an agent supplied the approval. Deployments that require identity-backed authority must use distinct principals or credentials.
 
 ## Lesson classes
 
 | Kind | Loaded at boot | Purpose |
 |---|---:|---|
-| `prohibition` | yes | A bounded action or failure class the agent must avoid. |
-| `rule` | yes | An operating discipline the agent should follow. |
-| `worked` | no | Evidence that a rule was earned. |
-| `failed` | no | Evidence that a prohibition or correction was earned. |
+| `prohibition` | yes, after acceptance | A bounded action or failure class the agent must avoid. |
+| `rule` | yes, after acceptance | An operating discipline the agent should follow. |
+| `worked` | no | Evidence that a technique or control succeeded. |
+| `failed` | no | Evidence that an approach or assertion failed. |
 
-Boot-loaded claims should be short, actionable, and narrowly scoped. Narrative, cost, and reasoning belong in `detail` and in the supporting `worked` or `failed` rows.
+Boot-loaded claims should be short, actionable, and narrowly scoped. Narrative, cost, and reasoning belong in `detail` and supporting evidence.
 
-## Evidence invariant
+## Evidence custody
 
-Every lesson requires a non-empty `evidence_ref` that identifies durable supporting evidence, such as:
+Evidence is a relation, not a comma-delimited string attached to a lesson.
 
-- a coordination record;
-- a migration or release artifact;
-- an immutable record identifier;
-- a test or incident artifact;
-- a public source.
+Each evidence row records:
 
-The database enforces presence, not truth or resolvability. Deployments remain responsible for ensuring that the locator can be resolved by an authorized reviewer.
+- a typed evidence kind;
+- a canonical locator;
+- the source authority or store;
+- a resolution state;
+- an optional integrity hash;
+- who appended it;
+- optional correction lineage.
 
-A lesson without traceable evidence is an assertion, not a lesson.
+New sanctioned writes use canonical locator forms:
 
-## Moving record
+| Evidence kind | Canonical shape |
+|---|---|
+| `model_channel` | `model_channel:12` or `model_channel:12-15` |
+| `household_channel` | `household_channel:7` |
+| `memory` | `memory:<uuid>` |
+| `migration` | `migration:<snake_case_name>` |
+| `artifact` | `artifact:sha256:<64 lowercase hex>` |
+| `public_source` | `public_source:https://...` |
+| `other_durable_locator` | `other:<scheme>:<value>` |
 
-Lessons are corrected by supersession, not in-place rewriting.
+A value can be syntactically canonical and still fail to resolve. Resolvability is an acceptance and conformance property, not something a regular expression can prove.
 
-Use:
+### Corrections append; they do not overwrite
 
-```sql
-select supersede_lesson(
-  p_id,
-  p_claim,
-  p_detail,
-  p_evidence_ref
-);
-```
+Evidence and authority events are append-only. A correction appends a successor evidence row linked through `supersedes`. The terminal rows are exposed through `work_lesson_evidence_current`.
 
-The function creates a successor, preserves the lesson kind and v1 scope, and marks the prior active row superseded in the same transaction.
+This preserves both the original assertion and the later correction. Direct update, delete, and truncate are denied for routine runtime roles.
 
-The earlier lesson remains evidence of what the system previously believed and why it changed.
+## Sanctioned write path
 
-## Version 1 scope
+The portable contract exposes bounded SECURITY DEFINER functions:
 
-Version 1 supports only `applies_to = 'all-agents'`.
+- `propose_work_lesson(...)`
+- `append_work_lesson_evidence(...)`
+- `correct_work_lesson_evidence(...)`
+- `accept_work_lesson(...)`
+- `reject_work_lesson(...)`
+- `propose_lesson_supersession(...)`
+- `work_lessons_boot_fragment()`
 
-Agent-specific loading is deliberately deferred until the deployment has a typed agent identity and explicit boot semantics for unknown agents, fallback behavior, and cross-agent visibility. The column is retained as a reserved compatibility seam but constrained so it cannot imply unsupported enforcement.
+The intended correction flow is:
+
+1. Propose a successor with `propose_lesson_supersession(...)`.
+2. Append or correct evidence until at least one current row is resolvable.
+3. Accept the successor with `accept_work_lesson(...)`.
+4. The acceptance transaction supersedes the predecessor and appends both authority events.
+
+There is intentionally no convenience function that silently proposes and accepts in one call.
+
+## Boot behavior
+
+`work_lessons_boot_fragment()` returns:
+
+- accepted, active prohibitions;
+- accepted, active rules;
+- deterministic ordering;
+- historical worked/failed counts;
+- proposed and evidence-blocked counts.
+
+Worked and failed rows remain queryable evidence but are never injected as behavioral instructions.
+
+Version 2 still supports only `applies_to = 'all-agents'`. Agent-scoped loading is deferred until a deployment has typed agent identity and explicit unknown-agent, fallback, and cross-agent semantics.
 
 ## What belongs here
 
 - A verification technique that caught a consequential error.
 - A failure mode that produced an incorrect result.
-- A narrowly stated prohibition supported by an observed failure.
+- A narrowly stated prohibition supported by observed evidence.
 - A coordination or execution rule supported by evidence.
 - A correction to prior agent behavior.
 
 ## What does not belong here
 
-- Facts about the principal or world. Those belong in memory.
-- Architecture decisions and rationale. Those belong in documents or decision records.
-- Current task status. That belongs in project state or an issue tracker.
+- Facts about the principal or world.
+- Architecture decisions and rationale.
+- Current task status.
 - Preferences presented as universal rules.
 - Unfalsifiable claims.
-- Lessons without durable evidence.
-
-## Failure modes
-
-### Growth without compression
-
-Boot-loaded rules consume context. If the active set grows beyond attentive use, overlapping rules should be merged through supersession and obsolete rules should be superseded. Do not silently drop low-ranked rules without an explicit policy.
-
-### Overbroad claims
-
-A useful rule in one investigation may be harmful as a universal prohibition. State the domain, trigger, and consequence narrowly enough that the rule changes the intended behavior without blocking authorized work.
-
-### Self-congratulation
-
-`worked` rows are easy to create and often low-information. Favor failures, corrections, and evidence that changed the operating model.
-
-### Written but not loaded
-
-A deployment that creates `work_lessons` but never calls `work_lessons_boot_fragment()` has implemented a log, not behavioral memory.
-
-### Unverified mechanism claims
-
-Verify that functions, constraints, grants, and boot integration exist in the live catalog and behave correctly. Documentation is not proof of deployment.
+- Behavioral instructions without resolvable evidence.
 
 ## Minimum conformance checks
 
 A deployment should prove that:
 
-1. blank evidence references are rejected;
-2. unsupported `applies_to` values are rejected;
-3. the supersession function creates valid lineage and deactivates the predecessor;
-4. only one active direct successor can exist for a lesson;
-5. boot output loads active rules and prohibitions in deterministic order;
-6. worked and failed rows remain available as evidence but are not injected as behavioral instructions;
-7. public or anonymous roles do not receive unintended access;
-8. the deployment's actual session boot includes the returned fragment.
+1. whitespace-only claims, actors, authorities, and locators are rejected;
+2. routine roles cannot directly mutate or truncate lessons, evidence, or events;
+3. a proposed rule or prohibition is absent from boot;
+4. acceptance fails without current resolvable evidence;
+5. an evidence correction appends a successor and a custody event;
+6. acceptance makes the lesson boot-visible and appends an authority event;
+7. rejection remains preserved but non-boot-active;
+8. supersession preserves lineage and cannot create competing active successors;
+9. worked and failed rows remain available but are not injected;
+10. ordering is deterministic;
+11. public, anonymous, and ordinary authenticated roles have no unintended access;
+12. rollback-only tests leave no fixtures.
+
+## Upgrade versus fresh install
+
+The SQL file defines the fresh-install contract. Existing deployments must not blindly replay it over live tables. See [`docs/upgrades/work-memory-v2.md`](upgrades/work-memory-v2.md) for the required inventory, custody, evidence-normalization, and boot-gating sequence.
