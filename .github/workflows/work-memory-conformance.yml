@@ -1,0 +1,89 @@
+name: Work Memory Conformance
+
+on:
+  pull_request:
+    paths:
+      - "sql/01_core.sql"
+      - "sql/07_work_lessons.sql"
+      - "sql/08_attention_events.sql"
+      - "tests/07_work_lessons.sql"
+      - "tests/08_attention_events.sql"
+      - ".github/workflows/work-memory-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres:
+    name: PostgreSQL ${{ matrix.pg }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ["15", "16"]
+
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sovereign_memory_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sovereign_memory_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGDATABASE: sovereign_memory_test
+      PGUSER: postgres
+      PGPASSWORD: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create managed-platform shim roles
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          begin
+            if not exists(select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
+            if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
+            if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role nologin; end if;
+          end $$;
+          SQL
+
+      - name: Apply core and work-memory contracts
+        run: |
+          psql -v ON_ERROR_STOP=1 -f sql/01_core.sql
+          psql -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
+          psql -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
+
+      - name: Verify external perimeter
+        run: psql -v ON_ERROR_STOP=1 -c "select assert_perimeter_closed();"
+
+      - name: Run rollback-only conformance tests
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/07_work_lessons.sql
+          psql -v ON_ERROR_STOP=1 -f tests/08_attention_events.sql
+
+      - name: Verify fixtures rolled back
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          select case when count(*)=0 then 'work-lessons-clean' else (1/0)::text end
+          from work_lessons where created_by='fixture-agent';
+
+          select case when count(*)=0 then 'attention-fixtures-clean' else (1/0)::text end
+          from memories where tags @> array['fixture']::text[];
+          SQL
