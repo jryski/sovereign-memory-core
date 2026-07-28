@@ -154,6 +154,8 @@ See `docs/07-source-import-cutover.md` and `docs/09-source-adapters.md`.
 
 The work-memory workflow runs the fresh-install core, SQL 07, SQL 08, the perimeter refresh, and both rollback-only conformance suites against PostgreSQL 15 and 16. It verifies the external perimeter and checks that no synthetic fixtures remain.
 
+The pull request remains draft until an independent reviewer examines the exact immutable head that produced the passing checks. A green moving branch is not itself an approval.
+
 Live deployments still require deployment-specific catalog, grant, viewer-isolation, backup, and restore checks. Passing portable CI is necessary but not proof that a particular production upgrade was applied correctly.
 
 ## License / provenance
