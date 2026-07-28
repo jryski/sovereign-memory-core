@@ -126,8 +126,8 @@ begin
   end;
 
   begin
-    execute 'truncate table attention_events';
-    raise exception 'event truncate unexpectedly succeeded';
+    execute 'truncate table attention_event_assignments';
+    raise exception 'assignment truncate unexpectedly succeeded';
   exception when others then
     if sqlerrm not like '%TRUNCATE is not permitted%' then raise; end if;
   end;
