@@ -94,9 +94,28 @@ jobs:
         run: psql -q -v ON_ERROR_STOP=1 -c "select assert_perimeter_closed();"
 
       - name: Run rollback-only conformance tests
+        id: conformance
+        shell: bash
         run: |
-          psql -q -v ON_ERROR_STOP=1 -f tests/07_work_lessons.sql
-          psql -q -v ON_ERROR_STOP=1 -f tests/08_attention_events.sql
+          set +e
+          {
+            echo '=== tests/07_work_lessons.sql ==='
+            psql -q -v ON_ERROR_STOP=1 -f tests/07_work_lessons.sql &&
+            echo '=== tests/08_attention_events.sql ==='
+            psql -q -v ON_ERROR_STOP=1 -f tests/08_attention_events.sql
+          } > conformance-pg${{ matrix.pg }}.log 2>&1
+          status=$?
+          cat conformance-pg${{ matrix.pg }}.log
+          exit "$status"
+
+      - name: Upload conformance failure log
+        if: failure() && steps.conformance.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-pg${{ matrix.pg }}
+          path: conformance-pg${{ matrix.pg }}.log
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Verify fixtures rolled back
         run: |
