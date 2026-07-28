@@ -120,9 +120,14 @@ jobs:
       - name: Verify fixtures rolled back
         run: |
           psql -q -v ON_ERROR_STOP=1 <<'SQL'
-          select case when count(*)=0 then 'work-lessons-clean' else (1/0)::text end
-          from work_lessons where created_by='fixture-agent';
-
-          select case when count(*)=0 then 'attention-fixtures-clean' else (1/0)::text end
-          from memories where tags @> array['fixture']::text[];
+          do $$
+          begin
+            if exists(select 1 from work_lessons where created_by='fixture-agent') then
+              raise exception 'work-lesson fixtures persisted';
+            end if;
+            if exists(select 1 from memories where tags @> array['fixture']::text[]) then
+              raise exception 'attention fixtures persisted';
+            end if;
+          end $$;
+          select 'rollback fixtures clean' as result;
           SQL
