@@ -1,22 +1,15 @@
 -- ============================================================================
--- SOVEREIGN MEMORY :: ATTENTION EVENTS + PROJECTION V2
--- Target: PostgreSQL 15+. Run after sql/01_core.sql.
+-- SOVEREIGN MEMORY :: ATTENTION EVENTS + PROJECTION V3
+-- Target: PostgreSQL 15+. Idempotent fresh-install and fix-forward contract.
 --
--- Fresh-install/additive contract:
---   * no destructive topic eviction or fixed topic-count worldview;
---   * native append-only source-semantic events;
---   * stable identity with linked observed revisions;
---   * separate append-only project/workstream/topic assignments;
---   * proposed->active captured as memory_activated, not memory_created;
---   * exact serialized-character, deterministic monotonic boot projection.
---
--- Existing deployments require a reviewed upgrade. Do not fabricate historical
--- events or rewrite old attention state. See docs/upgrades/work-memory-v2.md.
+-- Native creation and activation events are emitted only by their source
+-- transition triggers. Runtime replay APIs are existence-only. Every producer
+-- hashes the exact persisted source_revision value.
 -- ============================================================================
 
 create table if not exists attention_events (
   id                     uuid primary key default gen_random_uuid(),
-  contract_version       text not null default 'attention-event/0.2'
+  contract_version       text not null default 'attention-event/0.3'
                            check (contract_version ~ '[^[:space:]]'),
   source_system          text not null check (source_system ~ '[^[:space:]]'),
   source_namespace       text not null check (source_namespace ~ '[^[:space:]]'),
@@ -48,6 +41,13 @@ create table if not exists attention_events (
   )
 );
 
+alter table attention_events add column if not exists revision_ordinal integer not null default 1;
+alter table attention_events add column if not exists supersedes_event_id uuid references attention_events(id) on delete restrict;
+alter table attention_events add column if not exists owner text;
+alter table attention_events add column if not exists visibility text;
+alter table attention_events add column if not exists credential_ref text;
+alter table attention_events add column if not exists runtime_ref text;
+
 create unique index if not exists attention_events_identity_revision_uq
   on attention_events(identity_key,revision_ordinal);
 create unique index if not exists attention_events_one_successor_uq
@@ -69,31 +69,26 @@ create table if not exists attention_event_assignments (
   constraint attention_assignment_not_self check (supersedes is null or supersedes<>id),
   unique(event_id,assignment_kind,assignment_key,assigned_by)
 );
-
 create unique index if not exists attention_assignment_one_successor_uq
   on attention_event_assignments(supersedes)
   where supersedes is not null;
 
 comment on table attention_events is
-  'Append-only non-content observation envelopes. Stable identity may have multiple linked observed revisions.';
-comment on table attention_event_assignments is
-  'Append-only derived project/workstream/topic classifications linked to attention events.';
+  'Append-only non-content observation envelopes. Stable identity may carry linked observed revisions.';
 
 alter table attention_events enable row level security;
+alter table attention_events force row level security;
 alter table attention_event_assignments enable row level security;
+alter table attention_event_assignments force row level security;
 revoke all on attention_events,attention_event_assignments from public;
 
 do $$
 begin
-  if exists(select 1 from pg_roles where rolname='anon') then
-    execute 'revoke all on attention_events,attention_event_assignments from anon';
-  end if;
-  if exists(select 1 from pg_roles where rolname='authenticated') then
-    execute 'revoke all on attention_events,attention_event_assignments from authenticated';
-  end if;
   if exists(select 1 from pg_roles where rolname='service_role') then
-    execute 'revoke all on attention_events,attention_event_assignments from service_role';
-    execute 'grant select on attention_events,attention_event_assignments to service_role';
+    drop policy if exists attention_events_service_select on attention_events;
+    create policy attention_events_service_select on attention_events for select to service_role using(true);
+    drop policy if exists attention_assignments_service_select on attention_event_assignments;
+    create policy attention_assignments_service_select on attention_event_assignments for select to service_role using(true);
   end if;
 end $$;
 
@@ -128,6 +123,48 @@ begin
   if v_cut !~ '[[:space:]]' then return ''; end if;
   v_trimmed:=regexp_replace(v_cut,'[[:space:]][^[:space:]]*$','');
   return btrim(v_trimmed);
+end;
+$$;
+
+create or replace function attention_fixed_point_chars(p_base_chars integer)
+returns integer
+language plpgsql immutable set search_path=pg_catalog as $$
+declare
+  v_value integer:=greatest(coalesce(p_base_chars,0),0);
+  v_next integer;
+  v_i integer;
+begin
+  for v_i in 1..32 loop
+    v_next:=greatest(coalesce(p_base_chars,0),0)+char_length(v_value::text);
+    if v_next=v_value then return v_value; end if;
+    v_value:=v_next;
+  end loop;
+  raise exception 'decimal self-length failed to reach a fixed point';
+end;
+$$;
+
+create or replace function attention_set_rendered_chars(p_payload jsonb)
+returns jsonb
+language plpgsql immutable set search_path=public,pg_catalog as $$
+declare
+  v_payload jsonb;
+  v_base integer;
+  v_fixed integer;
+  v_actual integer;
+begin
+  if p_payload is null or jsonb_typeof(p_payload)<>'object'
+     or jsonb_typeof(p_payload->'coverage')<>'object' then
+    raise exception 'attention_set_rendered_chars requires an object with a coverage object';
+  end if;
+  v_payload:=jsonb_set(p_payload,'{coverage,rendered_chars}','0'::jsonb,true);
+  v_base:=char_length(v_payload::text)-1;
+  v_fixed:=attention_fixed_point_chars(v_base);
+  v_payload:=jsonb_set(v_payload,'{coverage,rendered_chars}',to_jsonb(v_fixed),true);
+  v_actual:=char_length(v_payload::text);
+  if v_actual<>v_fixed then
+    raise exception 'rendered_chars fixed-point assertion failed: reported %, actual %',v_fixed,v_actual;
+  end if;
+  return v_payload;
 end;
 $$;
 
@@ -178,22 +215,20 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists trg_attention_revision_lineage on attention_events;
 create trigger trg_attention_revision_lineage
 before insert on attention_events
 for each row execute function validate_attention_event_revision_lineage();
 
--- First-touch visibility is immediate. Storage grows; presentation performs the
--- limiting. The legacy staging table remains for upgrade compatibility but is no
--- longer part of the v2 write path.
 create or replace function hot_touch(
   p_topic_key text,p_memory_id uuid,p_summary text default null,p_workstream text default null
 ) returns text
 language plpgsql security definer set search_path=public as $$
 declare v_owner text;v_visibility text;v_workstream text;v_summary text;v_content text;
 begin
-  if p_topic_key is null or p_topic_key !~ '[^[:space:]]' then raise exception 'hot_touch: topic key must contain non-whitespace'; end if;
+  if p_topic_key is null or p_topic_key !~ '[^[:space:]]' then
+    raise exception 'hot_touch: topic key must contain non-whitespace';
+  end if;
   select owner,visibility,workstream,content
   into v_owner,v_visibility,v_workstream,v_content
   from memories where id=p_memory_id and status='active';
@@ -204,12 +239,8 @@ begin
   insert into memory_hot_index(memory_id,topic_key,owner,visibility,summary,workstream,touch_count,last_touched)
   values(p_memory_id,p_topic_key,v_owner,v_visibility,v_summary,v_workstream,1,now())
   on conflict(owner,topic_key) do update set
-    memory_id=excluded.memory_id,
-    visibility=excluded.visibility,
-    summary=excluded.summary,
-    workstream=excluded.workstream,
-    touch_count=memory_hot_index.touch_count+1,
-    last_touched=now();
+    memory_id=excluded.memory_id,visibility=excluded.visibility,summary=excluded.summary,
+    workstream=excluded.workstream,touch_count=memory_hot_index.touch_count+1,last_touched=now();
   delete from memory_hot_staging where owner=v_owner and topic_key=p_topic_key;
   return 'indexed';
 end;
@@ -224,43 +255,60 @@ join memories m on m.id=hi.memory_id and m.status='active';
 
 create or replace function record_native_memory_attention(p_memory_id uuid)
 returns uuid
-language plpgsql security definer set search_path=public,extensions as $$
-declare v_memory memories%rowtype;v_identity text;v_revision text;v_event uuid;v_topic text;
-begin
-  select * into v_memory from memories where id=p_memory_id;
-  if not found then raise exception 'record_native_memory_attention: memory not found'; end if;
-  if v_memory.status<>'active' or v_memory.source_kind not in ('agent','human','manual') then return null; end if;
-  v_topic:=attention_workstream_key(v_memory.workstream);
-  v_identity:=attention_hash_parts('attention-event/0.2','sovereign-memory','memory','memory_created',v_memory.id::text);
-  v_revision:=attention_hash_parts(v_identity,'native-revision:1');
-  insert into attention_events(
-    contract_version,source_system,source_namespace,source_event_type,source_native_event_id,
-    identity_key,revision_key,source_revision,revision_ordinal,memory_id,principal_key,owner,visibility,actor_key,
-    workstream_as_of,topic_key_as_of,occurred_at,source_evidence_ref,observation_method,historical_import,metadata
-  ) values(
-    'attention-event/0.2','sovereign-memory','memory','memory_created',v_memory.id::text,
-    v_identity,v_revision,'1',1,v_memory.id,v_memory.owner,v_memory.owner,v_memory.visibility,v_memory.source_agent,
-    v_memory.workstream,v_topic,v_memory.created_at,'memory:'||v_memory.id::text,'native_insert_trigger',false,
-    jsonb_build_object('source_kind',v_memory.source_kind::text)
-  ) on conflict(revision_key) do nothing returning id into v_event;
-  if v_event is null then select id into v_event from attention_events where revision_key=v_revision; end if;
-  if v_topic is not null then
-    insert into attention_event_assignments(event_id,assignment_kind,assignment_key,confidence,assigned_by,assignment_model_version)
-    values(v_event,'workstream',v_topic,1.0,'declared-source-field','attention-assignment/0.2')
-    on conflict do nothing;
-    if coalesce(current_setting('app.attention_explicit_topic',true),'')<>'on' and not v_memory.hot_touched then
-      perform hot_touch(v_topic,v_memory.id,left(v_memory.content,200),v_memory.workstream);
-    end if;
-  end if;
-  return v_event;
-end;
+language sql stable security definer set search_path=public as $$
+select e.id from attention_events e
+where e.memory_id=p_memory_id and e.source_event_type='memory_created' and e.revision_ordinal=1
+order by e.recorded_at,e.id limit 1;
+$$;
+
+create or replace function record_native_memory_activation(p_memory_id uuid,p_actor text default null)
+returns uuid
+language sql stable security definer set search_path=public as $$
+select e.id from attention_events e
+where e.memory_id=p_memory_id and e.source_event_type='memory_activated' and e.revision_ordinal=1
+order by e.recorded_at,e.id limit 1;
 $$;
 
 create or replace function capture_memory_attention_after_insert()
 returns trigger
 language plpgsql security definer set search_path=public,extensions as $$
+declare
+  v_identity text;
+  v_source_revision text:='native-revision:1';
+  v_revision text;
+  v_event uuid;
+  v_topic text;
+  v_credential text:=nullif(current_setting('app.credential_ref',true),'');
+  v_runtime text:=coalesce(nullif(current_setting('app.runtime_ref',true),''),'shared-runtime');
 begin
-  perform record_native_memory_attention(new.id);
+  if new.status<>'active' or new.source_kind not in ('agent','human','manual') then return new; end if;
+  v_topic:=attention_workstream_key(new.workstream);
+  v_identity:=attention_hash_parts('attention-event/0.3','sovereign-memory','memory','memory_created',new.id::text);
+  v_revision:=attention_hash_parts(v_identity,v_source_revision);
+  insert into attention_events(
+    contract_version,source_system,source_namespace,source_event_type,source_native_event_id,
+    identity_key,revision_key,source_revision,revision_ordinal,memory_id,principal_key,owner,visibility,
+    actor_key,credential_ref,runtime_ref,workstream_as_of,topic_key_as_of,occurred_at,
+    source_evidence_ref,observation_method,historical_import,metadata
+  ) values(
+    'attention-event/0.3','sovereign-memory','memory','memory_created',new.id::text,
+    v_identity,v_revision,v_source_revision,1,new.id,new.owner,new.owner,new.visibility,
+    new.source_agent,v_credential,v_runtime,new.workstream,v_topic,new.created_at,
+    'memory:'||new.id::text,'native_insert_trigger',false,
+    jsonb_build_object(
+      'source_kind',new.source_kind::text,
+      'attribution_assurance',case when v_credential is null then 'shared-runtime-assertion' else 'credential-asserted' end
+    )
+  ) on conflict(revision_key) do nothing returning id into v_event;
+  if v_event is null then select id into v_event from attention_events where revision_key=v_revision; end if;
+  if v_topic is not null and v_event is not null then
+    insert into attention_event_assignments(event_id,assignment_kind,assignment_key,confidence,assigned_by,assignment_model_version)
+    values(v_event,'workstream',v_topic,1.0,'declared-source-field','attention-assignment/0.3')
+    on conflict do nothing;
+    if coalesce(current_setting('app.attention_explicit_topic',true),'')<>'on' and not new.hot_touched then
+      perform hot_touch(v_topic,new.id,left(new.content,200),new.workstream);
+    end if;
+  end if;
   return new;
 end;
 $$;
@@ -268,50 +316,50 @@ $$;
 drop trigger if exists trg_capture_native_memory_attention on memories;
 create trigger trg_capture_native_memory_attention
 after insert on memories
-for each row execute function capture_memory_attention_after_insert();
-
-create or replace function record_native_memory_activation(p_memory_id uuid,p_actor text default null)
-returns uuid
-language plpgsql security definer set search_path=public,extensions as $$
-declare v_memory memories%rowtype;v_identity text;v_revision text;v_event uuid;v_topic text;v_actor text;
-begin
-  select * into v_memory from memories where id=p_memory_id;
-  if not found then raise exception 'record_native_memory_activation: memory not found'; end if;
-  if v_memory.status<>'active' or v_memory.source_kind not in ('agent','human','manual') then return null; end if;
-  v_actor:=coalesce(nullif(btrim(p_actor),''),v_memory.source_agent,'shared-runtime');
-  v_topic:=attention_workstream_key(v_memory.workstream);
-  v_identity:=attention_hash_parts('attention-event/0.2','sovereign-memory','memory','memory_activated',v_memory.id::text);
-  v_revision:=attention_hash_parts(v_identity,'native-revision:1');
-  insert into attention_events(
-    contract_version,source_system,source_namespace,source_event_type,source_native_event_id,
-    identity_key,revision_key,source_revision,revision_ordinal,memory_id,principal_key,owner,visibility,actor_key,
-    workstream_as_of,topic_key_as_of,occurred_at,source_evidence_ref,observation_method,historical_import,metadata
-  ) values(
-    'attention-event/0.2','sovereign-memory','memory','memory_activated',v_memory.id::text,
-    v_identity,v_revision,'1',1,v_memory.id,v_memory.owner,v_memory.owner,v_memory.visibility,v_actor,
-    v_memory.workstream,v_topic,now(),'memory:'||v_memory.id::text,'native_status_transition',false,
-    jsonb_build_object('source_kind',v_memory.source_kind::text,'transition','proposed_to_active')
-  ) on conflict(revision_key) do nothing returning id into v_event;
-  if v_event is null then select id into v_event from attention_events where revision_key=v_revision; end if;
-  if v_topic is not null then
-    insert into attention_event_assignments(event_id,assignment_kind,assignment_key,confidence,assigned_by,assignment_model_version)
-    values(v_event,'workstream',v_topic,1.0,'declared-source-field','attention-assignment/0.2')
-    on conflict do nothing;
-    if not v_memory.hot_touched then perform hot_touch(v_topic,v_memory.id,left(v_memory.content,200),v_memory.workstream); end if;
-  end if;
-  return v_event;
-end;
-$$;
+for each row
+when (new.status='active' and new.source_kind in ('agent','human','manual'))
+execute function capture_memory_attention_after_insert();
 
 create or replace function capture_memory_activation_after_update()
 returns trigger
 language plpgsql security definer set search_path=public,extensions as $$
+declare
+  v_identity text;
+  v_source_revision text:='native-revision:1';
+  v_revision text;
+  v_event uuid;
+  v_topic text;
+  v_actor text;
+  v_credential text:=nullif(current_setting('app.credential_ref',true),'');
+  v_runtime text:=coalesce(nullif(current_setting('app.runtime_ref',true),''),'shared-runtime');
 begin
-  if old.status='proposed' and new.status='active'
-     and new.source_kind in ('agent','human','manual') then
-    perform record_native_memory_activation(
-      new.id,coalesce(new.metadata->>'promoted_by',current_setting('app.actor_agent',true),new.source_agent)
-    );
+  if old.status<>'proposed' or new.status<>'active'
+     or new.source_kind not in ('agent','human','manual') then return new; end if;
+  v_actor:=coalesce(nullif(new.metadata->>'promoted_by',''),nullif(current_setting('app.actor_agent',true),''),new.source_agent,'shared-runtime');
+  v_topic:=attention_workstream_key(new.workstream);
+  v_identity:=attention_hash_parts('attention-event/0.3','sovereign-memory','memory','memory_activated',new.id::text);
+  v_revision:=attention_hash_parts(v_identity,v_source_revision);
+  insert into attention_events(
+    contract_version,source_system,source_namespace,source_event_type,source_native_event_id,
+    identity_key,revision_key,source_revision,revision_ordinal,memory_id,principal_key,owner,visibility,
+    actor_key,credential_ref,runtime_ref,workstream_as_of,topic_key_as_of,occurred_at,
+    source_evidence_ref,observation_method,historical_import,metadata
+  ) values(
+    'attention-event/0.3','sovereign-memory','memory','memory_activated',new.id::text,
+    v_identity,v_revision,v_source_revision,1,new.id,new.owner,new.owner,new.visibility,
+    v_actor,v_credential,v_runtime,new.workstream,v_topic,clock_timestamp(),
+    'memory:'||new.id::text,'native_status_transition',false,
+    jsonb_build_object(
+      'source_kind',new.source_kind::text,'transition','proposed_to_active',
+      'attribution_assurance',case when v_credential is null then 'shared-runtime-assertion' else 'credential-asserted' end
+    )
+  ) on conflict(revision_key) do nothing returning id into v_event;
+  if v_event is null then select id into v_event from attention_events where revision_key=v_revision; end if;
+  if v_topic is not null and v_event is not null then
+    insert into attention_event_assignments(event_id,assignment_kind,assignment_key,confidence,assigned_by,assignment_model_version)
+    values(v_event,'workstream',v_topic,1.0,'declared-source-field','attention-assignment/0.3')
+    on conflict do nothing;
+    if not new.hot_touched then perform hot_touch(v_topic,new.id,left(new.content,200),new.workstream); end if;
   end if;
   return new;
 end;
@@ -328,46 +376,65 @@ create or replace function append_attention_event_revision(
   p_source_evidence_ref text,p_observation_method text,p_metadata jsonb default '{}'
 ) returns uuid
 language plpgsql security definer set search_path=public,extensions as $$
-declare v_old attention_events%rowtype;v_revision_key text;v_existing uuid;v_new uuid;
+declare
+  v_requested attention_events%rowtype;
+  v_tip attention_events%rowtype;
+  v_revision_key text;
+  v_existing uuid;
+  v_new uuid;
+  v_actor text:=coalesce(nullif(current_setting('app.actor_agent',true),''),'shared-runtime');
+  v_credential text:=nullif(current_setting('app.credential_ref',true),'');
+  v_runtime text:=coalesce(nullif(current_setting('app.runtime_ref',true),''),'shared-runtime');
+  v_metadata jsonb;
 begin
   if p_source_revision is null or p_source_revision !~ '[^[:space:]]'
+     or p_occurred_at is null
      or p_source_evidence_ref is null or p_source_evidence_ref !~ '[^[:space:]]'
      or p_observation_method is null or p_observation_method !~ '[^[:space:]]' then
-    raise exception 'revision, evidence and observation method must contain non-whitespace';
+    raise exception 'revision, occurrence time, evidence and observation method are required';
   end if;
-  select * into v_old from attention_events where id=p_predecessor_event_id;
+  select * into v_requested from attention_events where id=p_predecessor_event_id;
   if not found then raise exception 'predecessor event not found'; end if;
-  v_revision_key:=attention_hash_parts(v_old.identity_key,p_source_revision);
+  v_revision_key:=attention_hash_parts(v_requested.identity_key,p_source_revision);
+  perform pg_advisory_xact_lock(hashtextextended(v_requested.identity_key,0));
   select id into v_existing from attention_events
-  where identity_key=v_old.identity_key and revision_key=v_revision_key;
+  where identity_key=v_requested.identity_key and revision_key=v_revision_key;
   if found then return v_existing; end if;
-  select * into v_old from attention_events where id=p_predecessor_event_id for update;
-  if exists(select 1 from attention_events where supersedes_event_id=v_old.id) then
+  select * into v_tip from attention_events
+  where identity_key=v_requested.identity_key
+  order by revision_ordinal desc,recorded_at desc,id
+  limit 1 for update;
+  if v_tip.id is distinct from p_predecessor_event_id then
     raise exception 'predecessor is not the current revision';
   end if;
+  v_metadata:=coalesce(p_metadata,'{}'::jsonb)||jsonb_build_object(
+    'attribution_assurance',case when v_credential is null then 'shared-runtime-assertion' else 'credential-asserted' end
+  );
   insert into attention_events(
     contract_version,source_system,source_namespace,source_event_type,source_native_event_id,
     identity_key,revision_key,source_revision,revision_ordinal,supersedes_event_id,
-    memory_id,principal_key,owner,visibility,actor_key,credential_ref,runtime_ref,workstream_as_of,topic_key_as_of,
-    occurred_at,source_evidence_ref,observation_method,historical_import,metadata
+    memory_id,principal_key,owner,visibility,actor_key,credential_ref,runtime_ref,
+    workstream_as_of,topic_key_as_of,occurred_at,source_evidence_ref,observation_method,historical_import,metadata
   ) values(
-    v_old.contract_version,v_old.source_system,v_old.source_namespace,v_old.source_event_type,v_old.source_native_event_id,
-    v_old.identity_key,v_revision_key,p_source_revision,v_old.revision_ordinal+1,v_old.id,
-    v_old.memory_id,v_old.principal_key,v_old.owner,v_old.visibility,v_old.actor_key,v_old.credential_ref,v_old.runtime_ref,
-    v_old.workstream_as_of,v_old.topic_key_as_of,p_occurred_at,p_source_evidence_ref,p_observation_method,
-    v_old.historical_import,coalesce(p_metadata,'{}')
-  ) returning id into v_new;
+    'attention-event/0.3',v_tip.source_system,v_tip.source_namespace,v_tip.source_event_type,v_tip.source_native_event_id,
+    v_tip.identity_key,v_revision_key,p_source_revision,v_tip.revision_ordinal+1,v_tip.id,
+    v_tip.memory_id,v_tip.principal_key,v_tip.owner,v_tip.visibility,v_actor,v_credential,v_runtime,
+    v_tip.workstream_as_of,v_tip.topic_key_as_of,p_occurred_at,p_source_evidence_ref,p_observation_method,
+    v_tip.historical_import,v_metadata
+  ) on conflict(revision_key) do nothing returning id into v_new;
+  if v_new is null then
+    select id into v_new from attention_events where revision_key=v_revision_key;
+    return v_new;
+  end if;
   insert into attention_event_assignments(
     event_id,assignment_kind,assignment_key,confidence,assigned_by,assignment_model_version,supersedes
   )
   select v_new,assignment_kind,assignment_key,confidence,assigned_by,assignment_model_version,id
-  from attention_event_assignments where event_id=v_old.id;
+  from attention_event_assignments where event_id=v_tip.id;
   return v_new;
 end;
 $$;
 
--- Keep explicit topic keys compatible while allowing zero-ceremony default
--- workstream orientation for ordinary direct inserts.
 create or replace function remember(
   p_content text,p_workstream text,p_topic_key text,p_source_agent text,p_owner text,
   p_summary text default null,p_tags text[] default '{}',p_visibility text default 'shared',
@@ -406,7 +473,6 @@ begin
   return 'promoted';
 end;
 $$;
-
 create or replace function promote_memory(p_id uuid,p_note text default null)
 returns text
 language sql security definer set search_path=public as $$
@@ -431,7 +497,6 @@ begin
   select count(*) into v_total
   from memory_hot_ranked
   where visibility='shared' or owner=p_viewer;
-
   for r in
     select topic_key,owner,visibility,summary,workstream,touch_count,score
     from memory_hot_ranked
@@ -440,59 +505,42 @@ begin
              score desc,last_touched desc,topic_key,memory_id
   loop
     v_candidate:=jsonb_build_object(
-      'topic_key',r.topic_key,
-      'owner',r.owner,
-      'visibility',r.visibility,
+      'topic_key',r.topic_key,'owner',r.owner,'visibility',r.visibility,
       'summary',attention_summary_at_word_boundary(r.summary,v_summary_limit),
-      'workstream',r.workstream,
-      'touch_count',r.touch_count,
-      'score',round(r.score::numeric,6)
+      'workstream',r.workstream,'touch_count',r.touch_count,'score',round(r.score::numeric,6)
     );
     v_candidate_topics:=v_topics||jsonb_build_array(v_candidate);
-    v_payload:=jsonb_build_object(
+    v_payload:=attention_set_rendered_chars(jsonb_build_object(
       'topics',v_candidate_topics,
       'coverage',jsonb_build_object(
-        'requested_char_budget',p_char_budget,
-        'effective_char_budget',v_budget,
-        'summary_char_limit',v_summary_limit,
-        'total_topics',v_total,
-        'represented_topics',v_represented+1,
-        'omitted_topics',v_total-(v_represented+1),
+        'requested_char_budget',p_char_budget,'effective_char_budget',v_budget,
+        'rendered_chars',0,'summary_char_limit',v_summary_limit,'total_topics',v_total,
+        'represented_topics',v_represented+1,'omitted_topics',v_total-(v_represented+1),
         'compression','budgeted-prefix',
         'retrieval_handle',jsonb_build_object(
           'view','public.memory_hot_ranked',
           'projection_rpc','public.attention_boot_projection_v2(text,integer,integer)'
         )
       )
-    );
+    ));
     if char_length(v_payload::text)<=v_budget then
-      v_topics:=v_candidate_topics;
-      v_represented:=v_represented+1;
-    else
-      exit;
+      v_topics:=v_candidate_topics;v_represented:=v_represented+1;
+    else exit;
     end if;
   end loop;
-
-  v_payload:=jsonb_build_object(
+  v_payload:=attention_set_rendered_chars(jsonb_build_object(
     'topics',v_topics,
     'coverage',jsonb_build_object(
-      'requested_char_budget',p_char_budget,
-      'effective_char_budget',v_budget,
-      'summary_char_limit',v_summary_limit,
-      'total_topics',v_total,
-      'represented_topics',v_represented,
-      'omitted_topics',v_total-v_represented,
-      'compression','budgeted-prefix',
+      'requested_char_budget',p_char_budget,'effective_char_budget',v_budget,
+      'rendered_chars',0,'summary_char_limit',v_summary_limit,'total_topics',v_total,
+      'represented_topics',v_represented,'omitted_topics',v_total-v_represented,
+      'compression',case when v_total=0 then 'empty' when v_total=v_represented then 'complete' else 'budgeted-prefix' end,
       'retrieval_handle',jsonb_build_object(
         'view','public.memory_hot_ranked',
         'projection_rpc','public.attention_boot_projection_v2(text,integer,integer)'
       )
     )
-  );
-  v_payload:=jsonb_set(v_payload,'{coverage,rendered_chars}',to_jsonb(char_length(v_payload::text)),true);
-  -- rendered_chars changes its own serialized width at most by a few digits. Recompute
-  -- until stable; two passes are sufficient for practical envelope sizes.
-  v_payload:=jsonb_set(v_payload,'{coverage,rendered_chars}',to_jsonb(char_length(v_payload::text)),true);
+  ));
   if char_length(v_payload::text)>v_budget then
     raise exception 'attention projection envelope exceeds effective character budget';
   end if;
@@ -507,24 +555,17 @@ language sql stable security definer set search_path=public as $$
 with p as (select attention_boot_projection_v2(p_viewer,p_char_budget,p_summary_chars) payload),
 m as (select payload,char_length(payload::text) actual_chars,octet_length(convert_to(payload::text,'UTF8')) actual_bytes from p)
 select jsonb_build_object(
-  'contract_unit','serialized_characters',
-  'viewer',p_viewer,
+  'contract_unit','serialized_characters','viewer',p_viewer,
   'requested_char_budget',p_char_budget,
   'effective_char_budget',(payload->'coverage'->>'effective_char_budget')::integer,
   'reported_chars',(payload->'coverage'->>'rendered_chars')::integer,
-  'actual_chars',actual_chars,
-  'actual_utf8_bytes',actual_bytes,
-  'byte_delta',actual_bytes-actual_chars,
+  'actual_chars',actual_chars,'actual_utf8_bytes',actual_bytes,'byte_delta',actual_bytes-actual_chars,
   'pass_reported_exact',(payload->'coverage'->>'rendered_chars')::integer=actual_chars,
   'pass_character_budget',actual_chars<=(payload->'coverage'->>'effective_char_budget')::integer,
   'does_not_guarantee',jsonb_build_array('UTF-8 bytes','model tokens')
 ) from m;
 $$;
 
-comment on function attention_boot_projection_v2(text,integer,integer) is
-  'Deterministic longest-prefix projection with an exact serialized PostgreSQL character budget. It does not guarantee bytes or model tokens.';
-
--- Replace the fixed-count boot presentation while retaining the baseline envelope.
 create or replace function session_boot(p_viewer text default 'shared')
 returns jsonb
 language sql stable security definer set search_path=public,extensions as $$
@@ -533,6 +574,7 @@ select jsonb_build_object(
   'viewer',p_viewer,
   'hot_topics',(select payload->'topics' from attention),
   'attention_coverage',(select payload->'coverage' from attention),
+  'work_lessons',work_lessons_boot_fragment(),
   'deadlines',(select coalesce(jsonb_agg(jsonb_build_object(
     'content',left(content,100),'owner',owner,'due_date',due_date,'overdue',overdue,'days_until',days_until
   ) order by due_date),'[]'::jsonb) from deadlines_upcoming where visibility='shared' or owner=p_viewer),
@@ -545,54 +587,55 @@ select jsonb_build_object(
   'health',jsonb_build_object(
     'memories_visible',(select count(*) from memories where status='active' and (visibility='shared' or owner=p_viewer)),
     'hot_touch_pending',(select count(*) from hot_touch_pending where owner=p_viewer or owner='shared'),
-    'attention_invalid_links',(
-      (select count(*) from memory_hot_index i where not exists(select 1 from memories m where m.id=i.memory_id and m.status='active'))+
-      (select count(*) from memory_hot_staging s where not exists(select 1 from memories m where m.id=s.memory_id and m.status='active'))
-    ),
     'attention_events',(select count(*) from attention_events),
     'attention_events_unassigned',(select count(*) from attention_events e where not exists(select 1 from attention_event_assignments a where a.event_id=e.id)),
-    'proposed_for_review',(select count(*) from memories where status='proposed' and (visibility='shared' or owner=p_viewer)),
-    'channel_open',(select count(*) from household_channel where status='open' and to_principal in (p_viewer,'shared'))
+    'proposed_for_review',(select count(*) from memories where status='proposed' and (visibility='shared' or owner=p_viewer))
   ),
   'booted_at',now()
 );
 $$;
 
-revoke all on function attention_hash_parts(text[]) from public;
-revoke all on function attention_workstream_key(text) from public;
+revoke all on function capture_memory_attention_after_insert() from public;
+revoke all on function capture_memory_activation_after_update() from public;
+revoke all on function attention_fixed_point_chars(integer) from public;
+revoke all on function attention_set_rendered_chars(jsonb) from public;
+revoke all on function append_attention_event_revision(uuid,text,timestamptz,text,text,jsonb) from public;
 revoke all on function record_native_memory_attention(uuid) from public;
 revoke all on function record_native_memory_activation(uuid,text) from public;
-revoke all on function append_attention_event_revision(uuid,text,timestamptz,text,text,jsonb) from public;
 revoke all on function attention_boot_projection_v2(text,integer,integer) from public;
 revoke all on function attention_budget_conformance_v2(text,integer,integer) from public;
-revoke all on function promote_memory(uuid,text,text) from public;
-revoke all on function promote_memory(uuid,text) from public;
 
 do $$
-declare r text;f text;
+declare r text;
 begin
   foreach r in array array['anon','authenticated'] loop
     if exists(select 1 from pg_roles where rolname=r) then
-      foreach f in array array[
-        'record_native_memory_attention(uuid)',
-        'record_native_memory_activation(uuid,text)',
-        'append_attention_event_revision(uuid,text,timestamptz,text,text,jsonb)',
-        'attention_boot_projection_v2(text,integer,integer)',
-        'attention_budget_conformance_v2(text,integer,integer)',
-        'promote_memory(uuid,text,text)','promote_memory(uuid,text)'
-      ] loop execute format('revoke all on function %s from %I',f,r); end loop;
+      execute format('revoke all on attention_events,attention_event_assignments from %I',r);
+      execute format('revoke all on function capture_memory_attention_after_insert() from %I',r);
+      execute format('revoke all on function capture_memory_activation_after_update() from %I',r);
+      execute format('revoke all on function attention_fixed_point_chars(integer) from %I',r);
+      execute format('revoke all on function attention_set_rendered_chars(jsonb) from %I',r);
+      execute format('revoke all on function record_native_memory_attention(uuid) from %I',r);
+      execute format('revoke all on function record_native_memory_activation(uuid,text) from %I',r);
+      execute format('revoke all on function append_attention_event_revision(uuid,text,timestamptz,text,text,jsonb) from %I',r);
+      execute format('revoke all on function attention_boot_projection_v2(text,integer,integer) from %I',r);
+      execute format('revoke all on function attention_budget_conformance_v2(text,integer,integer) from %I',r);
     end if;
   end loop;
   if exists(select 1 from pg_roles where rolname='service_role') then
-    foreach f in array array[
-      'record_native_memory_attention(uuid)',
-      'record_native_memory_activation(uuid,text)',
-      'append_attention_event_revision(uuid,text,timestamptz,text,text,jsonb)',
-      'attention_boot_projection_v2(text,integer,integer)',
-      'attention_budget_conformance_v2(text,integer,integer)',
-      'promote_memory(uuid,text,text)','promote_memory(uuid,text)'
-    ] loop execute format('grant execute on function %s to service_role',f); end loop;
+    revoke all on attention_events,attention_event_assignments from service_role;
+    grant select on attention_events,attention_event_assignments to service_role;
+    revoke all on function capture_memory_attention_after_insert() from service_role;
+    revoke all on function capture_memory_activation_after_update() from service_role;
+    revoke all on function attention_fixed_point_chars(integer) from service_role;
+    revoke all on function attention_set_rendered_chars(jsonb) from service_role;
+    grant execute on function record_native_memory_attention(uuid) to service_role;
+    grant execute on function record_native_memory_activation(uuid,text) to service_role;
+    grant execute on function append_attention_event_revision(uuid,text,timestamptz,text,text,jsonb) to service_role;
+    grant execute on function attention_boot_projection_v2(text,integer,integer) to service_role;
+    grant execute on function attention_budget_conformance_v2(text,integer,integer) to service_role;
+    grant execute on function promote_memory(uuid,text,text) to service_role;
+    grant execute on function promote_memory(uuid,text) to service_role;
+    grant execute on function session_boot(text) to service_role;
   end if;
 end $$;
-
--- End of attention-events and projection v2 contract.

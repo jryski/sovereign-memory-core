@@ -1,16 +1,10 @@
 -- ============================================================================
--- SOVEREIGN MEMORY :: WORK LESSONS V2 (fresh-install contract)
--- Target: PostgreSQL 15+.
+-- SOVEREIGN MEMORY :: WORK LESSONS V3
+-- Target: PostgreSQL 15+. Idempotent fresh-install and fix-forward contract.
 --
--- Purpose:
---   Record agent operating experience separately from user/world memory.
---   Behavioral lessons are proposal-gated, evidence-backed, accepted explicitly,
---   and loaded deterministically. Evidence and authority events are append-only.
---
--- Upgrade note:
---   This file defines the desired fresh-install state. Existing deployments must
---   inventory and migrate live rows in a reviewed sequence. See
---   docs/upgrades/work-memory-v2.md.
+-- Agent operating experience is separate from user/world memory. Behavioral
+-- rules are proposal-gated, evidence-backed, explicitly accepted, and loaded
+-- deterministically. Evidence and authority events are append-only.
 -- ============================================================================
 
 create table if not exists work_lessons (
@@ -36,21 +30,10 @@ create table if not exists work_lessons (
   )
 );
 
-create unique index if not exists work_lessons_one_active_successor_uq
-  on work_lessons(supersedes)
-  where supersedes is not null and status='active';
-
-create index if not exists work_lessons_boot_idx
-  on work_lessons(kind,learned_on desc,created_at desc,id)
-  where status='active' and authority_state='accepted';
-
 create table if not exists work_lesson_evidence (
   id                uuid primary key default gen_random_uuid(),
   lesson_id         uuid not null references work_lessons(id) on delete restrict,
-  evidence_kind     text not null check (evidence_kind in (
-    'model_channel','household_channel','memory','migration','artifact',
-    'public_source','other_durable_locator'
-  )),
+  evidence_kind     text not null,
   locator           text not null check (locator ~ '[^[:space:]]'),
   source_authority  text not null check (source_authority ~ '[^[:space:]]'),
   integrity_hash    text check (integrity_hash is null or integrity_hash ~ '^[0-9a-f]{64}$'),
@@ -67,13 +50,14 @@ create table if not exists work_lesson_evidence (
   )
 );
 
-create unique index if not exists work_lesson_evidence_root_locator_uq
-  on work_lesson_evidence(lesson_id,evidence_kind,locator)
-  where supersedes is null;
-
-create unique index if not exists work_lesson_evidence_one_successor_uq
-  on work_lesson_evidence(supersedes)
-  where supersedes is not null;
+alter table work_lesson_evidence
+  drop constraint if exists work_lesson_evidence_evidence_kind_check;
+alter table work_lesson_evidence
+  add constraint work_lesson_evidence_evidence_kind_check
+  check (evidence_kind in (
+    'coordination_ref','memory','migration','artifact',
+    'public_source','other_durable_locator'
+  ));
 
 create table if not exists work_lesson_events (
   id            uuid primary key default gen_random_uuid(),
@@ -87,30 +71,53 @@ create table if not exists work_lesson_events (
   occurred_at   timestamptz not null default now()
 );
 
+drop index if exists work_lessons_one_active_successor_uq;
+drop index if exists uq_work_lessons_one_active_successor;
+drop index if exists work_lessons_one_live_successor_uq;
+create unique index work_lessons_one_live_successor_uq
+  on work_lessons(supersedes)
+  where supersedes is not null
+    and status='active'
+    and authority_state<>'rejected';
+
+create index if not exists work_lessons_boot_idx
+  on work_lessons(kind,learned_on desc,created_at desc,id)
+  where status='active' and authority_state='accepted';
+
+create unique index if not exists work_lesson_evidence_root_locator_uq
+  on work_lesson_evidence(lesson_id,evidence_kind,locator)
+  where supersedes is null;
+create unique index if not exists work_lesson_evidence_one_successor_uq
+  on work_lesson_evidence(supersedes)
+  where supersedes is not null;
+
 comment on table work_lessons is
   'Agent operating experience. Behavioral lessons require explicit acceptance and current resolvable evidence before boot loading.';
 comment on table work_lesson_evidence is
-  'Append-only typed evidence custody. Corrections append a successor row rather than editing the prior record.';
+  'Append-only typed evidence custody. coordination_ref is generic; deployment mappings remain outside the public protocol.';
 comment on table work_lesson_events is
-  'Append-only authority and evidence-custody event trail for work lessons.';
+  'Append-only authority and evidence-custody event trail.';
+comment on index work_lessons_one_live_successor_uq is
+  'At most one non-rejected live successor may occupy a predecessor slot; rejected proposals remain readable history.';
 
 alter table work_lessons enable row level security;
+alter table work_lessons force row level security;
 alter table work_lesson_evidence enable row level security;
+alter table work_lesson_evidence force row level security;
 alter table work_lesson_events enable row level security;
+alter table work_lesson_events force row level security;
 
 revoke all on work_lessons,work_lesson_evidence,work_lesson_events from public;
 
 do $$
 begin
-  if exists(select 1 from pg_roles where rolname='anon') then
-    execute 'revoke all on work_lessons,work_lesson_evidence,work_lesson_events from anon';
-  end if;
-  if exists(select 1 from pg_roles where rolname='authenticated') then
-    execute 'revoke all on work_lessons,work_lesson_evidence,work_lesson_events from authenticated';
-  end if;
   if exists(select 1 from pg_roles where rolname='service_role') then
-    execute 'revoke all on work_lessons,work_lesson_evidence,work_lesson_events from service_role';
-    execute 'grant select on work_lessons,work_lesson_evidence,work_lesson_events to service_role';
+    drop policy if exists work_lessons_service_select on work_lessons;
+    create policy work_lessons_service_select on work_lessons for select to service_role using(true);
+    drop policy if exists work_lesson_evidence_service_select on work_lesson_evidence;
+    create policy work_lesson_evidence_service_select on work_lesson_evidence for select to service_role using(true);
+    drop policy if exists work_lesson_events_service_select on work_lesson_events;
+    create policy work_lesson_events_service_select on work_lesson_events for select to service_role using(true);
   end if;
 end $$;
 
@@ -118,8 +125,7 @@ create or replace function is_canonical_work_lesson_locator(p_kind text,p_locato
 returns boolean
 language sql immutable set search_path=public as $$
 select case p_kind
-  when 'model_channel' then p_locator ~ '^model_channel:[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$'
-  when 'household_channel' then p_locator ~ '^household_channel:[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$'
+  when 'coordination_ref' then p_locator ~ '^coordination:[a-z][a-z0-9+.-]*:[^[:space:]]+$'
   when 'memory' then p_locator ~ '^memory:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
   when 'migration' then p_locator ~ '^migration:[a-z0-9][a-z0-9_]*$'
   when 'artifact' then p_locator ~ '^artifact:sha256:[0-9a-f]{64}$'
@@ -169,7 +175,6 @@ drop trigger if exists trg_work_lessons_write_path on work_lessons;
 create trigger trg_work_lessons_write_path
 before insert or update or delete on work_lessons
 for each row execute function guard_work_lessons_write_path();
-
 drop trigger if exists trg_work_lessons_no_truncate on work_lessons;
 create trigger trg_work_lessons_no_truncate
 before truncate on work_lessons
@@ -179,7 +184,6 @@ drop trigger if exists trg_work_lesson_evidence_custody on work_lesson_evidence;
 create trigger trg_work_lesson_evidence_custody
 before insert or update or delete on work_lesson_evidence
 for each row execute function guard_work_lesson_custody_write_path();
-
 drop trigger if exists trg_work_lesson_evidence_no_truncate on work_lesson_evidence;
 create trigger trg_work_lesson_evidence_no_truncate
 before truncate on work_lesson_evidence
@@ -189,7 +193,6 @@ drop trigger if exists trg_work_lesson_events_custody on work_lesson_events;
 create trigger trg_work_lesson_events_custody
 before insert or update or delete on work_lesson_events
 for each row execute function guard_work_lesson_custody_write_path();
-
 drop trigger if exists trg_work_lesson_events_no_truncate on work_lesson_events;
 create trigger trg_work_lesson_events_no_truncate
 before truncate on work_lesson_events
@@ -205,11 +208,14 @@ declare v_id uuid;
 begin
   if p_kind not in ('worked','failed','prohibition','rule') then raise exception 'invalid kind'; end if;
   if p_claim is null or p_claim !~ '[^[:space:]]' then raise exception 'claim must contain non-whitespace'; end if;
-  if p_created_by is null or p_created_by !~ '[^[:space:]]' or p_source_authority is null or p_source_authority !~ '[^[:space:]]' then
+  if p_created_by is null or p_created_by !~ '[^[:space:]]'
+     or p_source_authority is null or p_source_authority !~ '[^[:space:]]' then
     raise exception 'creator and source authority must contain non-whitespace';
   end if;
   if p_resolution_state not in ('unverified','resolvable','invalid') then raise exception 'invalid resolution state'; end if;
-  if not is_canonical_work_lesson_locator(p_evidence_kind,p_evidence_locator) then raise exception 'evidence locator must be canonical'; end if;
+  if not is_canonical_work_lesson_locator(p_evidence_kind,p_evidence_locator) then
+    raise exception 'evidence locator must be canonical';
+  end if;
   perform set_config('app.work_lessons_write','on',true);
   perform set_config('app.work_lesson_custody_write','on',true);
   insert into work_lessons(kind,claim,detail,authority_state,created_by)
@@ -229,7 +235,8 @@ create or replace function append_work_lesson_evidence(
 language plpgsql security definer set search_path=public as $$
 declare v_id uuid;
 begin
-  if p_actor is null or p_actor !~ '[^[:space:]]' or p_source_authority is null or p_source_authority !~ '[^[:space:]]' then
+  if p_actor is null or p_actor !~ '[^[:space:]]'
+     or p_source_authority is null or p_source_authority !~ '[^[:space:]]' then
     raise exception 'actor and source authority must contain non-whitespace';
   end if;
   if p_resolution_state not in ('unverified','resolvable','invalid') then raise exception 'invalid resolution state'; end if;
@@ -256,13 +263,14 @@ create or replace function correct_work_lesson_evidence(
 language plpgsql security definer set search_path=public as $$
 declare v_old work_lesson_evidence%rowtype;v_new uuid;
 begin
-  if p_actor is null or p_actor !~ '[^[:space:]]' or p_source_authority is null or p_source_authority !~ '[^[:space:]]'
+  if p_actor is null or p_actor !~ '[^[:space:]]'
+     or p_source_authority is null or p_source_authority !~ '[^[:space:]]'
      or p_correction_reason is null or p_correction_reason !~ '[^[:space:]]' then
     raise exception 'actor, source authority and correction reason must contain non-whitespace';
   end if;
   if p_resolution_state not in ('unverified','resolvable','invalid') then raise exception 'invalid resolution state'; end if;
   if not is_canonical_work_lesson_locator(p_evidence_kind,p_locator) then raise exception 'evidence locator must be canonical'; end if;
-  select * into v_old from work_lesson_evidence where id=p_evidence_id for share;
+  select * into v_old from work_lesson_evidence where id=p_evidence_id for update;
   if not found then raise exception 'evidence not found'; end if;
   if exists(select 1 from work_lesson_evidence where supersedes=v_old.id) then raise exception 'evidence is not current'; end if;
   perform set_config('app.work_lesson_custody_write','on',true);
@@ -289,7 +297,8 @@ begin
   where id=p_predecessor_id and status='active' and authority_state='accepted' for update;
   if not found then raise exception 'no active accepted predecessor'; end if;
   if p_claim is null or p_claim !~ '[^[:space:]]' then raise exception 'claim must contain non-whitespace'; end if;
-  if p_created_by is null or p_created_by !~ '[^[:space:]]' or p_source_authority is null or p_source_authority !~ '[^[:space:]]' then
+  if p_created_by is null or p_created_by !~ '[^[:space:]]'
+     or p_source_authority is null or p_source_authority !~ '[^[:space:]]' then
     raise exception 'creator and source authority must contain non-whitespace';
   end if;
   if p_resolution_state not in ('unverified','resolvable','invalid') then raise exception 'invalid resolution state'; end if;
@@ -312,16 +321,16 @@ returns uuid
 language plpgsql security definer set search_path=public as $$
 declare v_row work_lessons%rowtype;
 begin
-  if p_accepted_by is null or p_accepted_by !~ '[^[:space:]]' or p_authority_ref is null or p_authority_ref !~ '[^[:space:]]' then
+  if p_accepted_by is null or p_accepted_by !~ '[^[:space:]]'
+     or p_authority_ref is null or p_authority_ref !~ '[^[:space:]]' then
     raise exception 'acceptor and authority reference must contain non-whitespace';
   end if;
-  select * into v_row from work_lessons where id=p_id and status='active' and authority_state='proposed' for update;
+  select * into v_row from work_lessons
+  where id=p_id and status='active' and authority_state='proposed' for update;
   if not found then raise exception 'no active proposed lesson'; end if;
   if v_row.kind in ('rule','prohibition') and not exists(
     select 1 from work_lesson_evidence_current where lesson_id=v_row.id and resolution_state='resolvable'
-  ) then
-    raise exception 'behavioral lesson requires current resolvable evidence';
-  end if;
+  ) then raise exception 'behavioral lesson requires current resolvable evidence'; end if;
   perform set_config('app.work_lessons_write','on',true);
   perform set_config('app.work_lesson_custody_write','on',true);
   if v_row.supersedes is not null then
@@ -344,7 +353,8 @@ create or replace function reject_work_lesson(p_id uuid,p_actor text,p_authority
 returns uuid
 language plpgsql security definer set search_path=public as $$
 begin
-  if p_actor is null or p_actor !~ '[^[:space:]]' or p_authority_ref is null or p_authority_ref !~ '[^[:space:]]' then
+  if p_actor is null or p_actor !~ '[^[:space:]]'
+     or p_authority_ref is null or p_authority_ref !~ '[^[:space:]]' then
     raise exception 'actor and authority reference must contain non-whitespace';
   end if;
   perform set_config('app.work_lessons_write','on',true);
@@ -384,9 +394,6 @@ select jsonb_build_object(
 );
 $$;
 
-comment on function work_lessons_boot_fragment() is
-  'Deterministic behavioral fragment: only active accepted rules/prohibitions with current resolvable evidence are loaded.';
-
 revoke all on function is_canonical_work_lesson_locator(text,text) from public;
 revoke all on function propose_work_lesson(text,text,text,text,text,text,text,text,text) from public;
 revoke all on function append_work_lesson_evidence(uuid,text,text,text,text,text,text) from public;
@@ -401,31 +408,30 @@ declare r text;f text;
 begin
   foreach r in array array['anon','authenticated'] loop
     if exists(select 1 from pg_roles where rolname=r) then
+      execute format('revoke all on work_lessons,work_lesson_evidence,work_lesson_events from %I',r);
       foreach f in array array[
         'is_canonical_work_lesson_locator(text,text)',
         'propose_work_lesson(text,text,text,text,text,text,text,text,text)',
         'append_work_lesson_evidence(uuid,text,text,text,text,text,text)',
         'correct_work_lesson_evidence(uuid,text,text,text,text,text,text,text)',
         'propose_lesson_supersession(uuid,text,text,text,text,text,text,text,text)',
-        'accept_work_lesson(uuid,text,text)',
-        'reject_work_lesson(uuid,text,text)',
+        'accept_work_lesson(uuid,text,text)','reject_work_lesson(uuid,text,text)',
         'work_lessons_boot_fragment()'
       ] loop execute format('revoke all on function %s from %I',f,r); end loop;
     end if;
   end loop;
   if exists(select 1 from pg_roles where rolname='service_role') then
-    execute 'grant select on work_lesson_evidence_current to service_role';
+    revoke all on work_lessons,work_lesson_evidence,work_lesson_events from service_role;
+    grant select on work_lessons,work_lesson_evidence,work_lesson_events to service_role;
+    grant select on work_lesson_evidence_current to service_role;
     foreach f in array array[
       'is_canonical_work_lesson_locator(text,text)',
       'propose_work_lesson(text,text,text,text,text,text,text,text,text)',
       'append_work_lesson_evidence(uuid,text,text,text,text,text,text)',
       'correct_work_lesson_evidence(uuid,text,text,text,text,text,text,text)',
       'propose_lesson_supersession(uuid,text,text,text,text,text,text,text,text)',
-      'accept_work_lesson(uuid,text,text)',
-      'reject_work_lesson(uuid,text,text)',
+      'accept_work_lesson(uuid,text,text)','reject_work_lesson(uuid,text,text)',
       'work_lessons_boot_fragment()'
     ] loop execute format('grant execute on function %s to service_role',f); end loop;
   end if;
 end $$;
-
--- End of work-lessons v2 contract.

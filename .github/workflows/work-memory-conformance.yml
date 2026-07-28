@@ -1,67 +1,54 @@
-name: Work Memory Conformance
+name: Work-memory conformance
 
 on:
   pull_request:
-    paths:
-      - "README.md"
-      - "docs/work-memory.md"
-      - "docs/attention-layer.md"
-      - "docs/upgrades/work-memory-v2.md"
-      - "sql/01_core.sql"
-      - "sql/07_work_lessons.sql"
-      - "sql/08_attention_events.sql"
-      - "sql/09_perimeter_refresh.sql"
-      - "tests/07_work_lessons.sql"
-      - "tests/08_attention_events.sql"
-      - ".github/workflows/work-memory-conformance.yml"
-  workflow_dispatch:
+  push:
+    branches:
+      - atlas/work-memory-v1
 
 permissions:
   contents: read
 
 jobs:
-  postgres:
-    name: PostgreSQL ${{ matrix.pg }}
+  fresh-install:
+    name: Fresh install, reapply, drift, runtime and concurrency (PG ${{ matrix.postgres }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        pg: ["15", "16"]
+        postgres: ["15", "16"]
 
     services:
       postgres:
-        image: postgres:${{ matrix.pg }}
+        image: postgres:${{ matrix.postgres }}
         env:
-          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: sovereign_memory_test
+          POSTGRES_DB: sovereign_memory
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d sovereign_memory_test"
+          --health-cmd "pg_isready -U postgres -d sovereign_memory"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
 
     env:
-      PGHOST: localhost
-      PGPORT: "5432"
-      PGDATABASE: sovereign_memory_test
-      PGUSER: postgres
       PGPASSWORD: postgres
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_memory
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Install PostgreSQL client
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
 
-      - name: Create managed-platform compatibility shims
+      - name: Create managed-role fixtures
         run: |
-          psql -q -v ON_ERROR_STOP=1 <<'SQL'
-          create schema if not exists extensions;
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           do $$
           begin
             if not exists(select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
@@ -70,68 +57,150 @@ jobs:
           end $$;
           SQL
 
-      - name: Apply core and work-memory contracts
-        id: apply
-        shell: bash
+      - name: Apply core and seed a pre-attention active memory
         run: |
-          set +e
-          {
-            psql -q -v ON_ERROR_STOP=1 -f sql/01_core.sql &&
-            psql -q -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql &&
-            psql -q -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql &&
-            psql -q -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
-          } > sql-apply-pg${{ matrix.pg }}.log 2>&1
-          status=$?
-          cat sql-apply-pg${{ matrix.pg }}.log
-          exit "$status"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          insert into public.memories(
+            content,workstream,owner,visibility,source_agent,source_kind,status
+          ) values(
+            'pre-attention conformance fixture','legacy','example-user','private',
+            'example-user-chatgpt','agent','active'
+          );
+          SQL
 
-      - name: Upload SQL failure log
-        if: failure() && steps.apply.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: sql-apply-pg${{ matrix.pg }}
-          path: sql-apply-pg${{ matrix.pg }}.log
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Verify external perimeter
-        run: psql -q -v ON_ERROR_STOP=1 -c "select assert_perimeter_closed();"
-
-      - name: Run rollback-only conformance tests
-        id: conformance
-        shell: bash
+      - name: Apply v3 package
         run: |
-          set +e
-          {
-            echo '=== tests/07_work_lessons.sql ==='
-            psql -q -v ON_ERROR_STOP=1 -f tests/07_work_lessons.sql &&
-            echo '=== tests/08_attention_events.sql ==='
-            psql -q -v ON_ERROR_STOP=1 -f tests/08_attention_events.sql
-          } > conformance-pg${{ matrix.pg }}.log 2>&1
-          status=$?
-          cat conformance-pg${{ matrix.pg }}.log
-          exit "$status"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
 
-      - name: Upload conformance failure log
-        if: failure() && steps.conformance.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: conformance-pg${{ matrix.pg }}
-          path: conformance-pg${{ matrix.pg }}.log
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Verify fixtures rolled back
+      - name: Reapply migrations
         run: |
-          psql -q -v ON_ERROR_STOP=1 <<'SQL'
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+
+      - name: Run rollback-only SQL conformance
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/07_work_lessons.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/08_attention_events.sql
+
+      - name: Introduce deliberate drift
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          grant create on schema public to service_role;
+          grant execute on function public.capture_memory_attention_after_insert() to service_role;
+          alter function public.append_attention_event_revision(uuid,text,timestamptz,text,text,jsonb)
+            set search_path=public,pg_temp;
+          drop index if exists public.work_lessons_one_live_successor_uq;
+          create unique index work_lessons_one_live_successor_uq
+            on public.work_lessons(supersedes)
+            where supersedes is not null and status='active';
+          SQL
+
+      - name: Reapply and prove drift remediation
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          select public.assert_perimeter_closed();
           do $$
+          declare v_def text;
           begin
-            if exists(select 1 from work_lessons where created_by='fixture-agent') then
-              raise exception 'work-lesson fixtures persisted';
-            end if;
-            if exists(select 1 from memories where tags @> array['fixture']::text[]) then
-              raise exception 'attention fixtures persisted';
+            select indexdef into v_def
+            from pg_indexes
+            where schemaname='public' and indexname='work_lessons_one_live_successor_uq';
+            if v_def not ilike '%authority_state%' or v_def not ilike '%rejected%' then
+              raise exception 'reapply did not remediate successor-index drift: %',v_def;
             end if;
           end $$;
-          select 'rollback fixtures clean' as result;
           SQL
+
+      - name: Concurrent identical revision replay
+        run: |
+          export CONCURRENCY_URL=postgresql://postgres:postgres@localhost:5432/smc_concurrency
+          createdb -h localhost -U postgres smc_concurrency
+          psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
+          psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
+          psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
+          psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+          DATABASE_URL="$CONCURRENCY_URL" bash tests/08_attention_concurrency.sh
+          dropdb -h localhost -U postgres smc_concurrency
+
+  executable-upgrade:
+    name: Executable previous-head upgrade (PG 16)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sovereign_upgrade
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sovereign_upgrade"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      PGPASSWORD: postgres
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_upgrade
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create managed-role fixtures
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          begin
+            if not exists(select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
+            if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
+            if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role nologin; end if;
+          end $$;
+          SQL
+
+      - name: Install previous PR head and seed immutable v2 rows
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          insert into public.memories(
+            content,workstream,owner,visibility,source_agent,source_kind,status
+          ) values(
+            'pre-attention upgrade fixture','legacy','example-user','private',
+            'example-user-chatgpt','agent','active'
+          );
+          SQL
+          git show HEAD^:sql/07_work_lessons.sql >/tmp/previous-07.sql
+          git show HEAD^:sql/08_attention_events.sql >/tmp/previous-08.sql
+          git show HEAD^:sql/09_perimeter_refresh.sql >/tmp/previous-09.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/previous-07.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/previous-08.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/previous-09.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/fixtures/v2_upgrade_seed.sql
+
+      - name: Execute v3 fix-forward upgrade
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/fixtures/v2_upgrade_verify.sql
+
+      - name: Reapply upgraded package
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select public.assert_perimeter_closed();"
