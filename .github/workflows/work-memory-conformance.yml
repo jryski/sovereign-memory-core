@@ -6,6 +6,7 @@ on:
       - "sql/01_core.sql"
       - "sql/07_work_lessons.sql"
       - "sql/08_attention_events.sql"
+      - "sql/09_perimeter_refresh.sql"
       - "tests/07_work_lessons.sql"
       - "tests/08_attention_events.sql"
       - ".github/workflows/work-memory-conformance.yml"
@@ -73,7 +74,8 @@ jobs:
           {
             psql -q -v ON_ERROR_STOP=1 -f sql/01_core.sql &&
             psql -q -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql &&
-            psql -q -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
+            psql -q -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql &&
+            psql -q -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
           } > sql-apply-pg${{ matrix.pg }}.log 2>&1
           status=$?
           cat sql-apply-pg${{ matrix.pg }}.log
