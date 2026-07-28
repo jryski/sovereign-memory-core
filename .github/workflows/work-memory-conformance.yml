@@ -3,6 +3,10 @@ name: Work Memory Conformance
 on:
   pull_request:
     paths:
+      - "README.md"
+      - "docs/work-memory.md"
+      - "docs/attention-layer.md"
+      - "docs/upgrades/work-memory-v2.md"
       - "sql/01_core.sql"
       - "sql/07_work_lessons.sql"
       - "sql/08_attention_events.sql"
