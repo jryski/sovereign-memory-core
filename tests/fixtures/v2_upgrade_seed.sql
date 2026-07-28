@@ -7,19 +7,16 @@ create table public.upgrade_expectations(
   legacy_without_event uuid not null
 );
 
-with legacy as (
-  select id from public.memories
-  where content='pre-attention upgrade fixture'
-  order by created_at,id limit 1
-),
-created as (
-  insert into public.memories(
-    content,workstream,owner,visibility,source_agent,source_kind,status
-  ) values(
-    'v2 generated event fixture','upgrade','example-user','private',
-    'example-user-chatgpt','agent','active'
-  ) returning id
-)
+-- This must be a separate statement. A data-modifying CTE and its main SELECT
+-- share one command snapshot, so trigger side effects would not be included in
+-- the baseline receipt captured by that same statement.
+insert into public.memories(
+  content,workstream,owner,visibility,source_agent,source_kind,status
+) values(
+  'v2 generated event fixture','upgrade','example-user','private',
+  'example-user-chatgpt','agent','active'
+);
+
 insert into public.upgrade_expectations
 select
   (select count(*) from public.attention_events),
@@ -37,4 +34,6 @@ select
       coalesce(supersedes::text,''),assigned_at::text),E'\n' order by id)
     from public.attention_event_assignments
   ),''),'sha256'),'hex'),
-  (select id from legacy);
+  (select id from public.memories
+   where content='pre-attention upgrade fixture'
+   order by created_at,id limit 1);
