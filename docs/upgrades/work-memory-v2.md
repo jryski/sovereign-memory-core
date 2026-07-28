@@ -6,7 +6,8 @@ This guide separates **fresh-install contracts** from **live-deployment upgrades
 
 - `sql/07_work_lessons.sql` defines the desired work-memory v2 state for a fresh installation.
 - `sql/08_attention_events.sql` defines the desired attention-event and projection v2 state after the core schema.
-- Existing deployments must not blindly replay either file over live tables.
+- `sql/09_perimeter_refresh.sql` re-closes PostgreSQL default privileges after optional public-schema layers.
+- Existing deployments must not blindly replay these files over live tables.
 
 The upgrade must preserve history, avoid synthetic observations, and maintain a usable boot path throughout the transition.
 
@@ -164,6 +165,17 @@ Before replacing boot, test:
 
 This contract does not guarantee UTF-8 bytes or model tokens.
 
+### 6. Refresh the public perimeter
+
+PostgreSQL grants EXECUTE on newly created functions to PUBLIC unless defaults have already been changed for the creating role. After the final optional layer:
+
+1. run `sql/09_perimeter_refresh.sql` or an equivalent reviewed closure;
+2. rerun the perimeter assertion;
+3. verify the intended runtime RPC grants still exist;
+4. verify anonymous, ordinary authenticated, and PUBLIC roles hold no unintended table, sequence, or function privileges.
+
+Do not treat the perimeter closure in the baseline core as sufficient for functions created later.
+
 ## Acceptance gates
 
 An upgrade is not complete until independent checks show:
@@ -182,6 +194,7 @@ An upgrade is not complete until independent checks show:
 - every viewer's projection respects owner and visibility;
 - character budgets are exact and monotonic;
 - invalid attention links are measured and deliberately resolved;
+- the post-layer perimeter assertion passes;
 - rollback-only tests leave no fixtures.
 
 ## Rollback posture
