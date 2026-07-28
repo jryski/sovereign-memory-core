@@ -53,9 +53,10 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client
 
-      - name: Create managed-platform shim roles
+      - name: Create managed-platform compatibility shims
         run: |
           psql -q -v ON_ERROR_STOP=1 <<'SQL'
+          create schema if not exists extensions;
           do $$
           begin
             if not exists(select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
@@ -70,8 +71,8 @@ jobs:
         run: |
           set +e
           {
-            psql -q -v ON_ERROR_STOP=1 -f sql/01_core.sql
-            psql -q -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
+            psql -q -v ON_ERROR_STOP=1 -f sql/01_core.sql &&
+            psql -q -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql &&
             psql -q -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           } > sql-apply-pg${{ matrix.pg }}.log 2>&1
           status=$?
