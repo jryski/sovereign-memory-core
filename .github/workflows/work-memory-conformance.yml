@@ -145,12 +145,16 @@ jobs:
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "/tmp/${f}.sql"
           done
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/fixtures/v2_upgrade_seed.sql
-      - name: Execute and verify fix-forward upgrade
+      - name: Apply v3 work-memory upgrade
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
+      - name: Apply v3 attention upgrade
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
+      - name: Apply v3 perimeter upgrade
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+      - name: Verify immutable upgrade
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/fixtures/v2_upgrade_verify.sql
+      - name: Reapply upgraded package
         run: |
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/fixtures/v2_upgrade_verify.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql

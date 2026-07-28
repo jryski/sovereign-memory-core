@@ -3,7 +3,7 @@ set -euo pipefail
 
 DB_URL="${DATABASE_URL:?DATABASE_URL is required}"
 
-memory_id="$(psql "$DB_URL" -Atv ON_ERROR_STOP=1 -c "
+memory_id="$(psql "$DB_URL" -XAtqv ON_ERROR_STOP=1 -c "
   insert into public.memories(
     content,workstream,owner,visibility,source_agent,source_kind,status
   ) values(
@@ -12,7 +12,7 @@ memory_id="$(psql "$DB_URL" -Atv ON_ERROR_STOP=1 -c "
   ) returning id;
 ")"
 
-event_id="$(psql "$DB_URL" -Atv ON_ERROR_STOP=1 -c "
+event_id="$(psql "$DB_URL" -XAtqv ON_ERROR_STOP=1 -c "
   select id from public.attention_events
   where memory_id='${memory_id}'::uuid and source_event_type='memory_created';
 ")"
@@ -30,9 +30,9 @@ tmp1="$(mktemp)"
 tmp2="$(mktemp)"
 trap 'rm -f "$tmp1" "$tmp2"' EXIT
 
-psql "$DB_URL" -Atv ON_ERROR_STOP=1 -c "$call_sql" >"$tmp1" &
+psql "$DB_URL" -XAtqv ON_ERROR_STOP=1 -c "$call_sql" >"$tmp1" &
 pid1=$!
-psql "$DB_URL" -Atv ON_ERROR_STOP=1 -c "$call_sql" >"$tmp2" &
+psql "$DB_URL" -XAtqv ON_ERROR_STOP=1 -c "$call_sql" >"$tmp2" &
 pid2=$!
 wait "$pid1"
 wait "$pid2"
@@ -42,7 +42,7 @@ id2="$(tail -n1 "$tmp2" | tr -d '[:space:]')"
 test -n "$id1"
 test "$id1" = "$id2"
 
-count="$(psql "$DB_URL" -Atv ON_ERROR_STOP=1 -c "
+count="$(psql "$DB_URL" -XAtqv ON_ERROR_STOP=1 -c "
   select count(*) from public.attention_events
   where identity_key=(select identity_key from public.attention_events where id='${event_id}'::uuid)
     and source_revision='concurrent-revision:2';
