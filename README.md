@@ -1,151 +1,129 @@
 # Sovereign Memory Core
 
-A personal, self-hosted memory and knowledge layer for AI assistants, built on plain Postgres
-(reference deployment: Supabase). It gives every AI you use one shared, verifiable source of
-truth that **you** own, instead of a per-vendor memory silo.
+Portable PostgreSQL contracts for provenance-preserving personal and household AI memory.
 
-This repository is the **core database/schema and operations package**. Any browser UI
-should live in a separate application repository.
+This repository contains protocol SQL, neutral documentation, synthetic fixtures, and conformance tests. It must not contain live deployment identifiers, private record counts, operational channel references, credentials, or production evidence.
 
-## Current status
+## Apply order
 
-This repo contains the baseline core schema, vault schema, provenance guards, security model,
-agent operating contract, build guide, operations guide, and the merged source-import/cutover
-foundation.
+```text
+sql/01_core.sql
+sql/02_vault_tier2.sql          # optional
+sql/03_document_ingest.sql      # optional
+sql/04_migration_foundation.sql # optional
+sql/05_candidate_locators.sql   # optional
+sql/06_cutover_probe_categories.sql # optional
+sql/07_work_lessons.sql
+sql/08_attention_events.sql
+sql/09_perimeter_refresh.sql
+sql/10_security_definer_hardening.sql
+```
 
-The core now includes generic source staging, manifest review, candidate-level provenance,
-readiness checks, and richer cutover probes. Chat-Mine is a research-grade emitter aligned with
-that contract; its current deterministic fixture does not prove mining quality on real,
-long-running conversations. Review UI, operator tooling, adapters for real source exports, and
-operational dry runs remain future work.
+`07`, `08`, and `09` are re-runnable legacy fix-forward migrations and must be
+reapplied, if needed, before `10`. `09` closes schema creation, table grants,
+function execution, default privileges, RLS/FORCE RLS, owner, and trigger-only
+boundaries. `10` is a re-runnable, one-way hardening boundary and must run last:
+after it has been applied, reapply `10` only, not `07`–`09`, because those
+historical definitions intentionally predate the explicit-`pg_temp` contract.
+`10` recreates the exact reviewed SECURITY DEFINER and authority-adjacent helper
+inventory with protected names qualified and `pg_temp` explicit last. See
+[`docs/security-definer-inventory.md`](docs/security-definer-inventory.md).
+
+## Perimeter policy inputs
+
+`09` audits every effective role, not only familiar platform role names. It
+classifies direct, inherited membership-chain, and `PUBLIC`-derived `CREATE`
+and `EXECUTE` authority, plus owner-scoped table, sequence, and function
+defaults that would affect future objects. Its protected-schema and authority-
+function registries bound remediation to sovereign-memory surfaces; unrelated
+schemas, functions, and owner/schema defaults are not silently absorbed. Every
+non-system schema in an explicitly registered authority function's fixed
+`search_path` must itself be present in the protected-schema registry; otherwise
+the assertion fails closed before remediation. The built-in inventory explicitly
+registers both `public` and the repository's `extensions` dependency when present.
+Durable control-table table and column ACL findings identify direct grants,
+membership-chain inheritance, and `PUBLIC` pseudo-grants as distinct sources. The
+default `portable` profile permits no non-owner schema creation or function
+execution. Deployments using the repository's Supabase grants must explicitly
+persist the scoped profile before applying the package:
+
+```sql
+alter database your_database
+  set sovereign_memory.perimeter_profile = 'supabase';
+```
+
+The `supabase` profile permits `service_role` only on non-internal authority
+functions. It never waives trigger-only/internal writers or schema `CREATE`.
+Other deployments can declare comma-separated effective-principal allowlists
+with `sovereign_memory.perimeter_allowed_owner_roles`,
+`sovereign_memory.perimeter_allowed_schema_create_roles`,
+`sovereign_memory.perimeter_allowed_function_execute_roles`, and
+`sovereign_memory.perimeter_allowed_internal_execute_roles`.
+
+The owner-run migration snapshots these inputs into an ACL-protected durable
+policy row. Runtime assertions read that row, not caller-controlled custom GUCs.
+
+`sovereign_memory.perimeter_acl_mode` is `revoke` by default: direct grants
+outside policy are revoked and the effective audit then fails if authority
+still remains. Set it to `fail` for audit-only deployment gates. An allowlist
+entry is a deliberate platform waiver; the audit still enumerates all roles,
+so it is not an assertion blind spot.
+
+Owner-global default privileges are a separate operator boundary because they
+apply in every schema where that owner creates objects. Migration `09` reports
+these as `global_default_*` violations in both modes and never revokes them.
+Before applying, operators must establish the intended global baseline for each
+allowed owner (PostgreSQL grants `PUBLIC` function execution by default), for
+example:
+
+```sql
+alter default privileges for role your_owner
+  revoke execute on functions from public;
+```
+
+A schema-scoped default can add privileges but cannot negate a global grant;
+`revoke` mode therefore repairs only schema-scoped defaults in explicitly
+registered protected schemas. Unrelated owners' global defaults are not read or
+mutated by this repository migration.
+
+## Current contracts
+
+- Work lessons are proposal-gated and evidence-backed.
+- Rejected successor proposals remain readable but do not block replacement successors.
+- Public evidence locators use generic protocol kinds such as `coordination_ref`; deployment mappings remain private.
+- Native creation and activation events are emitted only by their actual source-transition triggers.
+- Runtime replay APIs are existence-only and never synthesize missing history.
+- Revision keys hash the exact persisted `source_revision`.
+- Appended revisions capture the current observer context and label shared-runtime attribution honestly.
+- Concurrent identical revision replay returns one winning event.
+- Context budgets are serialized PostgreSQL characters, with a proven decimal fixed point for the self-reported count.
+- Generated events, evidence, and authority records are append-only.
 
 See:
 
-- [`docs/00-north-star.md`](docs/00-north-star.md) for the trustworthy memory transfer doctrine and research boundaries.
-- [`docs/roadmap.md`](docs/roadmap.md) for milestones, release targets, and track separation.
-- [`docs/project-management.md`](docs/project-management.md) for the GitHub-native operating model.
-- [`STATUS.md`](STATUS.md) for current completeness and readiness.
-- [`docs/publication/smp-custody-layer.md`](docs/publication/smp-custody-layer.md) for the Draft 0.3 SMP custody-layer specification.
-- [`docs/publication/smp-conformance-gap-audit.md`](docs/publication/smp-conformance-gap-audit.md) for the Draft 0.3 conformance gap audit.
-- [`docs/07-source-import-cutover.md`](docs/07-source-import-cutover.md) for the source import and authoritative cutover plan.
-- [`docs/08-readiness-scorecard.md`](docs/08-readiness-scorecard.md) for the 10/10 checklist.
-- [`docs/09-source-adapters.md`](docs/09-source-adapters.md) for real-world source adapter patterns.
-- [`docs/10-chat-mine-source-import-exporter.md`](docs/10-chat-mine-source-import-exporter.md) for the first internal Chat-Mine producer slice.
-- [`CONTRIBUTING.md`](CONTRIBUTING.md), [`SECURITY.md`](SECURITY.md), and [`SUPPORT.md`](SUPPORT.md) for contribution, security, and support expectations.
+- [`docs/work-memory.md`](docs/work-memory.md)
+- [`docs/attention-layer.md`](docs/attention-layer.md)
+- [`docs/upgrades/work-memory-v2.md`](docs/upgrades/work-memory-v2.md)
 
-## Why this exists
+## Conformance
 
-1. **Data sovereignty.** Your facts live in a database you control, exportable as plain SQL and
-   JSON. Vendor change is a migration, not a hostage negotiation.
-2. **Best tool for the job.** Any authorized model or application with a safe Postgres path can read and write
-   the same store. Models and apps are clients, not owners.
-3. **Verifiable source of truth.** Facts carry provenance. Consequential domains can be guarded
-   by the database. Corrections supersede; nothing is silently rewritten.
-4. **Operational continuity.** Session boot, hot topics, review queues, model channels, migration
-   manifests, cutover probes, and provider-exit tests make continuity something the system can
-   verify instead of something a prompt merely asks for.
+GitHub Actions tests PostgreSQL 15 and 16 for:
 
-## What you get
+- fresh install on a non-empty database;
+- runtime-role adversarial paths;
+- reject-then-replace lifecycle;
+- independent revision-key recomputation;
+- fixed-point boundaries at 9/10, 99/100, 999/1000, and 9999/10000;
+- multibyte, escaped, and tight-budget payloads;
+- migration reapplication;
+- deliberate drift followed by remediation;
+- arbitrary direct, inherited, and `PUBLIC` stale-grantee drift;
+- owner-scoped default ACL drift and future-object inheritance;
+- runtime GUC spoof attempts and unrelated SECURITY DEFINER negative fixtures;
+- portable-profile fresh apply and exact reapply;
+- executable upgrade from the previous PR head;
+- concurrent identical revision replay;
+- final perimeter closure.
+- exact SECURITY DEFINER inventory and omitted, misordered, untrusted, checker-self-shadow, and privileged-write temp-shadow probes.
 
-| Layer | What it is | SQL |
-|---|---|---|
-| Tier 1: Shared knowledge base | Memories, wiki pages, attention index, deadlines, doc integrity, agent registry, and coordination channel | `sql/01_core.sql` |
-| Tier 2: Private vault (optional) | Locked schemas for identity / health / finance with temporal truth, preserve-then-normalize import, and an audit change log | `sql/02_vault.sql` |
-| Provenance guards (optional) | Triggers that reject financial figures lacking a real source | `sql/03_provenance_guards.sql` |
-| Source import/cutover foundation | Source registry, import batches, raw evidence, manifest review, readiness checks, and cutover scorecards | `sql/04_source_import.sql` |
-| Candidate provenance | Candidate-level source locators, support quotes, and quote hashes for one-item-to-many-candidate imports | `sql/05_candidate_locators.sql` |
-| Richer cutover probes | Positive, negative, conflict, stale-state, and evidence-request probe categories | `sql/06_cutover_probe_categories.sql` |
-
-## Repo map
-
-```text
-README.md                       you are here
-STATUS.md                       current readiness and repo/live divergence
-sql/01_core.sql                 Tier 1, one idempotent script
-sql/02_vault.sql                Tier 2 private schemas + audit trail
-sql/03_provenance_guards.sql    financial provenance enforcement
-sql/04_source_import.sql        source-import and cutover foundation
-sql/05_candidate_locators.sql   candidate locators and quote hashes
-sql/06_cutover_probe_categories.sql  richer cutover probe categories
-docs/00-north-star.md           trustworthy memory transfer doctrine
-docs/01-architecture.md         concepts, zones, multi-agent model
-docs/02-security-model.md       the actual security boundary, and the traps
-docs/03-agent-operations.md     operating contract and assistant setup
-docs/04-implementation-guide.md build order with acceptance tests
-docs/05-operations.md           backups, restore test, provider-exit test, drift checks
-docs/06-patterns.md             transferable design patterns
-docs/07-source-import-cutover.md source import and authoritative cutover plan
-docs/08-readiness-scorecard.md  10/10 readiness checklist
-docs/09-source-adapters.md      real-world import source adapter matrix
-docs/10-chat-mine-source-import-exporter.md  internal Chat-Mine package exporter
-docs/publication/smp-custody-layer.md        Draft 0.3 custody-layer specification
-docs/publication/smp-conformance-gap-audit.md Draft 0.3 conformance gap audit
-docs/roadmap.md                 milestones, release targets, and tracks
-docs/project-management.md      GitHub-native roadmap, labels, issues, and ADR model
-docs/adr/                       architecture decision records
-CONTRIBUTING.md                 contribution and validation expectations
-SECURITY.md                     sensitive-reporting and live-state safety
-SUPPORT.md                      early-alpha support expectations
-.github/ISSUE_TEMPLATE/         issue templates
-.github/pull_request_template.md pull request checklist
-```
-
-## Quick start for a fresh deployment
-
-1. Create a Supabase project or vanilla Postgres database.
-2. Run `sql/01_core.sql` after customizing principals and trusted agents.
-3. Optionally run `sql/02_vault.sql` and `sql/03_provenance_guards.sql`.
-4. Install the operating contract from `docs/03-agent-operations.md`.
-5. Run the acceptance tests in `docs/04-implementation-guide.md`.
-6. Run the backup and restore rehearsal in `docs/05-operations.md`.
-
-## Import or migration from an existing source
-
-Do not cut over by assumption.
-
-The prior source might be a file wiki, exported chat history, notes app, spreadsheet,
-database, vendor export, AI project export, connector-backed memory store, or another memory system. The cutover must be evidence based:
-
-1. Freeze or watermark the old source.
-2. Export raw source records or documents.
-3. Preserve raw payloads and hashes.
-4. Classify each item into import, hold, exclude, or evidence.
-5. Import into the appropriate zone: HOUSE, VAULT, HOLD, or EVIDENCE.
-6. Run readiness checks.
-7. Run cutover probes.
-8. Leave the prior source readable until rollback confidence is high.
-9. Declare Sovereign Memory authoritative only after the scorecard passes.
-
-See `docs/07-source-import-cutover.md` and `docs/09-source-adapters.md`.
-
-## Non-goals
-
-- Not a RAG framework, not an agent framework, not a product. It is a data layer with rules.
-- No browser UI in this repo. UI development belongs in a separate application repository.
-- Vector search is optional and treated as regenerable cache, never as the system of record.
-
-## Requirements
-
-- Postgres 15+ (Supabase hosted or any Postgres you run)
-- At least one assistant, application, or service that can execute approved SQL/RPCs
-- Basic comfort applying SQL migrations and verifying acceptance tests
-
-## Verified baseline
-
-The baseline SQL scripts were applied end to end on vanilla PostgreSQL 16 with shim roles
-(`anon`, `authenticated`, `service_role`) and the acceptance tests in
-`docs/04-implementation-guide.md` were executed: perimeter assert, second-touch promotion,
-session_boot, supersede + audit, delete-guard rejection, channel round trip, vault audit
-triggers with zero grant leaks, and the provenance fail/pass/pass triple.
-
-The source-import/cutover suite also verifies required objects, security-definer search paths,
-grant posture, fixture rollback, and fatal readiness blockers. Candidate locator/quote-hash
-coverage and all five richer cutover probe categories are included in that gate. The first
-internal Chat-Mine producer slice additionally validates deterministic package output,
-one-source-item-to-many-candidate mapping, candidate quote hashes, and a rollback-only load into
-the merged core schema.
-
-## License / provenance
-
-Published as a generic reference implementation. Use freely. No warranty; read
-`docs/02-security-model.md` before putting anything sensitive in it.
+The public test corpus is synthetic.
