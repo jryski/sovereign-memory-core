@@ -203,22 +203,29 @@ def _validate_dependency_graph(dependencies: Any, entry_paths: set[str]) -> None
     if paths != sorted(set(paths), key=lambda item: item.encode("utf-8")):
         _fail("MANIFEST_DEPENDENCY", "dependency nodes must be bytewise sorted and unique")
 
-    visiting: set[str] = set()
-    visited: set[str] = set()
+    # 0 = unseen, 1 = active in the current DFS, 2 = completely visited.
+    state = {path: 0 for path in graph}
+    for start in graph:
+        if state[start] != 0:
+            continue
+        state[start] = 1
+        stack: list[tuple[str, int]] = [(start, 0)]
+        while stack:
+            path, required_index = stack[-1]
+            requires = graph[path]
+            if required_index == len(requires):
+                state[path] = 2
+                stack.pop()
+                continue
 
-    def visit(path: str) -> None:
-        if path in visiting:
-            _fail("MANIFEST_DEPENDENCY", "dependency graph contains a cycle")
-        if path in visited or path not in graph:
-            return
-        visiting.add(path)
-        for required in graph[path]:
-            visit(required)
-        visiting.remove(path)
-        visited.add(path)
-
-    for path in graph:
-        visit(path)
+            required = requires[required_index]
+            stack[-1] = (path, required_index + 1)
+            required_state = state.get(required)
+            if required_state == 1:
+                _fail("MANIFEST_DEPENDENCY", "dependency graph contains a cycle")
+            if required_state == 0:
+                state[required] = 1
+                stack.append((required, 0))
 
 
 def _validate_foreign_key_cycles(graph: dict[str, list[tuple[str, bool]]]) -> None:

@@ -142,6 +142,36 @@ def add_relation(manifest, members, *, name, order, columns, primary_key, depend
     manifest["relations"].sort(key=lambda relation: relation["restore_order"])
 
 
+def add_migration_chain(manifest, members, count):
+    original_path = manifest["migrations"][0]["path"]
+    members.pop(original_path)
+    manifest["entries"] = [
+        entry for entry in manifest["entries"] if entry["path"] != original_path
+    ]
+    digest = hashlib.sha256(b"").hexdigest()
+    paths = [f"migrations/{index:04d}.sql" for index in range(count)]
+    for path in paths:
+        members[path] = b""
+        manifest["entries"].append({
+            "bytes": 0,
+            "media_type": "application/sql",
+            "mode": "0644",
+            "path": path,
+            "role": "migration",
+            "sha256": digest,
+        })
+    manifest["entries"].sort(key=lambda item: item["path"].encode("utf-8"))
+    manifest["migrations"] = [
+        {"order": index, "path": path, "sha256": digest}
+        for index, path in enumerate(paths, start=1)
+    ]
+    manifest["dependencies"] = [
+        {"path": path, "requires": [] if index == count - 1 else [paths[index + 1]]}
+        for index, path in enumerate(paths)
+    ]
+    return paths
+
+
 class ManifestValidationTests(unittest.TestCase):
     def test_accepts_golden_canonical_manifest_and_inventory(self):
         manifest_raw = bundle.canonical_json_bytes(valid_manifest())
@@ -248,6 +278,24 @@ class ManifestValidationTests(unittest.TestCase):
         unsupported = valid_manifest()
         unsupported["compatibility"]["postgresql"]["maximum_exclusive_major"] = 18
         self.assert_code("MANIFEST_COMPATIBILITY", bundle_bytes(unsupported))
+
+    def test_dependency_chain_beyond_python_recursion_limit_is_accepted(self):
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        paths = add_migration_chain(manifest, members, 1400)
+
+        result = validator.validate_bundle(bundle_bytes(manifest, members))
+
+        self.assertEqual(len(result.manifest["dependencies"]), 1400)
+        self.assertEqual(result.manifest["dependencies"][-1]["path"], paths[-1])
+
+    def test_dependency_cycle_beyond_python_recursion_limit_has_stable_code(self):
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        paths = add_migration_chain(manifest, members, 1400)
+        manifest["dependencies"][-1]["requires"] = [paths[0]]
+
+        self.assert_code("MANIFEST_DEPENDENCY", bundle_bytes(manifest, members))
 
     def test_relation_and_evidence_structural_closure_fail_closed(self):
         bad_primary_key = valid_manifest()
