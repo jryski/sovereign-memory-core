@@ -1,4 +1,5 @@
 import hashlib
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -105,6 +106,40 @@ def bundle_bytes(manifest=None, members=None):
     return bundle.write_ustar(
         [("manifest.json", bundle.canonical_json_bytes(manifest)), *members.items()]
     )
+
+
+def add_relation(manifest, members, *, name, order, columns, primary_key, dependencies, foreign_keys):
+    path = f"data/100-public.{name}.jsonl"
+    payload = b""
+    members[path] = payload
+    entry = {
+        "bytes": len(payload),
+        "media_type": "application/x-ndjson",
+        "mode": "0644",
+        "path": path,
+        "role": "relation",
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+    manifest["entries"].append(entry)
+    manifest["entries"].sort(key=lambda item: item["path"].encode("utf-8"))
+    manifest["relations"].append({
+        "bytes": entry["bytes"],
+        "columns": [
+            {"name": column, "ordinal": index, "pg_type": "bigint"}
+            for index, column in enumerate(columns, start=1)
+        ],
+        "dependencies": dependencies,
+        "foreign_keys": foreign_keys,
+        "path": path,
+        "primary_key": primary_key,
+        "relation": name,
+        "restore_order": order,
+        "row_count": 0,
+        "row_digest_algorithm": "sha256-raw-jsonl-v1",
+        "schema": "public",
+        "sha256": entry["sha256"],
+    })
+    manifest["relations"].sort(key=lambda relation: relation["restore_order"])
 
 
 class ManifestValidationTests(unittest.TestCase):
@@ -234,6 +269,93 @@ class ManifestValidationTests(unittest.TestCase):
         duplicate_relation["relations"].append(second_relation)
         self.assert_code("MANIFEST_DEPENDENCY", bundle_bytes(duplicate_relation))
 
+    def test_relation_restore_order_rejects_child_before_nondeferrable_parent(self):
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        manifest["relations"][0]["restore_order"] = 2
+        add_relation(
+            manifest,
+            members,
+            name="child",
+            order=1,
+            columns=["id", "memory_id"],
+            primary_key=["id"],
+            dependencies=["public.memory"],
+            foreign_keys=[{
+                "columns": ["memory_id"],
+                "deferrable": False,
+                "referenced_columns": ["id"],
+                "referenced_relation": "memory",
+                "referenced_schema": "public",
+            }],
+        )
+
+        self.assert_code("MANIFEST_DEPENDENCY", bundle_bytes(manifest, members))
+
+    def test_relation_restore_order_rejects_nondeferrable_cycle(self):
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        parent = manifest["relations"][0]
+        parent["columns"].append({"name": "child_id", "ordinal": 2, "pg_type": "bigint"})
+        parent["dependencies"] = ["public.child"]
+        parent["foreign_keys"] = [{
+            "columns": ["child_id"],
+            "deferrable": False,
+            "referenced_columns": ["id"],
+            "referenced_relation": "child",
+            "referenced_schema": "public",
+        }]
+        add_relation(
+            manifest,
+            members,
+            name="child",
+            order=2,
+            columns=["id", "memory_id"],
+            primary_key=["id"],
+            dependencies=["public.memory"],
+            foreign_keys=[{
+                "columns": ["memory_id"],
+                "deferrable": False,
+                "referenced_columns": ["id"],
+                "referenced_relation": "memory",
+                "referenced_schema": "public",
+            }],
+        )
+
+        self.assert_code("MANIFEST_DEPENDENCY", bundle_bytes(manifest, members))
+
+    def test_composite_key_column_order_is_semantic_not_bytewise(self):
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        parent = manifest["relations"][0]
+        parent["columns"] = [
+            {"name": "z_id", "ordinal": 1, "pg_type": "bigint"},
+            {"name": "a_id", "ordinal": 2, "pg_type": "bigint"},
+        ]
+        parent["primary_key"] = ["z_id", "a_id"]
+        add_relation(
+            manifest,
+            members,
+            name="child",
+            order=2,
+            columns=["id", "z_parent", "a_parent"],
+            primary_key=["z_parent", "a_parent"],
+            dependencies=["public.memory"],
+            foreign_keys=[{
+                "columns": ["z_parent", "a_parent"],
+                "deferrable": False,
+                "referenced_columns": ["z_id", "a_id"],
+                "referenced_relation": "memory",
+                "referenced_schema": "public",
+            }],
+        )
+
+        result = validator.validate_bundle(bundle_bytes(manifest, members))
+        child = result.manifest["relations"][1]
+        self.assertEqual(child["primary_key"], ["z_parent", "a_parent"])
+        self.assertEqual(child["foreign_keys"][0]["columns"], ["z_parent", "a_parent"])
+        self.assertEqual(child["foreign_keys"][0]["referenced_columns"], ["z_id", "a_id"])
+
     def test_manifest_entry_and_external_archive_checksum_tamper_have_stable_codes(self):
         manifest = valid_manifest()
         manifest["entries"][0]["sha256"] = "f" * 64
@@ -284,6 +406,32 @@ class ManifestValidationTests(unittest.TestCase):
             tracemalloc.stop()
         self.assertLess(peak, len(raw) // 4)
         self.assert_code("ARCHIVE_INVALID", raw, max_path_bytes=10)
+
+    def test_cli_reads_at_most_archive_limit_plus_one_before_rejecting_oversize(self):
+        class ReadProbe(io.BytesIO):
+            def __init__(self, raw):
+                super().__init__(raw)
+                self.read_sizes = []
+
+            def read(self, size=None):
+                self.read_sizes.append(size)
+                if size is None or size < 0 or size > 1025:
+                    raise AssertionError("archive input was read without a strict bound")
+                return super().read(size)
+
+        source = ReadProbe(b"x" * 1025)
+        source.close = mock.Mock()
+        stderr = io.StringIO()
+        with (
+            mock.patch("builtins.open", return_value=source),
+            mock.patch.object(sys, "stderr", stderr),
+        ):
+            status = validator.main(["oversized.tar", "--max-archive-size", "1024"])
+
+        self.assertEqual(status, 1)
+        self.assertEqual(source.read_sizes, [1025])
+        source.close.assert_called_once_with()
+        self.assertEqual(json.loads(stderr.getvalue())["code"], "ARCHIVE_INVALID")
 
     def test_direct_cli_has_machine_readable_golden_and_tamper_results(self):
         raw = bundle_bytes()

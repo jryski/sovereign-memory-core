@@ -12,11 +12,15 @@ import sys
 from typing import Any, NoReturn
 
 try:
-    from scripts.sovereignty_bundle import ArchiveMember, parse_canonical_json_bytes, validate_ustar
+    from scripts.sovereignty_bundle import (
+        MAX_ARCHIVE_SIZE, ArchiveMember, parse_canonical_json_bytes, validate_ustar,
+    )
 except ModuleNotFoundError as exc:
     if exc.name != "scripts":
         raise
-    from sovereignty_bundle import ArchiveMember, parse_canonical_json_bytes, validate_ustar
+    from sovereignty_bundle import (
+        MAX_ARCHIVE_SIZE, ArchiveMember, parse_canonical_json_bytes, validate_ustar,
+    )
 
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -78,6 +82,14 @@ def _sorted_unique_strings(value: Any, label: str) -> list[str]:
         _fail("MANIFEST_STRUCTURE", f"{label} must be an array of nonempty strings")
     if value != sorted(set(value), key=lambda item: item.encode("utf-8")):
         _fail("MANIFEST_STRUCTURE", f"{label} must be bytewise sorted and unique")
+    return value
+
+
+def _ordered_unique_strings(value: Any, label: str) -> list[str]:
+    if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
+        _fail("MANIFEST_STRUCTURE", f"{label} must be an array of nonempty strings")
+    if len(set(value)) != len(value):
+        _fail("MANIFEST_STRUCTURE", f"{label} must contain unique items")
     return value
 
 
@@ -310,7 +322,7 @@ def _validate_manifest(manifest: Any, archive_paths: set[str]) -> dict[str, Any]
     relation_keys: list[tuple[int, str, str]] = []
     relation_names: set[str] = set()
     relation_dependencies: list[tuple[str, list[str]]] = []
-    relation_records: list[tuple[str, set[str], list[dict[str, Any]]]] = []
+    relation_records: list[tuple[str, int, set[str], list[dict[str, Any]]]] = []
     for index, raw_relation in enumerate(relations):
         relation = _object(
             raw_relation,
@@ -350,7 +362,7 @@ def _validate_manifest(manifest: Any, archive_paths: set[str]) -> dict[str, Any]
             _nonempty_string(column["pg_type"], "column PostgreSQL type")
         if len(set(column_names)) != len(column_names):
             _fail("MANIFEST_DEPENDENCY", "relation column names must be unique")
-        primary_key = _sorted_unique_strings(relation["primary_key"], "relation primary_key")
+        primary_key = _ordered_unique_strings(relation["primary_key"], "relation primary_key")
         if not primary_key or any(column not in column_names for column in primary_key):
             _fail("MANIFEST_DEPENDENCY", "primary key does not close over relation columns")
         foreign_keys = relation["foreign_keys"]
@@ -363,8 +375,8 @@ def _validate_manifest(manifest: Any, archive_paths: set[str]) -> dict[str, Any]
                 {"columns", "deferrable", "referenced_columns", "referenced_relation", "referenced_schema"},
                 "foreign key",
             )
-            local_columns = _sorted_unique_strings(foreign_key["columns"], "foreign key columns")
-            referenced_columns = _sorted_unique_strings(
+            local_columns = _ordered_unique_strings(foreign_key["columns"], "foreign key columns")
+            referenced_columns = _ordered_unique_strings(
                 foreign_key["referenced_columns"], "foreign key referenced_columns"
             )
             if (
@@ -383,7 +395,7 @@ def _validate_manifest(manifest: Any, archive_paths: set[str]) -> dict[str, Any]
             _fail("MANIFEST_STRUCTURE", "relation identities must be unique")
         relation_names.add(identity)
         relation_dependencies.append((identity, dependencies))
-        relation_records.append((identity, set(column_names), checked_foreign_keys))
+        relation_records.append((identity, order, set(column_names), checked_foreign_keys))
         relation_keys.append((order, schema, name))
         declared_paths.append(path)
     if relation_keys != sorted(relation_keys) or len({key[0] for key in relation_keys}) != len(relation_keys):
@@ -391,9 +403,10 @@ def _validate_manifest(manifest: Any, archive_paths: set[str]) -> dict[str, Any]
     for identity, dependencies in relation_dependencies:
         if identity in dependencies or any(dependency not in relation_names for dependency in dependencies):
             _fail("MANIFEST_DEPENDENCY", "relation dependency closure is incomplete")
-    columns_by_relation = {identity: columns for identity, columns, _ in relation_records}
+    columns_by_relation = {identity: columns for identity, _, columns, _ in relation_records}
+    restore_order_by_relation = {identity: order for identity, order, _, _ in relation_records}
     dependencies_by_relation = dict(relation_dependencies)
-    for identity, _, foreign_keys in relation_records:
+    for identity, order, _, foreign_keys in relation_records:
         expected_dependencies: set[str] = set()
         for foreign_key in foreign_keys:
             target = f"{foreign_key['referenced_schema']}.{foreign_key['referenced_relation']}"
@@ -402,6 +415,11 @@ def _validate_manifest(manifest: Any, archive_paths: set[str]) -> dict[str, Any]
                 column not in target_columns for column in foreign_key["referenced_columns"]
             ):
                 _fail("MANIFEST_DEPENDENCY", "foreign key target closure is incomplete")
+            if not foreign_key["deferrable"] and restore_order_by_relation[target] >= order:
+                _fail(
+                    "MANIFEST_DEPENDENCY",
+                    "non-deferrable foreign key target must precede its dependent relation",
+                )
             expected_dependencies.add(target)
         if set(dependencies_by_relation[identity]) != expected_dependencies:
             _fail("MANIFEST_DEPENDENCY", "relation dependencies must exactly match foreign key targets")
@@ -502,10 +520,21 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("archive")
     parser.add_argument("--expected-sha256")
+    parser.add_argument("--max-archive-size", type=int, default=MAX_ARCHIVE_SIZE)
     args = parser.parse_args(argv)
     try:
+        if not 0 <= args.max_archive_size <= MAX_ARCHIVE_SIZE:
+            _fail(
+                "ARCHIVE_INVALID",
+                f"max archive size must be between 0 and {MAX_ARCHIVE_SIZE}",
+            )
         with open(args.archive, "rb") as source:
-            result = validate_bundle(source.read(), expected_archive_sha256=args.expected_sha256)
+            raw = source.read(args.max_archive_size + 1)
+        result = validate_bundle(
+            raw,
+            expected_archive_sha256=args.expected_sha256,
+            max_archive_size=args.max_archive_size,
+        )
     except BundleValidationError as exc:
         print(json.dumps({"code": exc.code, "message": str(exc)}, sort_keys=True), file=sys.stderr)
         return 1

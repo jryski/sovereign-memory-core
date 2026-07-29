@@ -351,6 +351,7 @@ def _validate_bundle_path(path: str) -> None:
 
 
 _USTAR_PATH_PROFILE_MAX_BYTES = 255
+MAX_ARCHIVE_SIZE = 1 << 30
 
 
 def write_ustar(entries: Iterable[tuple[str, bytes]]) -> bytes:
@@ -447,7 +448,7 @@ def _checked_limit(name: str, value: int) -> int:
 def validate_ustar(
     raw: bytes,
     *,
-    max_archive_size: int = 1 << 30,
+    max_archive_size: int = MAX_ARCHIVE_SIZE,
     max_members: int = 10_000,
     max_path_bytes: int = 255,
     max_member_size: int = 1 << 29,
