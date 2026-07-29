@@ -317,6 +317,28 @@ class ArchiveValidationTests(unittest.TestCase):
             with self.subTest(prefix=hostile[:16]), self.assertRaises(ValueError):
                 bundle.validate_ustar(hostile)
 
+    def test_preflight_path_limit_cannot_broaden_the_255_byte_format_profile(self):
+        path = "a" * 155 + "/" + "b" * 100
+        self.assertEqual(len(path.encode("utf-8")), 256)
+        info = tarfile.TarInfo(path)
+        info.size = 0
+        info.mode = 0o644
+        info.mtime = 0
+        info.uid = 0
+        info.gid = 0
+        info.uname = ""
+        info.gname = ""
+        info.type = tarfile.REGTYPE
+        header = info.tobuf(
+            format=tarfile.USTAR_FORMAT,
+            encoding="utf-8",
+            errors="strict",
+        )
+        raw = header + (b"\0" * (tarfile.RECORDSIZE - len(header)))
+
+        with self.assertRaisesRegex(ValueError, "path exceeds"):
+            bundle.validate_ustar(raw, max_path_bytes=256)
+
     def test_preflight_never_calls_tar_extraction_apis(self):
         raw = bundle.write_ustar((("a.txt", b"abc"),))
         with (

@@ -350,6 +350,9 @@ def _validate_bundle_path(path: str) -> None:
         raise ValueError("bundle path is not valid UTF-8") from exc
 
 
+_USTAR_PATH_PROFILE_MAX_BYTES = 255
+
+
 def write_ustar(entries: Iterable[tuple[str, bytes]]) -> bytes:
     """Build a deterministic uncompressed POSIX ustar archive of regular files."""
     checked: list[tuple[str, bytes]] = []
@@ -357,7 +360,7 @@ def write_ustar(entries: Iterable[tuple[str, bytes]]) -> bytes:
     folded: set[str] = set()
     for path, content in entries:
         _validate_bundle_path(path)
-        if len(path.encode("utf-8")) > 255:
+        if len(path.encode("utf-8")) > _USTAR_PATH_PROFILE_MAX_BYTES:
             raise ValueError(f"bundle path exceeds the 255-byte profile: {path!r}")
         if path in exact:
             raise ValueError(f"duplicate bundle path: {path!r}")
@@ -456,7 +459,10 @@ def validate_ustar(
     limits = {
         "max_archive_size": _checked_limit("max_archive_size", max_archive_size),
         "max_members": _checked_limit("max_members", max_members),
-        "max_path_bytes": _checked_limit("max_path_bytes", max_path_bytes),
+        "max_path_bytes": min(
+            _USTAR_PATH_PROFILE_MAX_BYTES,
+            _checked_limit("max_path_bytes", max_path_bytes),
+        ),
         "max_member_size": _checked_limit("max_member_size", max_member_size),
         "max_total_size": _checked_limit("max_total_size", max_total_size),
     }
