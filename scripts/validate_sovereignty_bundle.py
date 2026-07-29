@@ -221,6 +221,67 @@ def _validate_dependency_graph(dependencies: Any, entry_paths: set[str]) -> None
         visit(path)
 
 
+def _validate_foreign_key_cycles(graph: dict[str, list[tuple[str, bool]]]) -> None:
+    """Reject cyclic FK components unless every internal edge is deferrable."""
+    visited: set[str] = set()
+    finish_order: list[str] = []
+    for start in graph:
+        if start in visited:
+            continue
+        visited.add(start)
+        stack: list[tuple[str, int]] = [(start, 0)]
+        while stack:
+            node, edge_index = stack[-1]
+            edges = graph[node]
+            if edge_index < len(edges):
+                target = edges[edge_index][0]
+                stack[-1] = (node, edge_index + 1)
+                if target not in visited:
+                    visited.add(target)
+                    stack.append((target, 0))
+            else:
+                finish_order.append(node)
+                stack.pop()
+
+    reverse_graph = {node: [] for node in graph}
+    for source, edges in graph.items():
+        for target, _ in edges:
+            reverse_graph[target].append(source)
+
+    assigned: set[str] = set()
+    for start in reversed(finish_order):
+        if start in assigned:
+            continue
+        component: set[str] = set()
+        stack = [(start, 0)]
+        assigned.add(start)
+        while stack:
+            node, edge_index = stack[-1]
+            sources = reverse_graph[node]
+            if edge_index < len(sources):
+                source = sources[edge_index]
+                stack[-1] = (node, edge_index + 1)
+                if source not in assigned:
+                    assigned.add(source)
+                    stack.append((source, 0))
+            else:
+                component.add(node)
+                stack.pop()
+
+        cyclic = len(component) > 1 or any(
+            target == node for node in component for target, _ in graph[node]
+        )
+        if cyclic and any(
+            target in component and not deferrable
+            for node in component
+            for target, deferrable in graph[node]
+        ):
+            _fail(
+                "MANIFEST_DEPENDENCY",
+                "foreign key cycle contains a non-deferrable constraint",
+            )
+
+
 def _validate_manifest(manifest: Any, archive_paths: set[str]) -> dict[str, Any]:
     if isinstance(manifest, dict) and isinstance(manifest.get("entries"), list):
         if any(isinstance(entry, dict) and entry.get("path") == "manifest.json" for entry in manifest["entries"]):
@@ -406,6 +467,9 @@ def _validate_manifest(manifest: Any, archive_paths: set[str]) -> dict[str, Any]
     columns_by_relation = {identity: columns for identity, _, columns, _ in relation_records}
     restore_order_by_relation = {identity: order for identity, order, _, _ in relation_records}
     dependencies_by_relation = dict(relation_dependencies)
+    foreign_key_graph: dict[str, list[tuple[str, bool]]] = {
+        identity: [] for identity, _, _, _ in relation_records
+    }
     for identity, order, _, foreign_keys in relation_records:
         expected_dependencies: set[str] = set()
         for foreign_key in foreign_keys:
@@ -420,9 +484,11 @@ def _validate_manifest(manifest: Any, archive_paths: set[str]) -> dict[str, Any]
                     "MANIFEST_DEPENDENCY",
                     "non-deferrable foreign key target must precede its dependent relation",
                 )
+            foreign_key_graph[identity].append((target, foreign_key["deferrable"]))
             expected_dependencies.add(target)
         if set(dependencies_by_relation[identity]) != expected_dependencies:
             _fail("MANIFEST_DEPENDENCY", "relation dependencies must exactly match foreign key targets")
+    _validate_foreign_key_cycles(foreign_key_graph)
 
     evidence = manifest["evidence"]
     if not isinstance(evidence, list):

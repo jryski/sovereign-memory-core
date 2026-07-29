@@ -292,6 +292,98 @@ class ManifestValidationTests(unittest.TestCase):
 
         self.assert_code("MANIFEST_DEPENDENCY", bundle_bytes(manifest, members))
 
+    def test_relation_restore_order_accepts_backward_acyclic_deferrable_edge(self):
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        manifest["relations"][0]["restore_order"] = 2
+        add_relation(
+            manifest,
+            members,
+            name="child",
+            order=1,
+            columns=["id", "memory_id"],
+            primary_key=["id"],
+            dependencies=["public.memory"],
+            foreign_keys=[{
+                "columns": ["memory_id"],
+                "deferrable": True,
+                "referenced_columns": ["id"],
+                "referenced_relation": "memory",
+                "referenced_schema": "public",
+            }],
+        )
+
+        result = validator.validate_bundle(bundle_bytes(manifest, members))
+        self.assertEqual(
+            [relation["restore_order"] for relation in result.manifest["relations"]],
+            [1, 2],
+        )
+
+    def test_relation_restore_order_accepts_all_deferrable_cycle(self):
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        parent = manifest["relations"][0]
+        parent["columns"].append({"name": "child_id", "ordinal": 2, "pg_type": "bigint"})
+        parent["dependencies"] = ["public.child"]
+        parent["foreign_keys"] = [{
+            "columns": ["child_id"],
+            "deferrable": True,
+            "referenced_columns": ["id"],
+            "referenced_relation": "child",
+            "referenced_schema": "public",
+        }]
+        add_relation(
+            manifest,
+            members,
+            name="child",
+            order=2,
+            columns=["id", "memory_id"],
+            primary_key=["id"],
+            dependencies=["public.memory"],
+            foreign_keys=[{
+                "columns": ["memory_id"],
+                "deferrable": True,
+                "referenced_columns": ["id"],
+                "referenced_relation": "memory",
+                "referenced_schema": "public",
+            }],
+        )
+
+        result = validator.validate_bundle(bundle_bytes(manifest, members))
+        self.assertEqual(len(result.manifest["relations"]), 2)
+
+    def test_relation_restore_order_rejects_mixed_deferrability_cycle(self):
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        parent = manifest["relations"][0]
+        parent["columns"].append({"name": "child_id", "ordinal": 2, "pg_type": "bigint"})
+        parent["dependencies"] = ["public.child"]
+        parent["foreign_keys"] = [{
+            "columns": ["child_id"],
+            "deferrable": True,
+            "referenced_columns": ["id"],
+            "referenced_relation": "child",
+            "referenced_schema": "public",
+        }]
+        add_relation(
+            manifest,
+            members,
+            name="child",
+            order=2,
+            columns=["id", "memory_id"],
+            primary_key=["id"],
+            dependencies=["public.memory"],
+            foreign_keys=[{
+                "columns": ["memory_id"],
+                "deferrable": False,
+                "referenced_columns": ["id"],
+                "referenced_relation": "memory",
+                "referenced_schema": "public",
+            }],
+        )
+
+        self.assert_code("MANIFEST_DEPENDENCY", bundle_bytes(manifest, members))
+
     def test_relation_restore_order_rejects_nondeferrable_cycle(self):
         manifest = valid_manifest()
         members = dict(MEMBERS)
