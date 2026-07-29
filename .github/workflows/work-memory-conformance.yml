@@ -10,7 +10,7 @@ permissions:
 
 env:
   PGPASSWORD: postgres
-  PREVIOUS_REVIEW_HEAD: 088521a900815f7eb702ec4dc7ffbf82387fddaf
+  PREVIOUS_REVIEW_HEAD: 19912ff2e612d9cc4188f9d0051a7e07a509341e
 
 jobs:
   fresh-install:
@@ -193,7 +193,7 @@ jobs:
           --health-cmd "pg_isready -U postgres -d sovereign_portable"
           --health-interval 5s --health-timeout 5s --health-retries 20
     env:
-      DATABASE_URL: postgresql://postgres:***@localhost:5432/sovereign_portable
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_portable
     steps:
       - uses: actions/checkout@v4
       - name: Install client
