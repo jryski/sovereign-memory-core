@@ -16,9 +16,18 @@ sql/06_cutover_probe_categories.sql # optional
 sql/07_work_lessons.sql
 sql/08_attention_events.sql
 sql/09_perimeter_refresh.sql
+sql/10_security_definer_hardening.sql
 ```
 
-`07`, `08`, and `09` are re-runnable fix-forward migrations. `09` must run last because it closes schema creation, table grants, function execution, default privileges, RLS/FORCE RLS, owner, search-path, and trigger-only boundaries.
+`07`, `08`, and `09` are re-runnable legacy fix-forward migrations and must be
+reapplied, if needed, before `10`. `09` closes schema creation, table grants,
+function execution, default privileges, RLS/FORCE RLS, owner, and trigger-only
+boundaries. `10` is a re-runnable, one-way hardening boundary and must run last:
+after it has been applied, reapply `10` only, not `07`–`09`, because those
+historical definitions intentionally predate the explicit-`pg_temp` contract.
+`10` recreates the exact reviewed SECURITY DEFINER and authority-adjacent helper
+inventory with protected names qualified and `pg_temp` explicit last. See
+[`docs/security-definer-inventory.md`](docs/security-definer-inventory.md).
 
 ## Perimeter policy inputs
 
@@ -115,5 +124,6 @@ GitHub Actions tests PostgreSQL 15 and 16 for:
 - executable upgrade from the previous PR head;
 - concurrent identical revision replay;
 - final perimeter closure.
+- exact SECURITY DEFINER inventory and omitted, misordered, untrusted, checker-self-shadow, and privileged-write temp-shadow probes.
 
 The public test corpus is synthetic.

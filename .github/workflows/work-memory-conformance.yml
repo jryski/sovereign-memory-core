@@ -10,7 +10,7 @@ permissions:
 
 env:
   PGPASSWORD: postgres
-  PREVIOUS_REVIEW_HEAD: 19912ff2e612d9cc4188f9d0051a7e07a509341e
+  PREVIOUS_REVIEW_HEAD: 088521a900815f7eb702ec4dc7ffbf82387fddaf
 
 jobs:
   fresh-install:
@@ -62,12 +62,12 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
-      - name: Reapply package
+      - name: Reapply legacy package before hardening boundary
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
-      - name: Runtime and rollback conformance
+      - name: Runtime and rollback conformance before hardening boundary
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/08_attention_events.sql
@@ -134,11 +134,13 @@ jobs:
           end $$;
           alter database sovereign_memory set sovereign_memory.perimeter_acl_mode='revoke';
           SQL
-      - name: Remediate drift
+      - name: Remediate drift and cross hardening boundary
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           select public.assert_perimeter_closed();
           do $$ declare d text; begin
@@ -149,6 +151,13 @@ jobs:
             end if;
           end $$;
           SQL
+      - name: Hardened runtime and temp-shadow conformance
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/07_work_lessons.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/08_attention_events.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/09_perimeter_acl.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/09_perimeter_acl_review.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/10_security_definer_temp_shadow.sql
       - name: Concurrent identical replay
         if: matrix.pg == '16'
         run: |
@@ -163,6 +172,7 @@ jobs:
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+          psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
           DATABASE_URL="$CONCURRENCY_URL" bash tests/08_attention_concurrency.sh
 
   portable-profile:
@@ -206,6 +216,8 @@ jobs:
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
           done
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           do $$ begin
             if (select profile from public.perimeter_acl_policy where singleton)<>'portable' then
@@ -332,6 +344,8 @@ jobs:
           SQL
       - name: Apply v4 perimeter upgrade
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+      - name: Apply SECURITY DEFINER temp-shadow hardening
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
       - name: Verify durable control-table repair preserved registry data
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
@@ -405,7 +419,5 @@ jobs:
           SQL
       - name: Reapply upgraded package
         run: |
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'select public.assert_perimeter_closed()'
