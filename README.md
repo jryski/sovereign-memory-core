@@ -24,10 +24,13 @@ sql/09_perimeter_refresh.sql
 
 `09` audits every effective role, not only familiar platform role names. It
 classifies direct, inherited membership-chain, and `PUBLIC`-derived `CREATE`
-and `EXECUTE` authority. The default `portable` profile permits no non-owner
-schema creation or function execution. Deployments using the repository's
-Supabase grants must explicitly persist the scoped profile before applying
-the package:
+and `EXECUTE` authority, plus owner-scoped table, sequence, and function
+defaults that would affect future objects. Its protected-schema and authority-
+function registries bound remediation to sovereign-memory surfaces; unrelated
+schemas, functions, and owner/schema defaults are not silently absorbed. The
+default `portable` profile permits no non-owner schema creation or function
+execution. Deployments using the repository's Supabase grants must explicitly
+persist the scoped profile before applying the package:
 
 ```sql
 alter database your_database
@@ -42,11 +45,31 @@ with `sovereign_memory.perimeter_allowed_owner_roles`,
 `sovereign_memory.perimeter_allowed_function_execute_roles`, and
 `sovereign_memory.perimeter_allowed_internal_execute_roles`.
 
+The owner-run migration snapshots these inputs into an ACL-protected durable
+policy row. Runtime assertions read that row, not caller-controlled custom GUCs.
+
 `sovereign_memory.perimeter_acl_mode` is `revoke` by default: direct grants
 outside policy are revoked and the effective audit then fails if authority
 still remains. Set it to `fail` for audit-only deployment gates. An allowlist
 entry is a deliberate platform waiver; the audit still enumerates all roles,
 so it is not an assertion blind spot.
+
+Owner-global default privileges are a separate operator boundary because they
+apply in every schema where that owner creates objects. Migration `09` reports
+these as `global_default_*` violations in both modes and never revokes them.
+Before applying, operators must establish the intended global baseline for each
+allowed owner (PostgreSQL grants `PUBLIC` function execution by default), for
+example:
+
+```sql
+alter default privileges for role your_owner
+  revoke execute on functions from public;
+```
+
+A schema-scoped default can add privileges but cannot negate a global grant;
+`revoke` mode therefore repairs only schema-scoped defaults in explicitly
+registered protected schemas. Unrelated owners' global defaults are not read or
+mutated by this repository migration.
 
 ## Current contracts
 
@@ -80,6 +103,9 @@ GitHub Actions tests PostgreSQL 15 and 16 for:
 - migration reapplication;
 - deliberate drift followed by remediation;
 - arbitrary direct, inherited, and `PUBLIC` stale-grantee drift;
+- owner-scoped default ACL drift and future-object inheritance;
+- runtime GUC spoof attempts and unrelated SECURITY DEFINER negative fixtures;
+- portable-profile fresh apply and exact reapply;
 - executable upgrade from the previous PR head;
 - concurrent identical revision replay;
 - final perimeter closure.

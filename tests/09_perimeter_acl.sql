@@ -26,12 +26,10 @@ end $$;
 
 do $$
 begin
-  perform set_config('sovereign_memory.perimeter_allowed_schema_create_roles','PUBLIC',true);
-  if 'PUBLIC'=any(public.perimeter_setting_roles(
-       'sovereign_memory.perimeter_allowed_schema_create_roles')) then
-    raise exception 'PUBLIC pseudo-grantee entered an explicit role allowlist';
-  end if;
-  perform set_config('sovereign_memory.perimeter_allowed_schema_create_roles','',true);
+  begin
+    update public.perimeter_acl_policy set schema_create_roles=array['PUBLIC'];
+  exception when check_violation then return; end;
+  raise exception 'PUBLIC pseudo-grantee entered the durable role allowlist';
 end $$;
 
 create role smc_stale_direct nologin;
@@ -139,13 +137,16 @@ end $$;
 
 -- Custom deployment allowlists are explicit effective-principal inputs.
 create role smc_declared_runtime nologin;
-select set_config('sovereign_memory.perimeter_allowed_schema_create_roles','smc_declared_runtime',true);
-select set_config('sovereign_memory.perimeter_allowed_function_execute_roles','smc_declared_runtime',true);
+update public.perimeter_acl_policy
+set schema_create_roles=array['smc_declared_runtime'],
+    function_execute_roles=array['service_role','smc_declared_runtime'];
 grant create on schema public to smc_declared_runtime;
 grant execute on function public.append_attention_event_revision(uuid,text,timestamptz,text,text,jsonb) to smc_declared_runtime;
 select public.assert_perimeter_closed();
 revoke create on schema public from smc_declared_runtime;
 revoke execute on function public.append_attention_event_revision(uuid,text,timestamptz,text,text,jsonb) from smc_declared_runtime;
+update public.perimeter_acl_policy
+set schema_create_roles=array[]::text[],function_execute_roles=array['service_role'];
 
 -- ACL-only remediation must not rewrite append-only historical rows.
 do $$
