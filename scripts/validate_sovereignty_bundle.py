@@ -1,4 +1,8 @@
-"""Engine-free validation for deterministic Sovereign Memory bundles."""
+"""Engine-free validation for deterministic Sovereign Memory bundles.
+
+The CLI reports archive open/read failures as ``ARCHIVE_IO`` without exposing
+operating-system error details or the supplied host path.
+"""
 
 from __future__ import annotations
 
@@ -468,8 +472,8 @@ def _validate_manifest(manifest: Any, archive_paths: set[str]) -> dict[str, Any]
         declared_paths.append(path)
     if relation_keys != sorted(relation_keys) or len({key[0] for key in relation_keys}) != len(relation_keys):
         _fail("MANIFEST_DEPENDENCY", "relations must have unique ordered restore_order values")
-    for identity, dependencies in relation_dependencies:
-        if identity in dependencies or any(dependency not in relation_names for dependency in dependencies):
+    for _, dependencies in relation_dependencies:
+        if any(dependency not in relation_names for dependency in dependencies):
             _fail("MANIFEST_DEPENDENCY", "relation dependency closure is incomplete")
     columns_by_relation = {identity: columns for identity, _, columns, _ in relation_records}
     restore_order_by_relation = {identity: order for identity, order, _, _ in relation_records}
@@ -486,7 +490,11 @@ def _validate_manifest(manifest: Any, archive_paths: set[str]) -> dict[str, Any]
                 column not in target_columns for column in foreign_key["referenced_columns"]
             ):
                 _fail("MANIFEST_DEPENDENCY", "foreign key target closure is incomplete")
-            if not foreign_key["deferrable"] and restore_order_by_relation[target] >= order:
+            if (
+                target != identity
+                and not foreign_key["deferrable"]
+                and restore_order_by_relation[target] >= order
+            ):
                 _fail(
                     "MANIFEST_DEPENDENCY",
                     "non-deferrable foreign key target must precede its dependent relation",
@@ -601,8 +609,11 @@ def main(argv: list[str] | None = None) -> int:
                 "ARCHIVE_INVALID",
                 f"max archive size must be between 0 and {MAX_ARCHIVE_SIZE}",
             )
-        with open(args.archive, "rb") as source:
-            raw = source.read(args.max_archive_size + 1)
+        try:
+            with open(args.archive, "rb") as source:
+                raw = source.read(args.max_archive_size + 1)
+        except OSError:
+            _fail("ARCHIVE_IO", "archive could not be read")
         result = validate_bundle(
             raw,
             expected_archive_sha256=args.expected_sha256,

@@ -367,6 +367,48 @@ class ManifestValidationTests(unittest.TestCase):
             [1, 2],
         )
 
+    def test_relation_restore_order_accepts_deferrable_self_reference(self):
+        manifest = valid_manifest()
+        relation = manifest["relations"][0]
+        relation["columns"].append({"name": "parent_id", "ordinal": 2, "pg_type": "bigint"})
+        relation["dependencies"] = ["public.memory"]
+        relation["foreign_keys"] = [{
+            "columns": ["parent_id"],
+            "deferrable": True,
+            "referenced_columns": ["id"],
+            "referenced_relation": "memory",
+            "referenced_schema": "public",
+        }]
+
+        result = validator.validate_bundle(bundle_bytes(manifest))
+
+        self.assertEqual(result.manifest["relations"][0]["dependencies"], ["public.memory"])
+
+    def test_relation_restore_order_rejects_nondeferrable_self_reference_as_cycle(self):
+        manifest = valid_manifest()
+        relation = manifest["relations"][0]
+        relation["columns"].append({"name": "parent_id", "ordinal": 2, "pg_type": "bigint"})
+        relation["dependencies"] = ["public.memory"]
+        relation["foreign_keys"] = [{
+            "columns": ["parent_id"],
+            "deferrable": False,
+            "referenced_columns": ["id"],
+            "referenced_relation": "memory",
+            "referenced_schema": "public",
+        }]
+
+        with self.assertRaises(validator.BundleValidationError) as caught:
+            validator.validate_bundle(bundle_bytes(manifest))
+
+        self.assertEqual(caught.exception.code, "MANIFEST_DEPENDENCY")
+        self.assertIn("cycle", str(caught.exception))
+
+    def test_relation_dependencies_reject_spurious_self_reference_without_self_fk(self):
+        manifest = valid_manifest()
+        manifest["relations"][0]["dependencies"] = ["public.memory"]
+
+        self.assert_code("MANIFEST_DEPENDENCY", bundle_bytes(manifest))
+
     def test_relation_restore_order_accepts_all_deferrable_cycle(self):
         manifest = valid_manifest()
         members = dict(MEMBERS)
@@ -572,6 +614,45 @@ class ManifestValidationTests(unittest.TestCase):
         self.assertEqual(source.read_sizes, [1025])
         source.close.assert_called_once_with()
         self.assertEqual(json.loads(stderr.getvalue())["code"], "ARCHIVE_INVALID")
+
+    def test_cli_unreadable_archive_has_stable_machine_readable_io_error(self):
+        class UnreadableProbe(io.BytesIO):
+            def read(self, size=None):
+                raise PermissionError("sensitive host detail")
+
+        source = UnreadableProbe(b"private")
+        source.close = mock.Mock(return_value=None)
+        stderr = io.StringIO()
+        with (
+            mock.patch("builtins.open", return_value=source),
+            mock.patch.object(sys, "stderr", stderr),
+        ):
+            status = validator.main(["private-host-path.tar"])
+
+        self.assertEqual(status, 1)
+        self.assertEqual(
+            json.loads(stderr.getvalue()),
+            {"code": "ARCHIVE_IO", "message": "archive could not be read"},
+        )
+        source.close.assert_called_once_with()
+
+    def test_direct_cli_missing_archive_has_stable_machine_readable_io_error(self):
+        script = Path(validator.__file__)
+        with tempfile.TemporaryDirectory() as directory:
+            missing_path = Path(directory) / "private-host-path.tar"
+            result = subprocess.run(
+                [sys.executable, str(script), str(missing_path)],
+                check=False, capture_output=True, text=True,
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(
+            json.loads(result.stderr),
+            {"code": "ARCHIVE_IO", "message": "archive could not be read"},
+        )
+        self.assertNotIn(str(missing_path), result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
 
     def test_direct_cli_has_machine_readable_golden_and_tamper_results(self):
         raw = bundle_bytes()
