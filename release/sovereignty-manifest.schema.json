@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jryski/sovereign-memory-core/release/sovereignty-manifest.schema.json",
+  "title": "Sovereign Memory deterministic bundle manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "compatibility", "dependencies", "entries", "evidence", "exporter", "format",
+    "loss_report_path", "migrations", "profile", "relations", "restore_plan_path",
+    "schema_version", "sequence_state_path", "source", "source_snapshot_path", "toolchain"
+  ],
+  "properties": {
+    "format": {"const": "sovereign-memory.bundle/1.0"},
+    "schema_version": {"const": "sovereign-memory.manifest/1.0"},
+    "profile": {"const": "full-synthetic-v1"},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["commit", "repository_url"],
+      "properties": {
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "repository_url": {"$ref": "#/$defs/nonemptyString"}
+      }
+    },
+    "exporter": {
+      "type": "object", "additionalProperties": false, "required": ["version"],
+      "properties": {"version": {"$ref": "#/$defs/nonemptyString"}}
+    },
+    "toolchain": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["identity", "name", "version"],
+        "properties": {
+          "identity": {"$ref": "#/$defs/nonemptyString"},
+          "name": {"$ref": "#/$defs/nonemptyString"},
+          "version": {"$ref": "#/$defs/nonemptyString"}
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object", "additionalProperties": false, "required": ["postgresql"],
+      "properties": {
+        "postgresql": {
+          "type": "object", "additionalProperties": false,
+          "required": ["maximum_exclusive_major", "minimum_major"],
+          "properties": {
+            "minimum_major": {"const": 15},
+            "maximum_exclusive_major": {"const": 17}
+          }
+        }
+      }
+    },
+    "entries": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/entry"}},
+    "migrations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/migration"}},
+    "relations": {"type": "array", "items": {"$ref": "#/$defs/relation"}},
+    "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
+    "dependencies": {"type": "array", "items": {"$ref": "#/$defs/dependency"}},
+    "sequence_state_path": {"$ref": "#/$defs/path"},
+    "restore_plan_path": {"$ref": "#/$defs/path"},
+    "loss_report_path": {"$ref": "#/$defs/path"},
+    "source_snapshot_path": {"$ref": "#/$defs/path"}
+  },
+  "$defs": {
+    "nonemptyString": {"type": "string", "minLength": 1},
+    "path": {
+      "type": "string", "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)[^\\u0000]+$"
+    },
+    "stringArray": {
+      "type": "array", "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonemptyString"}
+    },
+    "pathArray": {
+      "type": "array", "uniqueItems": true,
+      "items": {"$ref": "#/$defs/path"}
+    },
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "entry": {
+      "type": "object", "additionalProperties": false,
+      "required": ["bytes", "media_type", "mode", "path", "role", "sha256"],
+      "properties": {
+        "bytes": {"type": "integer", "minimum": 0},
+        "media_type": {
+          "type": "string",
+          "enum": ["application/json", "application/octet-stream", "application/sql", "application/x-ndjson"]
+        },
+        "mode": {"const": "0644"},
+        "path": {"$ref": "#/$defs/path"},
+        "role": {
+          "type": "string",
+          "enum": ["evidence", "loss-report", "migration", "relation", "restore-plan", "sequence-state", "source-snapshot"]
+        },
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "migration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["order", "path", "sha256"],
+      "properties": {
+        "order": {"type": "integer", "minimum": 1},
+        "path": {"$ref": "#/$defs/path"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "column": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "ordinal", "pg_type"],
+      "properties": {
+        "name": {"$ref": "#/$defs/nonemptyString"},
+        "ordinal": {"type": "integer", "minimum": 1},
+        "pg_type": {"$ref": "#/$defs/nonemptyString"}
+      }
+    },
+    "foreignKey": {
+      "type": "object", "additionalProperties": false,
+      "required": ["columns", "deferrable", "referenced_columns", "referenced_relation", "referenced_schema"],
+      "properties": {
+        "columns": {"$ref": "#/$defs/stringArray"},
+        "deferrable": {"type": "boolean"},
+        "referenced_columns": {"$ref": "#/$defs/stringArray"},
+        "referenced_relation": {"$ref": "#/$defs/nonemptyString"},
+        "referenced_schema": {"$ref": "#/$defs/nonemptyString"}
+      }
+    },
+    "relation": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "bytes", "columns", "dependencies", "foreign_keys", "path", "primary_key", "relation",
+        "restore_order", "row_count", "row_digest_algorithm", "schema", "sha256"
+      ],
+      "properties": {
+        "bytes": {"type": "integer", "minimum": 0},
+        "columns": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/column"}},
+        "dependencies": {"$ref": "#/$defs/stringArray"},
+        "foreign_keys": {"type": "array", "items": {"$ref": "#/$defs/foreignKey"}},
+        "path": {"$ref": "#/$defs/path"},
+        "primary_key": {"$ref": "#/$defs/stringArray"},
+        "relation": {"$ref": "#/$defs/nonemptyString"},
+        "restore_order": {"type": "integer", "minimum": 1},
+        "row_count": {"type": "integer", "minimum": 0},
+        "row_digest_algorithm": {"const": "sha256-raw-jsonl-v1"},
+        "schema": {"$ref": "#/$defs/nonemptyString"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "locator": {
+      "type": "object", "additionalProperties": false,
+      "required": ["byte_end", "byte_start", "locator"],
+      "properties": {
+        "byte_end": {"type": "integer", "minimum": 1},
+        "byte_start": {"type": "integer", "minimum": 0},
+        "locator": {"$ref": "#/$defs/nonemptyString"}
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["locators", "path", "sha256"],
+      "properties": {
+        "locators": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/locator"}},
+        "path": {"$ref": "#/$defs/path"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "dependency": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "requires"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "requires": {"$ref": "#/$defs/pathArray"}
+      }
+    }
+  }
+}
