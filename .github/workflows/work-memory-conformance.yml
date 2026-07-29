@@ -10,7 +10,7 @@ permissions:
 
 env:
   PGPASSWORD: postgres
-  PREVIOUS_REVIEW_HEAD: 24d45fd1b5274145f39933cb723376a635d889fb
+  PREVIOUS_REVIEW_HEAD: 19912ff2e612d9cc4188f9d0051a7e07a509341e
 
 jobs:
   fresh-install:
@@ -46,6 +46,7 @@ jobs:
             if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
             if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role nologin; end if;
           end $$;
+          alter database sovereign_memory set sovereign_memory.perimeter_profile='supabase';
           SQL
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
@@ -66,6 +67,7 @@ jobs:
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/08_attention_events.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/09_perimeter_acl.sql
       - name: Introduce drift
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
@@ -77,6 +79,42 @@ jobs:
           create unique index work_lessons_one_live_successor_uq
             on public.work_lessons(supersedes)
             where supersedes is not null and status='active';
+          SQL
+      - name: Assert deliberate drift fails closed
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          do $$ begin
+            begin
+              perform public.assert_perimeter_closed();
+            exception when others then
+              if sqlstate='P0001'
+                 and sqlerrm like 'PERIMETER FAIL: unexpected effective ACL grantees:%'
+                 and sqlerrm like '%service_role%' then return; end if;
+              raise exception 'drift failure lacked grantee evidence: %',sqlerrm;
+            end;
+            raise exception 'deliberate ACL drift was accepted';
+          end $$;
+          SQL
+      - name: Assert fail-only migration preserves deliberate ACL drift
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -c "alter database sovereign_memory set sovereign_memory.perimeter_acl_mode='fail'"
+          if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql \
+              > /tmp/perimeter-fail-only.log 2>&1; then
+            echo 'fail-only perimeter migration accepted deliberate ACL drift' >&2
+            exit 1
+          fi
+          grep -q 'PERIMETER FAIL: unexpected effective ACL grantees:.*service_role' \
+            /tmp/perimeter-fail-only.log
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          do $$ begin
+            if not has_schema_privilege('service_role','public','CREATE')
+               or not has_function_privilege('service_role',
+                 'public.capture_memory_attention_after_insert()','EXECUTE') then
+              raise exception 'fail-only migration revoked deliberate ACL drift';
+            end if;
+          end $$;
+          alter database sovereign_memory set sovereign_memory.perimeter_acl_mode='revoke';
           SQL
       - name: Remediate drift
         run: |
@@ -134,6 +172,7 @@ jobs:
             if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
             if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role nologin; end if;
           end $$;
+          alter database sovereign_upgrade set sovereign_memory.perimeter_profile='supabase';
           SQL
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
@@ -149,7 +188,7 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
       - name: Apply v3 attention upgrade
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
-      - name: Apply v3 perimeter upgrade
+      - name: Apply v4 perimeter upgrade
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
       - name: Verify event count preservation
         run: |

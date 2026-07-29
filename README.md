@@ -20,6 +20,34 @@ sql/09_perimeter_refresh.sql
 
 `07`, `08`, and `09` are re-runnable fix-forward migrations. `09` must run last because it closes schema creation, table grants, function execution, default privileges, RLS/FORCE RLS, owner, search-path, and trigger-only boundaries.
 
+## Perimeter policy inputs
+
+`09` audits every effective role, not only familiar platform role names. It
+classifies direct, inherited membership-chain, and `PUBLIC`-derived `CREATE`
+and `EXECUTE` authority. The default `portable` profile permits no non-owner
+schema creation or function execution. Deployments using the repository's
+Supabase grants must explicitly persist the scoped profile before applying
+the package:
+
+```sql
+alter database your_database
+  set sovereign_memory.perimeter_profile = 'supabase';
+```
+
+The `supabase` profile permits `service_role` only on non-internal authority
+functions. It never waives trigger-only/internal writers or schema `CREATE`.
+Other deployments can declare comma-separated effective-principal allowlists
+with `sovereign_memory.perimeter_allowed_owner_roles`,
+`sovereign_memory.perimeter_allowed_schema_create_roles`,
+`sovereign_memory.perimeter_allowed_function_execute_roles`, and
+`sovereign_memory.perimeter_allowed_internal_execute_roles`.
+
+`sovereign_memory.perimeter_acl_mode` is `revoke` by default: direct grants
+outside policy are revoked and the effective audit then fails if authority
+still remains. Set it to `fail` for audit-only deployment gates. An allowlist
+entry is a deliberate platform waiver; the audit still enumerates all roles,
+so it is not an assertion blind spot.
+
 ## Current contracts
 
 - Work lessons are proposal-gated and evidence-backed.
@@ -51,6 +79,7 @@ GitHub Actions tests PostgreSQL 15 and 16 for:
 - multibyte, escaped, and tight-budget payloads;
 - migration reapplication;
 - deliberate drift followed by remediation;
+- arbitrary direct, inherited, and `PUBLIC` stale-grantee drift;
 - executable upgrade from the previous PR head;
 - concurrent identical revision replay;
 - final perimeter closure.
