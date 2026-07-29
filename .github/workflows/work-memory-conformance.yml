@@ -10,7 +10,7 @@ permissions:
 
 env:
   PGPASSWORD: postgres
-  PREVIOUS_REVIEW_HEAD: 24d45fd1b5274145f39933cb723376a635d889fb
+  PREVIOUS_REVIEW_HEAD: 19912ff2e612d9cc4188f9d0051a7e07a509341e
 
 jobs:
   fresh-install:
@@ -46,6 +46,11 @@ jobs:
             if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
             if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role nologin; end if;
           end $$;
+          alter database sovereign_memory set sovereign_memory.perimeter_profile='supabase';
+          -- Owner-global defaults cross schema/repository boundaries. Establish
+          -- the operator-owned baseline explicitly; migration 09 never changes it.
+          alter default privileges for role postgres revoke execute on functions from public;
+          alter default privileges for role pg_database_owner revoke execute on functions from public;
           SQL
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
@@ -57,20 +62,25 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
-      - name: Reapply package
+      - name: Reapply legacy package before hardening boundary
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
-      - name: Runtime and rollback conformance
+      - name: Runtime and rollback conformance before hardening boundary
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/08_attention_events.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/09_perimeter_acl.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/09_perimeter_acl_review.sql
       - name: Introduce drift
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           grant create on schema public to service_role;
           grant execute on function public.capture_memory_attention_after_insert() to service_role;
+          grant execute on function public.remediate_perimeter_acl() to service_role;
+          alter default privileges for role postgres in schema public
+            grant execute on functions to service_role;
           alter function public.append_attention_event_revision(uuid,text,timestamptz,text,text,jsonb)
             set search_path=public,pg_temp;
           drop index if exists public.work_lessons_one_live_successor_uq;
@@ -78,11 +88,59 @@ jobs:
             on public.work_lessons(supersedes)
             where supersedes is not null and status='active';
           SQL
-      - name: Remediate drift
+      - name: Assert deliberate drift fails closed
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          do $$ begin
+            begin
+              perform public.assert_perimeter_closed();
+            exception when others then
+              if sqlstate='P0001'
+                 and sqlerrm like 'PERIMETER FAIL: unexpected effective ACL grantees:%'
+                 and sqlerrm like '%service_role%' then return; end if;
+              raise exception 'drift failure lacked grantee evidence: %',sqlerrm;
+            end;
+            raise exception 'deliberate ACL drift was accepted';
+          end $$;
+          SQL
+      - name: Assert fail-only migration preserves deliberate ACL drift
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -c "alter database sovereign_memory set sovereign_memory.perimeter_acl_mode='fail'"
+          if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql \
+              > /tmp/perimeter-fail-only.log 2>&1; then
+            echo 'fail-only perimeter migration accepted deliberate ACL drift' >&2
+            exit 1
+          fi
+          grep -q 'PERIMETER FAIL: unexpected effective ACL grantees:.*service_role' \
+            /tmp/perimeter-fail-only.log
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          do $$ begin
+            if not has_schema_privilege('service_role','public','CREATE')
+               or not has_function_privilege('service_role',
+                 'public.capture_memory_attention_after_insert()','EXECUTE')
+               or not has_function_privilege('service_role',
+                 'public.remediate_perimeter_acl()','EXECUTE')
+               or not exists(
+                 select 1 from pg_default_acl d
+                 join pg_namespace n on n.oid=d.defaclnamespace
+                 cross join lateral aclexplode(d.defaclacl) a
+                 where n.nspname='public' and d.defaclobjtype='f'
+                   and a.grantee='service_role'::regrole
+                   and a.privilege_type='EXECUTE'
+               ) then
+              raise exception 'fail-only migration revoked deliberate ACL drift';
+            end if;
+          end $$;
+          alter database sovereign_memory set sovereign_memory.perimeter_acl_mode='revoke';
+          SQL
+      - name: Remediate drift and cross hardening boundary
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           select public.assert_perimeter_closed();
           do $$ declare d text; begin
@@ -93,17 +151,87 @@ jobs:
             end if;
           end $$;
           SQL
+      - name: Hardened runtime and temp-shadow conformance
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/07_work_lessons.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/08_attention_events.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/09_perimeter_acl.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/09_perimeter_acl_review.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/10_security_definer_temp_shadow.sql
       - name: Concurrent identical replay
         if: matrix.pg == '16'
         run: |
           createdb -h localhost -U postgres smc_concurrency
           export CONCURRENCY_URL=postgresql://postgres:postgres@localhost:5432/smc_concurrency
-          psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -c 'create schema if not exists extensions'
+          psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          create schema if not exists extensions;
+          alter default privileges for role postgres revoke execute on functions from public;
+          alter default privileges for role pg_database_owner revoke execute on functions from public;
+          SQL
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+          psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
           DATABASE_URL="$CONCURRENCY_URL" bash tests/08_attention_concurrency.sh
+
+  portable-profile:
+    name: Portable fresh and reapply (PG ${{ matrix.pg }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ["15", "16"]
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sovereign_portable
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sovereign_portable"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_portable
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Bootstrap portable profile
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          create schema extensions;
+          create role anon nologin;
+          create role authenticated nologin;
+          create role service_role nologin;
+          alter default privileges for role postgres revoke execute on functions from public;
+          alter default privileges for role pg_database_owner revoke execute on functions from public;
+          SQL
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
+      - name: Fresh apply and exact reapply
+        run: |
+          for pass in 1 2; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+          done
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          do $$ begin
+            if (select profile from public.perimeter_acl_policy where singleton)<>'portable' then
+              raise exception 'portable profile was not persisted';
+            end if;
+            if has_function_privilege('service_role',
+                 'public.append_attention_event_revision(uuid,text,timestamptz,text,text,jsonb)','EXECUTE')
+               or has_function_privilege('service_role',
+                 'public.assert_perimeter_closed()','EXECUTE') then
+              raise exception 'portable profile retained Supabase-only EXECUTE';
+            end if;
+          end $$;
+          select public.assert_perimeter_closed();
+          SQL
 
   executable-upgrade:
     name: Upgrade reviewed head (PG 16)
@@ -134,6 +262,11 @@ jobs:
             if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
             if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role nologin; end if;
           end $$;
+          alter database sovereign_upgrade set sovereign_memory.perimeter_profile='supabase';
+          -- Match the documented operator-owned global baseline used by fresh
+          -- and portable installs; migration 09 reports but never mutates it.
+          alter default privileges for role postgres revoke execute on functions from public;
+          alter default privileges for role pg_database_owner revoke execute on functions from public;
           SQL
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
@@ -149,8 +282,91 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
       - name: Apply v3 attention upgrade
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
-      - name: Apply v3 perimeter upgrade
+      - name: Seed durable control-table upgrade drift
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          create role smc_upgrade_policy_attacker nologin;
+          create role smc_upgrade_policy_parent nologin;
+          create role smc_upgrade_policy_leaf nologin;
+          grant smc_upgrade_policy_parent to smc_upgrade_policy_leaf;
+          create table public.perimeter_acl_policy (
+            singleton boolean primary key default true check(singleton),
+            profile text not null check(profile in ('portable','supabase')),
+            owner_roles text[] not null,
+            schema_create_roles text[] not null,
+            function_execute_roles text[] not null,
+            internal_execute_roles text[] not null,
+            updated_at timestamptz not null default now(),
+            constraint perimeter_owner_roles_are_named check(not ('public'=any(lower(owner_roles::text)::text[]))),
+            constraint perimeter_schema_roles_are_named check(not ('public'=any(lower(schema_create_roles::text)::text[]))),
+            constraint perimeter_function_roles_are_named check(not ('public'=any(lower(function_execute_roles::text)::text[]))),
+            constraint perimeter_internal_roles_are_named check(not ('public'=any(lower(internal_execute_roles::text)::text[])))
+          );
+          create table public.perimeter_protected_schema_registry (
+            schema_name text primary key check(schema_name<>'' and schema_name=btrim(schema_name))
+          );
+          create table public.perimeter_authority_function_registry (
+            function_identity text primary key check(function_identity<>'' and function_identity=btrim(function_identity)),
+            is_internal boolean not null
+          );
+          insert into public.perimeter_protected_schema_registry values('smc_upgrade_sentinel');
+          insert into public.perimeter_authority_function_registry values('smc_upgrade_sentinel()',true);
+          alter table public.perimeter_acl_policy owner to smc_upgrade_policy_attacker;
+          grant update on public.perimeter_acl_policy,
+            public.perimeter_protected_schema_registry to smc_upgrade_policy_parent;
+          grant update(function_identity) on public.perimeter_authority_function_registry
+            to smc_upgrade_policy_parent;
+          alter database sovereign_upgrade set sovereign_memory.perimeter_acl_mode='fail';
+          SQL
+      - name: Fail-only upgrade preserves and reports durable-table drift
+        run: |
+          if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql \
+              >/tmp/perimeter-control-fail.log 2>&1; then
+            echo 'fail-only upgrade accepted attacker-owned control tables' >&2
+            exit 1
+          fi
+          grep -q 'durable control-table ownership/effective ACLs require operator action:.*smc_upgrade_policy_attacker.*smc_upgrade_policy_leaf' \
+            /tmp/perimeter-control-fail.log
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          do $$ begin
+            if (select r.rolname from pg_class c join pg_roles r on r.oid=c.relowner
+                where c.oid='public.perimeter_acl_policy'::regclass)<>'smc_upgrade_policy_attacker'
+               or not has_column_privilege('smc_upgrade_policy_leaf',
+                    'public.perimeter_authority_function_registry','function_identity','UPDATE')
+               or not exists(select 1 from public.perimeter_protected_schema_registry
+                    where schema_name='smc_upgrade_sentinel')
+               or not exists(select 1 from public.perimeter_authority_function_registry
+                    where function_identity='smc_upgrade_sentinel()') then
+              raise exception 'fail-only upgrade changed durable control-table drift or data';
+            end if;
+          end $$;
+          alter database sovereign_upgrade set sovereign_memory.perimeter_acl_mode='revoke';
+          SQL
+      - name: Apply v4 perimeter upgrade
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+      - name: Apply SECURITY DEFINER temp-shadow hardening
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+      - name: Verify durable control-table repair preserved registry data
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          do $$ begin
+            if exists(
+              select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
+              where n.nspname='public'
+                and c.relname=any(array['perimeter_acl_policy','perimeter_protected_schema_registry','perimeter_authority_function_registry'])
+                and c.relowner<>current_user::regrole
+            ) or has_table_privilege('smc_upgrade_policy_leaf',
+                 'public.perimeter_acl_policy','UPDATE')
+               or has_column_privilege('smc_upgrade_policy_leaf',
+                 'public.perimeter_authority_function_registry','function_identity','UPDATE')
+               or not exists(select 1 from public.perimeter_protected_schema_registry
+                    where schema_name='smc_upgrade_sentinel')
+               or not exists(select 1 from public.perimeter_authority_function_registry
+                    where function_identity='smc_upgrade_sentinel()') then
+              raise exception 'revoke upgrade failed safe ownership/ACL repair or lost registry data';
+            end if;
+          end $$;
+          SQL
       - name: Verify event count preservation
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
@@ -203,7 +419,5 @@ jobs:
           SQL
       - name: Reapply upgraded package
         run: |
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'select public.assert_perimeter_closed()'
