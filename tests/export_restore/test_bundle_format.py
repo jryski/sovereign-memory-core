@@ -2,6 +2,7 @@ import datetime as dt
 from decimal import Decimal
 import io
 import tarfile
+import tracemalloc
 import unittest
 from unittest import mock
 from uuid import UUID
@@ -99,12 +100,51 @@ class PostgreSqlScalarTests(unittest.TestCase):
             with self.subTest(pg_type=pg_type):
                 self.assertEqual(bundle.encode_pg_scalar(pg_type, value), expected)
 
+    def test_catalog_enums_and_json_types_have_explicit_lossless_metadata(self):
+        catalog = (
+            bundle.PgEnumCatalog("public.example_status", ("proposed", "accepted")),
+        )
+        self.assertEqual(
+            bundle.encode_pg_scalar(
+                "public.example_status", "accepted", enum_catalog=catalog,
+            ),
+            "accepted",
+        )
+        for pg_type in ("json", "jsonb"):
+            with self.subTest(pg_type=pg_type, source="text"):
+                self.assertEqual(
+                    bundle.encode_pg_scalar(
+                        pg_type, bundle.PgJsonText(b'{"a":[1,true],"z":"value"}')
+                    ),
+                    {"a": [1, True], "z": "value"},
+                )
+            with self.subTest(pg_type=pg_type, source="decoded"):
+                self.assertEqual(
+                    bundle.encode_pg_scalar(
+                        pg_type, bundle.PgJsonValue({"z": None, "a": "scalar"})
+                    ),
+                    {"z": None, "a": "scalar"},
+                )
+
+        rejected = (
+            ("enum", "accepted", {}),
+            ("public.example_status", "accepted", {}),
+            ("public.example_status", "unknown", {"enum_catalog": catalog}),
+            ("json", '{"a":1}', {}),
+            ("jsonb", {"a": 1}, {}),
+            ("json", bundle.PgJsonText(b'{ "a":1}'), {}),
+            ("jsonb", bundle.PgJsonText(b'{"a":1,"a":2}'), {}),
+            ("jsonb", bundle.PgJsonValue(Decimal("1.0")), {}),
+        )
+        for pg_type, value, kwargs in rejected:
+            with self.subTest(pg_type=pg_type, value=value), self.assertRaises((TypeError, ValueError)):
+                bundle.encode_pg_scalar(pg_type, value, **kwargs)
+
     def test_unsupported_or_mismatched_postgresql_values_fail_closed(self):
         rejected = (
             ("enum", "not catalog mapped"),
             ("example_status", "not catalog mapped"),
             ("jsonb", {}),
-            ("jsonb", None),
             ("int8", True),
             ("numeric", Decimal("NaN")),
             ("numeric", Decimal("-0.00")),
@@ -123,20 +163,50 @@ class PostgreSqlScalarTests(unittest.TestCase):
             with self.subTest(pg_type=pg_type, value=value), self.assertRaises((TypeError, ValueError)):
                 bundle.encode_pg_scalar(pg_type, value)
 
+    def test_text_array_shape_metadata_requires_exact_integers(self):
+        for dimensions, lower_bound in (
+            (1.0, 1), (Decimal("1"), 1), (True, 1),
+            (1, 1.0), (1, Decimal("1")), (1, True),
+        ):
+            with self.subTest(dimensions=dimensions, lower_bound=lower_bound), self.assertRaises(TypeError):
+                bundle.encode_pg_scalar(
+                    "text[]",
+                    bundle.PgTextArray(["x"], dimensions=dimensions, lower_bound=lower_bound),
+                )
+
 
 class JsonLinesTests(unittest.TestCase):
     def test_jsonl_and_raw_row_digest_are_byte_deterministic(self):
-        self.assertEqual(
-            bundle.canonical_jsonl_bytes(({"b": 2}, {"a": 1})),
-            b'{"b":2}\n{"a":1}\n',
+        rows = (
+            {"pk": ["2"], "row": {"id": "2"}},
+            {"pk": ["1"], "row": {"id": "1"}},
         )
-        raw_row = b'{"a":1}\n'
+        self.assertEqual(
+            bundle.canonical_jsonl_bytes(rows),
+            b'{"pk":["2"],"row":{"id":"2"}}\n{"pk":["1"],"row":{"id":"1"}}\n',
+        )
+        raw_row = b'{"pk":["1"],"row":{"id":"1"}}\n'
         self.assertEqual(
             bundle.jsonl_row_digest(raw_row),
-            "e346432021b04179518d9614f3560ccd71354a4ee101ddcb893d6959a9d6301c",
+            "134ce7eba35a58e88508102fd7990f3fafa74d195c500833116bbde2c4b98fa0",
         )
         with self.assertRaises(ValueError):
             bundle.jsonl_row_digest(b'{ "a": 1 }\n')
+
+    def test_jsonl_rows_require_the_exact_normative_envelope(self):
+        invalid_rows = (
+            None, 1, "row", [],
+            {}, {"pk": []}, {"row": {}},
+            {"pk": [], "row": {}, "extra": True},
+            {"pk": "not-array", "row": {}},
+            {"pk": [], "row": []},
+        )
+        for row in invalid_rows:
+            with self.subTest(row=row), self.assertRaises((TypeError, ValueError)):
+                bundle.canonical_jsonl_bytes([row])
+            raw = bundle.canonical_json_bytes(row)
+            with self.subTest(raw=raw), self.assertRaises((TypeError, ValueError)):
+                bundle.jsonl_row_digest(raw)
 
 
 class UstarWriterTests(unittest.TestCase):
@@ -165,6 +235,16 @@ class UstarWriterTests(unittest.TestCase):
         for entries in invalid_sets:
             with self.subTest(entries=entries), self.assertRaises((TypeError, ValueError)):
                 bundle.write_ustar(entries)
+
+    def test_writer_uses_the_validator_default_255_byte_path_profile(self):
+        accepted = "a" * 154 + "/" + "b" * 100
+        self.assertEqual(len(accepted.encode()), 255)
+        bundle.validate_ustar(bundle.write_ustar(((accepted, b"x"),)))
+
+        rejected = "a" * 155 + "/" + "b" * 100
+        self.assertEqual(len(rejected.encode()), 256)
+        with self.assertRaises(ValueError):
+            bundle.write_ustar(((rejected, b"x"),))
 
 
 class ArchiveValidationTests(unittest.TestCase):
@@ -260,6 +340,16 @@ class ArchiveValidationTests(unittest.TestCase):
         raw = bundle.write_ustar((("a.txt", b"abc"),))
         with self.assertRaises(ValueError):
             bundle.validate_ustar(raw + (b"\0" * 512))
+
+    def test_preflight_has_bounded_additional_memory(self):
+        raw = bundle.write_ustar((("payload.bin", b"x" * (8 * 1024 * 1024)),))
+        tracemalloc.start()
+        try:
+            bundle.validate_ustar(raw)
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        self.assertLess(peak, len(raw) // 4)
 
 
 if __name__ == "__main__":

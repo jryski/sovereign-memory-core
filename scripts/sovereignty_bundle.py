@@ -140,6 +140,7 @@ _PG_TYPE_TAGS = {
     "bigint": "int", "int8": "int",
     "numeric": "numeric", "decimal": "numeric",
     "boolean": "bool", "bool": "bool", "text[]": "text[]", "bytea": "bytea",
+    "json": "json", "jsonb": "json",
 }
 
 
@@ -155,20 +156,71 @@ class PgTextArray:
         object.__setattr__(self, "values", tuple(self.values))
 
 
+@dataclass(frozen=True)
+class PgEnumCatalog:
+    """Catalog-derived identity and ordered labels for one PostgreSQL enum."""
+
+    type_name: str
+    labels: Iterable[str]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.type_name, str) or not self.type_name.strip():
+            raise TypeError("enum catalog type identity must be a nonempty string")
+        labels = tuple(self.labels)
+        if not labels or any(not isinstance(label, str) for label in labels):
+            raise TypeError("enum catalog labels must be nonempty strings")
+        if len(set(labels)) != len(labels):
+            raise ValueError("enum catalog labels must be unique")
+        for label in labels:
+            _validate_string(label)
+        object.__setattr__(self, "labels", labels)
+
+
+@dataclass(frozen=True)
+class PgJsonText:
+    """An explicitly textual, already-canonical PostgreSQL JSON value."""
+
+    raw: bytes
+
+
+@dataclass(frozen=True)
+class PgJsonValue:
+    """An explicitly decoded PostgreSQL JSON value."""
+
+    value: Any
+
+
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise TypeError(message)
 
 
-def encode_pg_scalar(pg_type: str, value: Any) -> Any:
+def encode_pg_scalar(
+    pg_type: str,
+    value: Any,
+    *,
+    enum_catalog: Iterable[PgEnumCatalog] = (),
+) -> Any:
     """Encode a supported PostgreSQL scalar in the normative bundle shape."""
     if not isinstance(pg_type, str):
         raise TypeError("PostgreSQL type name must be str")
     normalized_type = pg_type.strip().lower()
-    try:
-        tag = _PG_TYPE_TAGS[normalized_type]
-    except KeyError as exc:
-        raise TypeError(f"unsupported PostgreSQL type: {pg_type!r}") from exc
+    catalog_by_type: dict[str, PgEnumCatalog] = {}
+    for entry in enum_catalog:
+        _require(isinstance(entry, PgEnumCatalog), "enum catalog entries require PgEnumCatalog")
+        identity = entry.type_name.strip().lower()
+        if identity in catalog_by_type:
+            raise ValueError(f"duplicate enum catalog identity: {entry.type_name!r}")
+        catalog_by_type[identity] = entry
+    if normalized_type == "enum":
+        raise TypeError("generic enum claims are unsupported; use a catalog type identity")
+    if normalized_type in catalog_by_type:
+        tag = "enum"
+    else:
+        try:
+            tag = _PG_TYPE_TAGS[normalized_type]
+        except KeyError as exc:
+            raise TypeError(f"unsupported PostgreSQL type: {pg_type!r}") from exc
     if value is None:
         return None
 
@@ -209,14 +261,34 @@ def encode_pg_scalar(pg_type: str, value: Any) -> Any:
     elif tag == "bool":
         _require(isinstance(value, bool), "boolean requires bool")
         encoded = value
+    elif tag == "enum":
+        _require(isinstance(value, str), "enum requires str")
+        _validate_string(value)
+        _require(value in catalog_by_type[normalized_type].labels, "enum label is absent from catalog metadata")
+        encoded = value
+    elif tag == "json":
+        if isinstance(value, PgJsonText):
+            _require(isinstance(value.raw, bytes), "JSON text requires bytes")
+            if b"\n" in value.raw or b"\r" in value.raw:
+                raise ValueError("JSON text must be one canonical value without a line terminator")
+            encoded = parse_canonical_json_bytes(value.raw + b"\n")
+        elif isinstance(value, PgJsonValue):
+            _validate_json_value(value.value)
+            encoded = value.value
+        else:
+            raise TypeError("json/jsonb requires PgJsonText or PgJsonValue to disambiguate strings")
     elif tag == "text[]":
         _require(isinstance(value, PgTextArray), "text[] requires validated array metadata")
         _require(
-            value.dimensions == 1 and not isinstance(value.dimensions, bool),
+            isinstance(value.dimensions, int)
+            and not isinstance(value.dimensions, bool)
+            and value.dimensions == 1,
             "text[] must be one-dimensional",
         )
         _require(
-            value.lower_bound == 1 and not isinstance(value.lower_bound, bool),
+            isinstance(value.lower_bound, int)
+            and not isinstance(value.lower_bound, bool)
+            and value.lower_bound == 1,
             "text[] must have lower bound 1",
         )
         _require(
@@ -233,16 +305,32 @@ def encode_pg_scalar(pg_type: str, value: Any) -> Any:
     return encoded
 
 
+def _validate_jsonl_row(row: Any) -> None:
+    if not isinstance(row, dict):
+        raise TypeError("JSONL row must be an object")
+    if set(row) != {"pk", "row"}:
+        raise ValueError("JSONL row must contain exactly 'pk' and 'row'")
+    if not isinstance(row["pk"], list):
+        raise TypeError("JSONL row 'pk' must be an array")
+    if not isinstance(row["row"], dict):
+        raise TypeError("JSONL row 'row' must be an object")
+
+
 def canonical_jsonl_bytes(rows: Any) -> bytes:
-    """Encode an iterable of values as canonical JSON Lines."""
-    return b"".join(canonical_json_bytes(row) for row in rows)
+    """Encode normative ``pk``/``row`` objects as canonical JSON Lines."""
+    output = bytearray()
+    for row in rows:
+        _validate_jsonl_row(row)
+        output.extend(canonical_json_bytes(row))
+    return bytes(output)
 
 
 def jsonl_row_digest(raw_row: bytes) -> str:
     """Return the SHA-256 hex digest of one already-canonical raw JSONL row."""
     if not isinstance(raw_row, bytes):
         raise TypeError("raw JSONL row must be bytes")
-    parse_canonical_json_bytes(raw_row)
+    row = parse_canonical_json_bytes(raw_row)
+    _validate_jsonl_row(row)
     return hashlib.sha256(raw_row).hexdigest()
 
 
@@ -269,6 +357,8 @@ def write_ustar(entries: Iterable[tuple[str, bytes]]) -> bytes:
     folded: set[str] = set()
     for path, content in entries:
         _validate_bundle_path(path)
+        if len(path.encode("utf-8")) > 255:
+            raise ValueError(f"bundle path exceeds the 255-byte profile: {path!r}")
         if path in exact:
             raise ValueError(f"duplicate bundle path: {path!r}")
         folded_path = path.casefold()
@@ -306,6 +396,26 @@ class ArchiveMember:
     path: str
     size: int
     data_offset: int
+
+
+def _canonical_ustar_header(path: str, size: int) -> bytes:
+    info = tarfile.TarInfo(path)
+    info.size = size
+    info.mode = 0o644
+    info.mtime = 0
+    info.uid = 0
+    info.gid = 0
+    info.uname = ""
+    info.gname = ""
+    info.type = tarfile.REGTYPE
+    try:
+        return info.tobuf(
+            format=tarfile.USTAR_FORMAT,
+            encoding="utf-8",
+            errors="strict",
+        )
+    except (ValueError, UnicodeError) as exc:
+        raise ValueError(f"path cannot be represented in POSIX ustar: {path!r}") from exc
 
 
 def _tar_string(field: bytes, label: str) -> str:
@@ -356,7 +466,6 @@ def validate_ustar(
         raise ValueError("archive is not complete 512-byte POSIX records")
 
     members: list[ArchiveMember] = []
-    reconstructed_entries: list[tuple[str, bytes]] = []
     seen: set[str] = set()
     folded: set[str] = set()
     total_size = 0
@@ -406,24 +515,28 @@ def validate_ustar(
             raise ValueError("archive member ownership or timestamp is not canonical")
         if _tar_string(header[265:297], "uname") or _tar_string(header[297:329], "gname"):
             raise ValueError("archive member owner names are not empty")
+        if header != _canonical_ustar_header(path, size):
+            raise ValueError("archive member header is not the exact canonical encoding")
 
         data_offset = offset + 512
         padded_size = (size + 511) // 512 * 512
         next_offset = data_offset + padded_size
         if next_offset > len(raw):
             raise ValueError("archive member data is truncated")
-        if any(raw[data_offset + size : next_offset]):
+        if any(memoryview(raw)[data_offset + size : next_offset]):
             raise ValueError("archive member padding is not zero-filled")
         members.append(ArchiveMember(path, size, data_offset))
-        reconstructed_entries.append((path, raw[data_offset:data_offset + size]))
         seen.add(path)
         folded.add(folded_path)
         offset = next_offset
 
     if offset + 1024 > len(raw) or raw[offset : offset + 1024] != zero + zero:
         raise ValueError("archive lacks two zero end-of-archive records")
-    if any(raw[offset:]):
+    canonical_size = (
+        (offset + 1024 + tarfile.RECORDSIZE - 1) // tarfile.RECORDSIZE
+    ) * tarfile.RECORDSIZE
+    if len(raw) != canonical_size:
+        raise ValueError("archive has a noncanonical trailing record count")
+    if any(memoryview(raw)[offset:]):
         raise ValueError("archive contains non-zero trailing records")
-    if write_ustar(reconstructed_entries) != raw:
-        raise ValueError("archive is not the exact deterministic ustar encoding")
     return tuple(members)
