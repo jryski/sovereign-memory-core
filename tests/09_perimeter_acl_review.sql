@@ -33,6 +33,56 @@ begin
   end if;
 end $$;
 
+-- A registered authority function closes over every non-system schema in its
+-- fixed search path. The schema must be explicitly registered before its CREATE
+-- ACL can be repaired; unrelated SECURITY DEFINER paths remain out of scope.
+create role smc_registered_path_stale nologin;
+create schema smc_registered_path authorization current_user;
+create function smc_registered_path.registered_path_writer()
+returns void language sql security definer
+set search_path=pg_catalog,smc_registered_path
+as $$ select null::void $$;
+insert into public.perimeter_authority_function_registry(function_identity,is_internal)
+values('smc_registered_path.registered_path_writer()',false);
+grant create on schema smc_registered_path to smc_registered_path_stale;
+grant create on schema smc_unrelated to smc_registered_path_stale;
+do $$
+begin
+  begin
+    perform public.assert_perimeter_closed();
+  exception when others then
+    if sqlstate='P0001' and sqlerrm like '%registered authority-function search-path schema%'
+       and sqlerrm like '%smc_registered_path%' then return; end if;
+    raise exception 'unregistered authority path failure lacked schema evidence: %',sqlerrm;
+  end;
+  raise exception 'perimeter accepted an unregistered authority-function path schema';
+end $$;
+insert into public.perimeter_protected_schema_registry(schema_name)
+values('smc_registered_path');
+do $$
+begin
+  begin
+    perform public.assert_perimeter_closed();
+  exception when others then
+    if sqlstate='P0001' and sqlerrm like '%unexpected effective ACL grantees%'
+       and sqlerrm like '%smc_registered_path_stale%'
+       and sqlerrm like '%smc_registered_path%' then return; end if;
+    raise exception 'registered authority path ACL failure lacked exact evidence: %',sqlerrm;
+  end;
+  raise exception 'perimeter accepted CREATE on a registered authority path schema';
+end $$;
+select public.remediate_perimeter_acl();
+select public.assert_perimeter_closed();
+do $$
+begin
+  if has_schema_privilege('smc_registered_path_stale','smc_registered_path','CREATE') then
+    raise exception 'registered authority path CREATE survived remediation';
+  end if;
+  if not has_schema_privilege('smc_registered_path_stale','smc_unrelated','CREATE') then
+    raise exception 'registered authority path remediation touched an unrelated schema';
+  end if;
+end $$;
+
 create role smc_secondary_stale nologin;
 create schema smc_secondary authorization current_user;
 insert into public.perimeter_protected_schema_registry(schema_name)
@@ -151,7 +201,8 @@ begin
   exception when others then
     if sqlstate='P0001' and sqlerrm like '%durable_control_table%'
        and sqlerrm like '%smc_policy_attacker%'
-       and sqlerrm like '%smc_policy_leaf%' then return; end if;
+       and sqlerrm like '%smc_policy_parent%UPDATE%via direct%'
+       and sqlerrm like '%smc_policy_leaf%UPDATE%via inherited%' then return; end if;
     raise exception 'durable-table failure lacked owner/effective-ACL evidence: %',sqlerrm;
   end;
   raise exception 'perimeter accepted attacker-owned durable policy state';
@@ -201,8 +252,8 @@ begin
     perform public.assert_perimeter_closed();
   exception when others then
     if sqlstate='P0001' and sqlerrm like '%durable_control_table%'
-       and sqlerrm like '%smc_policy_leaf%'
-       and sqlerrm like '%UPDATE(function_identity)%' then return; end if;
+       and sqlerrm like '%smc_policy_parent%UPDATE(function_identity)%via direct%'
+       and sqlerrm like '%smc_policy_leaf%UPDATE(function_identity)%via inherited%' then return; end if;
     raise exception 'column-ACL failure lacked inherited column evidence: %',sqlerrm;
   end;
   raise exception 'perimeter accepted inherited column-only control-table authority';
@@ -216,6 +267,25 @@ begin
     raise exception 'column-only control-table authority survived remediation';
   end if;
 end $$;
+
+-- PUBLIC table and column ACLs are reported once as explicit pseudo-grantee
+-- evidence, rather than being ambiguously attributed to every effective role.
+grant select on public.perimeter_acl_policy to public;
+grant update(function_identity) on public.perimeter_authority_function_registry to public;
+do $$
+begin
+  begin
+    perform public.assert_perimeter_closed();
+  exception when others then
+    if sqlstate='P0001'
+       and sqlerrm like '%durable_control_table PUBLIC SELECT public.perimeter_acl_policy via PUBLIC%'
+       and sqlerrm like '%durable_control_table PUBLIC UPDATE(function_identity) public.perimeter_authority_function_registry via PUBLIC%' then return; end if;
+    raise exception 'PUBLIC control-table failure lacked exact table/column evidence: %',sqlerrm;
+  end;
+  raise exception 'perimeter accepted PUBLIC control-table authority';
+end $$;
+select public.remediate_perimeter_acl();
+select public.assert_perimeter_closed();
 
 -- Global defaults are owner-wide and therefore outside schema-local repair.
 -- Both policy modes must preserve and report them for explicit operator action.

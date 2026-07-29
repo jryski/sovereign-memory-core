@@ -27,7 +27,13 @@ classifies direct, inherited membership-chain, and `PUBLIC`-derived `CREATE`
 and `EXECUTE` authority, plus owner-scoped table, sequence, and function
 defaults that would affect future objects. Its protected-schema and authority-
 function registries bound remediation to sovereign-memory surfaces; unrelated
-schemas, functions, and owner/schema defaults are not silently absorbed. The
+schemas, functions, and owner/schema defaults are not silently absorbed. Every
+non-system schema in an explicitly registered authority function's fixed
+`search_path` must itself be present in the protected-schema registry; otherwise
+the assertion fails closed before remediation. The built-in inventory explicitly
+registers both `public` and the repository's `extensions` dependency when present.
+Durable control-table table and column ACL findings identify direct grants,
+membership-chain inheritance, and `PUBLIC` pseudo-grants as distinct sources. The
 default `portable` profile permits no non-owner schema creation or function
 execution. Deployments using the repository's Supabase grants must explicitly
 persist the scoped profile before applying the package:
