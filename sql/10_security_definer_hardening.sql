@@ -535,35 +535,43 @@ begin
     from pg_class c join pg_namespace n on n.oid=c.relnamespace join pg_roles r on r.oid=c.relowner
     where n.nspname='public'
       and c.relname=any(array['perimeter_acl_policy','perimeter_protected_schema_registry','perimeter_authority_function_registry'])
+  ), table_acl as (
+    select c.oid,c.relname,c.relowner,a.grantee,a.privilege_type
+    from control_tables c
+    cross join lateral aclexplode(coalesce(
+      (select relacl from pg_class where oid=c.oid),acldefault('r',c.relowner))) a
+  ), column_acl as (
+    select c.oid,c.relname,c.relowner,att.attname,a.grantee,a.privilege_type
+    from control_tables c
+    join pg_attribute att on att.attrelid=c.oid and att.attnum>0
+      and not att.attisdropped and att.attacl is not null
+    cross join lateral aclexplode(att.attacl) a
   ), violations as (
-    select 'public.'||relname object_identity,owner_name grantee,'OWNER'::text privilege_type,'owner'::text privilege_source
+    select 'public.'||relname object_identity,owner_name grantee,
+           'OWNER'::text privilege_type,'owner'::text privilege_source
     from control_tables where relowner<>current_user::regrole
     union all
-    select 'public.'||c.relname,r.rolname,p.privilege,
-      case when exists(
-        select 1 from pg_class x cross join lateral aclexplode(coalesce(x.relacl,acldefault('r',x.relowner))) a
-        where x.oid=c.oid and a.grantee=r.oid and a.privilege_type=p.privilege
-      ) then 'direct' else 'inherited_or_PUBLIC' end
-    from control_tables c cross join pg_roles r
-    cross join (values('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER')) p(privilege)
-    where r.oid<>c.relowner
-      and not (r.rolname like 'pg\_%' escape '\' and not r.rolcanlogin)
-      and has_table_privilege(r.oid,c.oid,p.privilege)
+    select 'public.'||a.relname,'PUBLIC',a.privilege_type,'PUBLIC'
+    from table_acl a where a.grantee=0
     union all
-    select 'public.'||c.relname,r.rolname,
-      p.privilege||'('||att.attname||')',
-      case when exists(
-        select 1 from pg_attribute x cross join lateral aclexplode(x.attacl) a
-        where x.attrelid=c.oid and x.attnum=att.attnum
-          and a.grantee=r.oid and a.privilege_type=p.privilege
-      ) then 'direct' else 'inherited_or_PUBLIC' end
-    from control_tables c
-    join pg_attribute att on att.attrelid=c.oid and att.attnum>0 and not att.attisdropped
-    cross join pg_roles r
-    cross join (values('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) p(privilege)
-    where r.oid<>c.relowner
+    select distinct 'public.'||a.relname,r.rolname,a.privilege_type,
+           case when r.oid=a.grantee then 'direct' else 'inherited' end
+    from table_acl a
+    join pg_roles r on a.grantee<>0 and pg_has_role(r.oid,a.grantee,'USAGE')
+    where a.grantee<>a.relowner and r.oid<>a.relowner
       and not (r.rolname like 'pg\_%' escape '\' and not r.rolcanlogin)
-      and has_column_privilege(r.oid,c.oid,att.attnum,p.privilege)
+    union all
+    select 'public.'||a.relname,'PUBLIC',
+           a.privilege_type||'('||a.attname||')','PUBLIC'
+    from column_acl a where a.grantee=0
+    union all
+    select distinct 'public.'||a.relname,r.rolname,
+           a.privilege_type||'('||a.attname||')',
+           case when r.oid=a.grantee then 'direct' else 'inherited' end
+    from column_acl a
+    join pg_roles r on a.grantee<>0 and pg_has_role(r.oid,a.grantee,'USAGE')
+    where a.grantee<>a.relowner and r.oid<>a.relowner
+      and not (r.rolname like 'pg\_%' escape '\' and not r.rolcanlogin)
   )
   select string_agg(format('durable_control_table %s %s %s via %s',grantee,privilege_type,object_identity,privilege_source),', ' order by object_identity,grantee,privilege_type)
     into v_bad from violations;
@@ -599,6 +607,32 @@ begin
   from public.perimeter_authority_functions() f join pg_proc p on p.oid=f.function_oid join pg_roles r on r.oid=p.proowner
   where not (r.rolname=any(v_owner));
   if v_bad is not null then raise exception 'PERIMETER FAIL: unexpected authority-function owner: %',v_bad; end if;
+
+  with authority_paths as (
+    select f.function_identity,
+           replace(trim(both '"' from btrim(path_item)),'""','"') schema_name
+    from public.perimeter_authority_functions() f
+    join pg_proc p on p.oid=f.function_oid
+    cross join lateral unnest(p.proconfig) setting
+    cross join lateral regexp_split_to_table(
+      substring(setting from char_length('search_path=')+1),E'\\s*,\\s*') path_item
+    where setting like 'search_path=%'
+  )
+  select string_agg(function_identity||' path_schema='||schema_name,', '
+                    order by function_identity,schema_name)
+    into v_bad
+  from authority_paths p
+  where p.schema_name<>''
+    and lower(p.schema_name)<>'information_schema'
+    and lower(p.schema_name) not like 'pg\_%' escape '\'
+    and p.schema_name<>'$user'
+    and (to_regnamespace(p.schema_name) is null or not exists(
+      select 1 from public.perimeter_protected_schema_registry r
+      where r.schema_name=p.schema_name
+    ));
+  if v_bad is not null then
+    raise exception 'PERIMETER FAIL: registered authority-function search-path schema is missing or not explicitly protected: %',v_bad;
+  end if;
 
   select string_agg(grantee||':'||table_name||':'||privilege_type,', ' order by grantee,table_name,privilege_type) into v_bad
   from information_schema.role_table_grants where table_schema='public' and table_name=any(v_tables)

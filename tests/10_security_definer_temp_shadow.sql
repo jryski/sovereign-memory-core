@@ -84,7 +84,11 @@ begin
     begin
       perform public.assert_perimeter_closed();
     exception when others then
-      if sqlstate='P0001' and sqlerrm like 'PERIMETER FAIL: unsafe or missing function search_path:%'
+      if sqlstate='P0001'
+         and sqlerrm like (case when v_case='untrusted'
+           then 'PERIMETER FAIL: registered authority-function search-path schema is missing or not explicitly protected:%'
+           else 'PERIMETER FAIL: unsafe or missing function search_path:%'
+         end)
          and sqlerrm like '%public.current_doc_hash%' then
         execute 'alter function public.current_doc_hash(text) set search_path=pg_catalog,pg_temp';
         continue;
