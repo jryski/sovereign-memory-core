@@ -141,6 +141,74 @@ begin
   end if;
 end $$;
 
+-- ACL evidence is source-preserving. A leaf with its own grant and authority
+-- inherited from a granted parent produces both rows, while one PUBLIC ACL
+-- produces exactly one pseudo-grantee row and never fans out across roles.
+create role smc_acl_source_parent nologin;
+create role smc_acl_source_leaf nologin;
+grant smc_acl_source_parent to smc_acl_source_leaf;
+create schema smc_acl_source authorization current_user;
+insert into public.perimeter_protected_schema_registry(schema_name)
+values('smc_acl_source');
+create function smc_acl_source.registered_writer()
+returns void language sql security definer
+set search_path=pg_catalog,smc_acl_source
+as $$ select null::void $$;
+insert into public.perimeter_authority_function_registry(function_identity,is_internal)
+values('smc_acl_source.registered_writer()',false);
+grant create on schema smc_acl_source to smc_acl_source_parent,smc_acl_source_leaf;
+grant create on schema smc_acl_source to public;
+grant execute on function smc_acl_source.registered_writer()
+  to smc_acl_source_parent,smc_acl_source_leaf;
+grant execute on function smc_acl_source.registered_writer() to public;
+do $$
+begin
+  if (select count(*) from public.perimeter_acl_violations()
+      where boundary='schema' and object_identity='smc_acl_source'
+        and grantee='smc_acl_source_leaf' and privilege_type='CREATE'
+        and privilege_source='direct')<>1
+     or (select count(*) from public.perimeter_acl_violations()
+         where boundary='schema' and object_identity='smc_acl_source'
+           and grantee='smc_acl_source_leaf' and privilege_type='CREATE'
+           and privilege_source='inherited')<>1 then
+    raise exception 'schema ACL evidence did not preserve simultaneous direct and inherited sources';
+  end if;
+  if (select count(*) from public.perimeter_acl_violations()
+      where boundary='authority_function'
+        and object_identity='smc_acl_source.registered_writer()'
+        and grantee='smc_acl_source_leaf' and privilege_type='EXECUTE'
+        and privilege_source='direct')<>1
+     or (select count(*) from public.perimeter_acl_violations()
+         where boundary='authority_function'
+           and object_identity='smc_acl_source.registered_writer()'
+           and grantee='smc_acl_source_leaf' and privilege_type='EXECUTE'
+           and privilege_source='inherited')<>1 then
+    raise exception 'function ACL evidence did not preserve simultaneous direct and inherited sources';
+  end if;
+  if (select count(*) from public.perimeter_acl_violations()
+      where boundary='schema' and object_identity='smc_acl_source'
+        and grantee='PUBLIC' and privilege_type='CREATE'
+        and privilege_source='PUBLIC')<>1
+     or exists(select 1 from public.perimeter_acl_violations()
+         where boundary='schema' and object_identity='smc_acl_source'
+           and grantee<>'PUBLIC' and privilege_source='PUBLIC') then
+    raise exception 'one schema PUBLIC ACL did not produce exactly one pseudo-grantee source';
+  end if;
+  if (select count(*) from public.perimeter_acl_violations()
+      where boundary='authority_function'
+        and object_identity='smc_acl_source.registered_writer()'
+        and grantee='PUBLIC' and privilege_type='EXECUTE'
+        and privilege_source='PUBLIC')<>1
+     or exists(select 1 from public.perimeter_acl_violations()
+         where boundary='authority_function'
+           and object_identity='smc_acl_source.registered_writer()'
+           and grantee<>'PUBLIC' and privilege_source='PUBLIC') then
+    raise exception 'one function PUBLIC ACL did not produce exactly one pseudo-grantee source';
+  end if;
+end $$;
+select public.remediate_perimeter_acl();
+select public.assert_perimeter_closed();
+
 -- Runtime callers cannot turn custom GUCs into assertion allowlists.
 grant create on schema public to service_role;
 grant execute on function public.capture_memory_attention_after_insert() to service_role;

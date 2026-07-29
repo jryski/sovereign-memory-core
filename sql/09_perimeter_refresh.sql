@@ -354,11 +354,14 @@ with policy as (
   where exists(select 1 from schema_acl a where a.schema_oid=s.schema_oid and a.grantee=0)
     and not ('PUBLIC'=any(((select schema_creators from policy))::text[]))
 ), schema_roles as (
-  select 'schema'::text,s.schema_name,r.rolname,'CREATE'::text,
-         case when exists(select 1 from schema_acl a where a.schema_oid=s.schema_oid and a.grantee=r.oid) then 'direct'
-              when exists(select 1 from schema_acl a where a.schema_oid=s.schema_oid and a.grantee=0) then 'PUBLIC'
-              else 'inherited' end::text
-  from protected_schemas s join pg_roles r on has_schema_privilege(r.oid,s.schema_oid,'CREATE')
+  -- Derive each finding from the non-PUBLIC ACL fact that supplies it. Do not
+  -- collapse simultaneous direct and membership-chain sources by asking only
+  -- whether the role has the effective privilege.
+  select distinct 'schema'::text,s.schema_name,r.rolname,'CREATE'::text,
+         case when r.oid=a.grantee then 'direct' else 'inherited' end::text
+  from protected_schemas s
+  join schema_acl a on a.schema_oid=s.schema_oid and a.grantee<>0
+  join pg_roles r on pg_has_role(r.oid,a.grantee,'USAGE')
   where r.oid<>s.nspowner and not (r.rolname=any(((select owners from policy))::text[]))
     and not (r.rolname=any(((select schema_creators from policy))::text[]))
 ), authority_functions as (
@@ -374,12 +377,12 @@ with policy as (
   where exists(select 1 from function_acl a where a.function_oid=f.function_oid and a.grantee=0)
     and not ('PUBLIC'=any((case when f.is_internal then (select internal_executors from policy) else (select function_executors from policy) end)::text[]))
 ), function_roles as (
-  select case when f.is_internal then 'internal_function' else 'authority_function' end,
+  select distinct case when f.is_internal then 'internal_function' else 'authority_function' end,
          f.function_identity,r.rolname,'EXECUTE'::text,
-         case when exists(select 1 from function_acl a where a.function_oid=f.function_oid and a.grantee=r.oid) then 'direct'
-              when exists(select 1 from function_acl a where a.function_oid=f.function_oid and a.grantee=0) then 'PUBLIC'
-              else 'inherited' end::text
-  from authority_functions f join pg_roles r on has_function_privilege(r.oid,f.function_oid,'EXECUTE')
+         case when r.oid=a.grantee then 'direct' else 'inherited' end::text
+  from authority_functions f
+  join function_acl a on a.function_oid=f.function_oid and a.grantee<>0
+  join pg_roles r on pg_has_role(r.oid,a.grantee,'USAGE')
   where r.oid<>f.proowner and not (r.rolname=any(((select owners from policy))::text[]))
     and not (r.rolname=any((case when f.is_internal then (select internal_executors from policy) else (select function_executors from policy) end)::text[]))
 ), default_targets as (
