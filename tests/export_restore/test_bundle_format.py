@@ -78,6 +78,10 @@ class CanonicalJsonTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid canonical JSON"):
             bundle.parse_canonical_json_bytes(raw)
 
+        with mock.patch.object(bundle.json, "loads", side_effect=RecursionError("parser depth")):
+            with self.assertRaisesRegex(ValueError, "invalid canonical JSON"):
+                bundle.parse_canonical_json_bytes(b"[]\n")
+
 
 class PostgreSqlScalarTests(unittest.TestCase):
     def test_supported_scalars_have_exact_normative_shapes(self):

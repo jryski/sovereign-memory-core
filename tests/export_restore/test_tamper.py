@@ -223,12 +223,99 @@ class ManifestValidationTests(unittest.TestCase):
 
         self.assert_code("MEMBER_JSON_INVALID", bundle_bytes(manifest, members))
 
+    def test_declared_json_member_content_limit_accepts_boundary_and_cannot_be_broadened(self):
+        limit = validator.MAX_CANONICAL_JSON_MEMBER_SIZE
+        self.assertEqual(limit, 1 << 20)
+        accepted = b'"' + (b"x" * (limit - 3)) + b'"\n'
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        replace_member(manifest, members, "reports/source-snapshot.json", accepted)
+        accepted_raw = bundle_bytes(manifest, members)
+        validator.validate_bundle(accepted_raw)
+        self.assert_code("MEMBER_JSON_LIMIT", accepted_raw, max_json_member_size=limit - 1)
+
+        rejected = b'"' + (b"x" * (limit - 2)) + b'"\n'
+        replace_member(manifest, members, "reports/source-snapshot.json", rejected)
+        raw = bundle_bytes(manifest, members)
+        self.assert_code("MEMBER_JSON_LIMIT", raw)
+        self.assert_code("MEMBER_JSON_LIMIT", raw, max_json_member_size=limit + 1)
+
     def test_relation_jsonl_row_count_must_match_actual_lines(self):
         manifest = valid_manifest()
         members = dict(MEMBERS)
         manifest["relations"][0]["row_count"] = 2
 
         self.assert_code("RELATION_JSONL_INVALID", bundle_bytes(manifest, members))
+
+    def test_relation_jsonl_row_limit_accepts_boundary_and_cannot_be_broadened(self):
+        limit = validator.MAX_CANONICAL_JSONL_ROW_SIZE
+        self.assertEqual(limit, 1 << 20)
+        prefix = b'{"pk":["1"],"row":{"id":"1","payload":"'
+        suffix = b'"}}\n'
+        relation = valid_manifest()["relations"][0]
+        relation["columns"].append({"name": "payload", "ordinal": 2, "pg_type": "text"})
+
+        accepted = prefix + (b"x" * (limit - len(prefix) - len(suffix))) + suffix
+        manifest = valid_manifest()
+        manifest["relations"][0] = relation
+        members = dict(MEMBERS)
+        replace_member(manifest, members, relation["path"], accepted)
+        accepted_raw = bundle_bytes(manifest, members)
+        validator.validate_bundle(accepted_raw)
+        self.assert_code("RELATION_JSONL_LIMIT", accepted_raw, max_jsonl_row_size=limit - 1)
+
+        rejected = prefix + (b"x" * (limit + 1 - len(prefix) - len(suffix))) + suffix
+        replace_member(manifest, members, relation["path"], rejected)
+        raw = bundle_bytes(manifest, members)
+        self.assert_code("RELATION_JSONL_LIMIT", raw)
+        self.assert_code("RELATION_JSONL_LIMIT", raw, max_jsonl_row_size=limit + 1)
+
+    def test_content_limit_arguments_require_nonnegative_integers(self):
+        raw = bundle_bytes()
+        for name in ("max_json_member_size", "max_jsonl_row_size"):
+            for value in (-1, True, 1.5):
+                with self.subTest(name=name, value=value):
+                    self.assert_code("ARCHIVE_INVALID", raw, **{name: value})
+
+    def test_content_limits_preserve_checksum_tamper_precedence(self):
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        json_path = "reports/source-snapshot.json"
+        json_payload = b'"' + (b"x" * validator.MAX_CANONICAL_JSON_MEMBER_SIZE) + b'"\n'
+        replace_member(manifest, members, json_path, json_payload)
+        members[json_path] = b"!" + members[json_path][1:]
+        self.assert_code("MEMBER_SHA256_MISMATCH", bundle_bytes(manifest, members))
+
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        replace_member(manifest, members, json_path, json_payload)
+        json_entry = next(entry for entry in manifest["entries"] if entry["path"] == json_path)
+        json_entry["bytes"] -= 1
+        self.assert_code("ENTRY_BYTES", bundle_bytes(manifest, members))
+
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        relation = manifest["relations"][0]
+        relation["columns"].append({"name": "payload", "ordinal": 2, "pg_type": "text"})
+        relation_path = relation["path"]
+        row_payload = (
+            b'{"pk":["1"],"row":{"id":"1","payload":"'
+            + (b"x" * validator.MAX_CANONICAL_JSONL_ROW_SIZE)
+            + b'"}}\n'
+        )
+        replace_member(manifest, members, relation_path, row_payload)
+        members[relation_path] = b"!" + members[relation_path][1:]
+        self.assert_code("MEMBER_SHA256_MISMATCH", bundle_bytes(manifest, members))
+
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        relation = manifest["relations"][0]
+        relation["columns"].append({"name": "payload", "ordinal": 2, "pg_type": "text"})
+        replace_member(manifest, members, relation_path, row_payload)
+        relation["bytes"] -= 1
+        relation_entry = next(entry for entry in manifest["entries"] if entry["path"] == relation_path)
+        relation_entry["bytes"] -= 1
+        self.assert_code("ENTRY_BYTES", bundle_bytes(manifest, members))
 
     def test_relation_jsonl_rejects_noncanonical_framing_envelope_columns_and_pk(self):
         cases = (
@@ -248,6 +335,25 @@ class ManifestValidationTests(unittest.TestCase):
             manifest["relations"][0]["row_count"] = row_count
             with self.subTest(payload=payload, row_count=row_count):
                 self.assert_code("RELATION_JSONL_INVALID", bundle_bytes(manifest, members))
+
+    def test_relation_jsonl_framing_checks_have_distinct_stable_messages(self):
+        cases = (
+            (b'{"pk":["1"],"row":{"id":"1"}}', 1, "relation JSONL row lacks an LF terminator"),
+            (
+                b'{"pk":["1"],"row":{"id":"1"}}\n',
+                0,
+                "relation JSONL byte/count invariant is invalid",
+            ),
+        )
+        for payload, row_count, message in cases:
+            manifest = valid_manifest()
+            members = dict(MEMBERS)
+            replace_member(manifest, members, "data/001-public.memory.jsonl", payload)
+            manifest["relations"][0]["row_count"] = row_count
+            with self.subTest(message=message), self.assertRaises(validator.BundleValidationError) as caught:
+                validator.validate_bundle(bundle_bytes(manifest, members))
+            self.assertEqual(caught.exception.code, "RELATION_JSONL_INVALID")
+            self.assertEqual(str(caught.exception), message)
 
     def test_relation_jsonl_composite_pk_uses_declared_semantic_order(self):
         manifest = valid_manifest()
@@ -287,6 +393,27 @@ class ManifestValidationTests(unittest.TestCase):
         pretty = json.dumps(valid_manifest(), indent=2, ensure_ascii=False).encode() + b"\n"
         noncanonical = bundle.write_ustar([("manifest.json", pretty), *MEMBERS.items()])
         self.assert_code("MANIFEST_CANONICAL", noncanonical)
+
+        sensitive = bundle.write_ustar([
+            ("manifest.json", b'{"private-field":1,"private-field":2}\n'),
+            *MEMBERS.items(),
+        ])
+        with self.assertRaises(validator.BundleValidationError) as caught:
+            validator.validate_bundle(sensitive)
+        self.assertEqual(caught.exception.code, "MANIFEST_CANONICAL")
+        self.assertEqual(str(caught.exception), "manifest.json is not canonical JSON")
+        self.assertNotIn("private-field", str(caught.exception))
+
+        limit = validator.MAX_CANONICAL_JSON_MEMBER_SIZE
+        boundary_manifest = b'"' + (b"x" * (limit - 3)) + b'"\n'
+        boundary = bundle.write_ustar([("manifest.json", boundary_manifest), *MEMBERS.items()])
+        self.assert_code("MANIFEST_STRUCTURE", boundary)
+        self.assert_code("MANIFEST_JSON_LIMIT", boundary, max_json_member_size=limit - 1)
+
+        oversized_manifest = b'"' + (b"x" * (limit - 2)) + b'"\n'
+        oversized = bundle.write_ustar([("manifest.json", oversized_manifest), *MEMBERS.items()])
+        self.assert_code("MANIFEST_JSON_LIMIT", oversized)
+        self.assert_code("MANIFEST_JSON_LIMIT", oversized, max_json_member_size=limit + 1)
 
     def test_archive_inventory_is_exact_sorted_and_unique(self):
         missing = valid_manifest()
@@ -672,6 +799,27 @@ class ManifestValidationTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "MANIFEST_SCHEMA")
         self.assertEqual(str(caught.exception), "release manifest schema is unavailable or invalid")
 
+        schema_failures = (
+            (None, None),
+            ({"$ref": "private-sensitive-reference"}, "private-sensitive-label"),
+            ({"$defs": {}, "$ref": "#/$defs/private-sensitive-reference"}, "private-sensitive-label"),
+        )
+        for schema, label in schema_failures:
+            with self.subTest(schema=schema):
+                with self.assertRaises(validator.BundleValidationError) as caught:
+                    if schema is None:
+                        with mock.patch.object(validator.json, "load", return_value=[]):
+                            validator._validate_release_schema(valid_manifest())
+                    else:
+                        assert label is not None
+                        validator._validate_schema_node({}, schema, schema, label)
+                self.assertEqual(caught.exception.code, "MANIFEST_SCHEMA")
+                self.assertEqual(
+                    str(caught.exception),
+                    "release manifest schema is unavailable or invalid",
+                )
+                self.assertNotIn("private-sensitive", str(caught.exception))
+
     def test_deep_manifest_and_json_member_have_stable_codes(self):
         deep = (b"[" * 2000) + b"0" + (b"]" * 2000) + b"\n"
         raw = bundle.write_ustar([("manifest.json", deep), *MEMBERS.items()])
@@ -681,6 +829,37 @@ class ManifestValidationTests(unittest.TestCase):
         members = dict(MEMBERS)
         replace_member(manifest, members, "state/sequences.json", deep)
         self.assert_code("MEMBER_JSON_INVALID", bundle_bytes(manifest, members))
+
+    def test_content_limits_bound_large_valid_json_and_single_jsonl_row_memory(self):
+        cases = []
+
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        json_payload = b'"' + (b"x" * (8 * 1024 * 1024)) + b'"\n'
+        replace_member(manifest, members, "reports/source-snapshot.json", json_payload)
+        cases.append(("MEMBER_JSON_LIMIT", bundle_bytes(manifest, members)))
+
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        relation = manifest["relations"][0]
+        relation["columns"].append({"name": "payload", "ordinal": 2, "pg_type": "text"})
+        row_payload = (
+            b'{"pk":["1"],"row":{"id":"1","payload":"'
+            + (b"x" * (8 * 1024 * 1024))
+            + b'"}}\n'
+        )
+        replace_member(manifest, members, relation["path"], row_payload)
+        cases.append(("RELATION_JSONL_LIMIT", bundle_bytes(manifest, members)))
+
+        for code, raw in cases:
+            tracemalloc.start()
+            try:
+                with self.subTest(code=code):
+                    self.assert_code(code, raw)
+                _, peak = tracemalloc.get_traced_memory()
+            finally:
+                tracemalloc.stop()
+            self.assertLess(peak, len(raw) // 4)
 
     def test_validation_is_bounded_and_never_extracts(self):
         members = dict(MEMBERS)
@@ -751,6 +930,48 @@ class ManifestValidationTests(unittest.TestCase):
             json.loads(stderr.getvalue()),
             {"code": "ARCHIVE_IO", "message": "archive could not be read"},
         )
+        source.close.assert_called_once_with()
+
+    def test_cli_memory_exhaustion_has_stable_redacted_machine_error(self):
+        source = io.BytesIO(bundle_bytes())
+        source.close = mock.Mock(return_value=None)
+        stderr = io.StringIO()
+        with (
+            mock.patch("builtins.open", return_value=source),
+            mock.patch.object(validator, "validate_bundle", side_effect=MemoryError("private host detail")),
+            mock.patch.object(validator.json, "dumps", side_effect=MemoryError("no allocation headroom")),
+            mock.patch.object(sys, "stderr", stderr),
+        ):
+            status = validator.main(["private-host-path.tar"])
+
+        self.assertEqual(status, 1)
+        self.assertEqual(
+            json.loads(stderr.getvalue()),
+            {"code": "VALIDATION_RESOURCE_LIMIT", "message": "bundle validation exceeded resource limits"},
+        )
+        self.assertNotIn("private", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+        source.close.assert_called_once_with()
+
+    def test_cli_unexpected_validation_error_has_stable_redacted_machine_error(self):
+        source = io.BytesIO(bundle_bytes())
+        source.close = mock.Mock(return_value=None)
+        stderr = io.StringIO()
+        with (
+            mock.patch("builtins.open", return_value=source),
+            mock.patch.object(validator, "validate_bundle", side_effect=RuntimeError("private host detail")),
+            mock.patch.object(validator.json, "dumps", side_effect=MemoryError("no allocation headroom")),
+            mock.patch.object(sys, "stderr", stderr),
+        ):
+            status = validator.main(["private-host-path.tar"])
+
+        self.assertEqual(status, 1)
+        self.assertEqual(
+            json.loads(stderr.getvalue()),
+            {"code": "VALIDATION_INTERNAL", "message": "bundle validation failed unexpectedly"},
+        )
+        self.assertNotIn("private", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
         source.close.assert_called_once_with()
 
     def test_direct_cli_missing_archive_has_stable_machine_readable_io_error(self):

@@ -44,6 +44,17 @@ _POINTER_ROLES = {
     "source_snapshot_path": ("source-snapshot", "application/json"),
 }
 _MANIFEST_SCHEMA_PATH = Path(__file__).resolve().parent.parent / "release" / "sovereignty-manifest.schema.json"
+_MANIFEST_SCHEMA_ERROR = "release manifest schema is unavailable or invalid"
+_RESOURCE_LIMIT_ERROR_JSON = (
+    '{"code": "VALIDATION_RESOURCE_LIMIT", '
+    '"message": "bundle validation exceeded resource limits"}\n'
+)
+_INTERNAL_ERROR_JSON = (
+    '{"code": "VALIDATION_INTERNAL", '
+    '"message": "bundle validation failed unexpectedly"}\n'
+)
+MAX_CANONICAL_JSON_MEMBER_SIZE = 1 << 20
+MAX_CANONICAL_JSONL_ROW_SIZE = 1 << 20
 
 
 class BundleValidationError(ValueError):
@@ -132,10 +143,10 @@ def _validate_schema_node(value: Any, node: dict[str, Any], root: dict[str, Any]
     reference = node.get("$ref")
     if reference is not None:
         if not isinstance(reference, str) or not reference.startswith("#/$defs/"):
-            _fail("MANIFEST_SCHEMA", f"unsupported schema reference at {label}")
+            _fail("MANIFEST_SCHEMA", _MANIFEST_SCHEMA_ERROR)
         definition = root.get("$defs", {}).get(reference.removeprefix("#/$defs/"))
         if not isinstance(definition, dict):
-            _fail("MANIFEST_SCHEMA", f"unresolved schema reference at {label}")
+            _fail("MANIFEST_SCHEMA", _MANIFEST_SCHEMA_ERROR)
         _validate_schema_node(value, definition, root, label)
         return
 
@@ -185,9 +196,9 @@ def _validate_release_schema(manifest: Any) -> None:
         with _MANIFEST_SCHEMA_PATH.open("r", encoding="utf-8") as source:
             schema = json.load(source)
     except (OSError, UnicodeError, json.JSONDecodeError, RecursionError, OverflowError):
-        _fail("MANIFEST_SCHEMA", "release manifest schema is unavailable or invalid")
+        _fail("MANIFEST_SCHEMA", _MANIFEST_SCHEMA_ERROR)
     if not isinstance(schema, dict):
-        _fail("MANIFEST_SCHEMA", "release manifest schema root must be an object")
+        _fail("MANIFEST_SCHEMA", _MANIFEST_SCHEMA_ERROR)
     _validate_schema_node(manifest, schema, schema, "manifest")
 
 
@@ -555,7 +566,17 @@ def _member_view(raw: bytes, member: ArchiveMember) -> memoryview:
     return memoryview(raw)[member.data_offset:member.data_offset + member.size]
 
 
-def _validate_relation_jsonl(content: memoryview, relation: dict[str, Any]) -> None:
+def _effective_content_limit(name: str, value: int, profile_limit: int) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        _fail("ARCHIVE_INVALID", f"{name} must be a non-negative integer")
+    return min(value, profile_limit)
+
+
+def _validate_relation_jsonl(
+    content: memoryview,
+    relation: dict[str, Any],
+    max_row_size: int,
+) -> None:
     expected_count = relation["row_count"]
     if (expected_count == 0) != (len(content) == 0):
         _fail("RELATION_JSONL_INVALID", "relation JSONL byte/count invariant is invalid")
@@ -564,6 +585,8 @@ def _validate_relation_jsonl(content: memoryview, relation: dict[str, Any]) -> N
     line_start = 0
     line_count = 0
     for offset, byte in enumerate(content):
+        if offset - line_start + 1 > max_row_size:
+            _fail("RELATION_JSONL_LIMIT", "relation JSONL row exceeds content-validation limit")
         if byte != 0x0A:
             continue
         if offset == line_start:
@@ -598,15 +621,29 @@ def validate_bundle(
     raw: bytes,
     *,
     expected_archive_sha256: str | None = None,
+    max_json_member_size: int = MAX_CANONICAL_JSON_MEMBER_SIZE,
+    max_jsonl_row_size: int = MAX_CANONICAL_JSONL_ROW_SIZE,
     **archive_limits: int,
 ) -> BundleValidationResult:
     """Validate archive, canonical manifest, closure, inventory, and member hashes.
 
     Validation is engine-free and performs no extraction, network, or database I/O.
-    Member payloads are hashed through bounded memory views rather than copied.
+    Hashing uses bounded memory views. Canonical JSON members and individual
+    JSONL rows are copied only after immutable profile ceilings and any tighter
+    caller limits have been enforced.
     """
     if expected_archive_sha256 is not None:
         expected_archive_sha256 = _sha256(expected_archive_sha256, "expected archive SHA-256")
+    json_member_limit = _effective_content_limit(
+        "max_json_member_size",
+        max_json_member_size,
+        MAX_CANONICAL_JSON_MEMBER_SIZE,
+    )
+    jsonl_row_limit = _effective_content_limit(
+        "max_jsonl_row_size",
+        max_jsonl_row_size,
+        MAX_CANONICAL_JSONL_ROW_SIZE,
+    )
     archive_sha256 = hashlib.sha256(raw).hexdigest() if isinstance(raw, bytes) else ""
     if expected_archive_sha256 is not None and archive_sha256 != expected_archive_sha256:
         _fail("ARCHIVE_SHA256_MISMATCH", "archive SHA-256 does not match the external checksum")
@@ -619,11 +656,13 @@ def validate_bundle(
     manifest_member = member_by_path.get("manifest.json")
     if manifest_member is None:
         _fail("MANIFEST_MISSING", "archive does not contain manifest.json")
+    if manifest_member.size > json_member_limit:
+        _fail("MANIFEST_JSON_LIMIT", "manifest.json exceeds content-validation limit")
     try:
         manifest_raw = bytes(_member_view(raw, manifest_member))
         manifest = parse_canonical_json_bytes(manifest_raw)
-    except (TypeError, ValueError) as exc:
-        _fail("MANIFEST_CANONICAL", str(exc))
+    except (TypeError, ValueError):
+        _fail("MANIFEST_CANONICAL", "manifest.json is not canonical JSON")
     archive_paths = set(member_by_path)
     manifest = _validate_manifest(manifest, archive_paths)
 
@@ -639,6 +678,8 @@ def validate_bundle(
         if entry["media_type"] != "application/json":
             continue
         member = member_by_path[entry["path"]]
+        if member.size > json_member_limit:
+            _fail("MEMBER_JSON_LIMIT", "declared JSON member exceeds content-validation limit")
         try:
             parse_canonical_json_bytes(bytes(_member_view(raw, member)))
         except (TypeError, ValueError):
@@ -648,6 +689,7 @@ def validate_bundle(
         _validate_relation_jsonl(
             _member_view(raw, member_by_path[relation["path"]]),
             relation,
+            jsonl_row_limit,
         )
 
     return BundleValidationResult(manifest, archive_sha256, tuple(member.path for member in members))
@@ -677,6 +719,12 @@ def main(argv: list[str] | None = None) -> int:
         )
     except BundleValidationError as exc:
         print(json.dumps({"code": exc.code, "message": str(exc)}, sort_keys=True), file=sys.stderr)
+        return 1
+    except (MemoryError, RecursionError, OverflowError):
+        sys.stderr.write(_RESOURCE_LIMIT_ERROR_JSON)
+        return 1
+    except Exception:
+        sys.stderr.write(_INTERNAL_ERROR_JSON)
         return 1
     print(json.dumps({"archive_sha256": result.archive_sha256, "code": "OK"}, sort_keys=True))
     return 0
