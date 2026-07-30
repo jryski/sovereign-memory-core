@@ -52,9 +52,13 @@ def parse_canonical_json_bytes(raw: bytes) -> Any:
             parse_int=_parse_int,
             parse_float=_reject_float,
         )
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError, OverflowError) as exc:
         raise ValueError("invalid canonical JSON") from exc
-    if canonical_json_bytes(value) != raw:
+    try:
+        encoded = canonical_json_bytes(value)
+    except (RecursionError, OverflowError) as exc:
+        raise ValueError("invalid canonical JSON") from exc
+    if encoded != raw:
         raise ValueError("JSON input is not in canonical form")
     return value
 

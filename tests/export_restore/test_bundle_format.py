@@ -72,6 +72,12 @@ class CanonicalJsonTests(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaisesRegex(ValueError, "surrogate"):
                 bundle.parse_canonical_json_bytes(raw)
 
+    def test_deep_canonical_json_has_stable_value_error_not_recursion_error(self):
+        raw = (b"[" * 2000) + b"0" + (b"]" * 2000) + b"\n"
+
+        with self.assertRaisesRegex(ValueError, "invalid canonical JSON"):
+            bundle.parse_canonical_json_bytes(raw)
+
 
 class PostgreSqlScalarTests(unittest.TestCase):
     def test_supported_scalars_have_exact_normative_shapes(self):

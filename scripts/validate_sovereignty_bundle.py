@@ -17,13 +17,15 @@ from typing import Any, NoReturn
 
 try:
     from scripts.sovereignty_bundle import (
-        MAX_ARCHIVE_SIZE, ArchiveMember, parse_canonical_json_bytes, validate_ustar,
+        MAX_ARCHIVE_SIZE, ArchiveMember, canonical_json_bytes,
+        parse_canonical_json_bytes, validate_ustar,
     )
 except ModuleNotFoundError as exc:
     if exc.name != "scripts":
         raise
     from sovereignty_bundle import (
-        MAX_ARCHIVE_SIZE, ArchiveMember, parse_canonical_json_bytes, validate_ustar,
+        MAX_ARCHIVE_SIZE, ArchiveMember, canonical_json_bytes,
+        parse_canonical_json_bytes, validate_ustar,
     )
 
 
@@ -182,8 +184,8 @@ def _validate_release_schema(manifest: Any) -> None:
     try:
         with _MANIFEST_SCHEMA_PATH.open("r", encoding="utf-8") as source:
             schema = json.load(source)
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        _fail("MANIFEST_SCHEMA", f"release manifest schema is unavailable or invalid: {exc}")
+    except (OSError, UnicodeError, json.JSONDecodeError, RecursionError, OverflowError):
+        _fail("MANIFEST_SCHEMA", "release manifest schema is unavailable or invalid")
     if not isinstance(schema, dict):
         _fail("MANIFEST_SCHEMA", "release manifest schema root must be an object")
     _validate_schema_node(manifest, schema, schema, "manifest")
@@ -553,6 +555,45 @@ def _member_view(raw: bytes, member: ArchiveMember) -> memoryview:
     return memoryview(raw)[member.data_offset:member.data_offset + member.size]
 
 
+def _validate_relation_jsonl(content: memoryview, relation: dict[str, Any]) -> None:
+    expected_count = relation["row_count"]
+    if (expected_count == 0) != (len(content) == 0):
+        _fail("RELATION_JSONL_INVALID", "relation JSONL byte/count invariant is invalid")
+    columns = [column["name"] for column in relation["columns"]]
+    primary_key = relation["primary_key"]
+    line_start = 0
+    line_count = 0
+    for offset, byte in enumerate(content):
+        if byte != 0x0A:
+            continue
+        if offset == line_start:
+            _fail("RELATION_JSONL_INVALID", "relation JSONL contains a blank line")
+        try:
+            row = parse_canonical_json_bytes(bytes(content[line_start:offset + 1]))
+        except (TypeError, ValueError):
+            _fail("RELATION_JSONL_INVALID", "relation JSONL contains a noncanonical row")
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"pk", "row"}
+            or not isinstance(row["pk"], list)
+            or not isinstance(row["row"], dict)
+        ):
+            _fail("RELATION_JSONL_INVALID", "relation JSONL row envelope is invalid")
+        if set(row["row"]) != set(columns):
+            _fail("RELATION_JSONL_INVALID", "relation JSONL row columns do not match the manifest")
+        if len(row["pk"]) != len(primary_key) or any(
+            canonical_json_bytes(pk_value) != canonical_json_bytes(row["row"][column])
+            for pk_value, column in zip(row["pk"], primary_key)
+        ):
+            _fail("RELATION_JSONL_INVALID", "relation JSONL primary key does not match its row")
+        line_count += 1
+        line_start = offset + 1
+    if line_start != len(content):
+        _fail("RELATION_JSONL_INVALID", "relation JSONL row lacks an LF terminator")
+    if line_count != expected_count:
+        _fail("RELATION_JSONL_INVALID", "relation JSONL line count does not match row_count")
+
+
 def validate_bundle(
     raw: bytes,
     *,
@@ -593,6 +634,21 @@ def validate_bundle(
         digest = hashlib.sha256(_member_view(raw, member)).hexdigest()
         if digest != entry["sha256"]:
             _fail("MEMBER_SHA256_MISMATCH", f"member {member.path!r} SHA-256 does not match manifest")
+
+    for entry in manifest["entries"]:
+        if entry["media_type"] != "application/json":
+            continue
+        member = member_by_path[entry["path"]]
+        try:
+            parse_canonical_json_bytes(bytes(_member_view(raw, member)))
+        except (TypeError, ValueError):
+            _fail("MEMBER_JSON_INVALID", "declared JSON member is not canonical JSON")
+
+    for relation in manifest["relations"]:
+        _validate_relation_jsonl(
+            _member_view(raw, member_by_path[relation["path"]]),
+            relation,
+        )
 
     return BundleValidationResult(manifest, archive_sha256, tuple(member.path for member in members))
 

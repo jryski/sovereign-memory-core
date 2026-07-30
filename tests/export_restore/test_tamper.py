@@ -108,6 +108,21 @@ def bundle_bytes(manifest=None, members=None):
     )
 
 
+def replace_member(manifest, members, path, payload):
+    members[path] = payload
+    digest = hashlib.sha256(payload).hexdigest()
+    entry = next(entry for entry in manifest["entries"] if entry["path"] == path)
+    entry["bytes"] = len(payload)
+    entry["sha256"] = digest
+    for relation in manifest["relations"]:
+        if relation["path"] == path:
+            relation["bytes"] = len(payload)
+            relation["sha256"] = digest
+    for migration in manifest["migrations"]:
+        if migration["path"] == path:
+            migration["sha256"] = digest
+
+
 def add_relation(manifest, members, *, name, order, columns, primary_key, dependencies, foreign_keys):
     path = f"data/100-public.{name}.jsonl"
     payload = b""
@@ -200,6 +215,57 @@ class ManifestValidationTests(unittest.TestCase):
         with self.assertRaises(validator.BundleValidationError) as caught:
             validator.validate_bundle(bytes(mutated))
         self.assertEqual(caught.exception.code, "MEMBER_SHA256_MISMATCH")
+
+    def test_declared_json_member_must_be_canonical(self):
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        replace_member(manifest, members, "state/sequences.json", b'{ "sequences":[]}\n')
+
+        self.assert_code("MEMBER_JSON_INVALID", bundle_bytes(manifest, members))
+
+    def test_relation_jsonl_row_count_must_match_actual_lines(self):
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        manifest["relations"][0]["row_count"] = 2
+
+        self.assert_code("RELATION_JSONL_INVALID", bundle_bytes(manifest, members))
+
+    def test_relation_jsonl_rejects_noncanonical_framing_envelope_columns_and_pk(self):
+        cases = (
+            (b"", 1),
+            (b'\n', 1),
+            (b'{ "pk":["1"],"row":{"id":"1"}}\n', 1),
+            (b'{"pk":["1"],"row":{"id":"1"}}', 1),
+            (b'{"pk":["1"]}\n', 1),
+            (b'{"pk":["1"],"row":{"extra":"1","id":"1"}}\n', 1),
+            (b'{"pk":["2"],"row":{"id":"1"}}\n', 1),
+            (b'{"pk":["1"],"row":{"id":"1"}}\n', 0),
+        )
+        for payload, row_count in cases:
+            manifest = valid_manifest()
+            members = dict(MEMBERS)
+            replace_member(manifest, members, "data/001-public.memory.jsonl", payload)
+            manifest["relations"][0]["row_count"] = row_count
+            with self.subTest(payload=payload, row_count=row_count):
+                self.assert_code("RELATION_JSONL_INVALID", bundle_bytes(manifest, members))
+
+    def test_relation_jsonl_composite_pk_uses_declared_semantic_order(self):
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        relation = manifest["relations"][0]
+        relation["columns"] = [
+            {"name": "z_id", "ordinal": 1, "pg_type": "bigint"},
+            {"name": "a_id", "ordinal": 2, "pg_type": "bigint"},
+        ]
+        relation["primary_key"] = ["z_id", "a_id"]
+        payload = b'{"pk":["2","1"],"row":{"a_id":"1","z_id":"2"}}\n'
+        replace_member(manifest, members, relation["path"], payload)
+
+        validator.validate_bundle(bundle_bytes(manifest, members))
+
+        bad_payload = b'{"pk":["1","2"],"row":{"a_id":"1","z_id":"2"}}\n'
+        replace_member(manifest, members, relation["path"], bad_payload)
+        self.assert_code("RELATION_JSONL_INVALID", bundle_bytes(manifest, members))
 
     def assert_code(self, expected, raw, **kwargs):
         with self.assertRaises(validator.BundleValidationError) as caught:
@@ -369,6 +435,7 @@ class ManifestValidationTests(unittest.TestCase):
 
     def test_relation_restore_order_accepts_deferrable_self_reference(self):
         manifest = valid_manifest()
+        members = dict(MEMBERS)
         relation = manifest["relations"][0]
         relation["columns"].append({"name": "parent_id", "ordinal": 2, "pg_type": "bigint"})
         relation["dependencies"] = ["public.memory"]
@@ -379,8 +446,14 @@ class ManifestValidationTests(unittest.TestCase):
             "referenced_relation": "memory",
             "referenced_schema": "public",
         }]
+        replace_member(
+            manifest,
+            members,
+            relation["path"],
+            b'{"pk":["1"],"row":{"id":"1","parent_id":null}}\n',
+        )
 
-        result = validator.validate_bundle(bundle_bytes(manifest))
+        result = validator.validate_bundle(bundle_bytes(manifest, members))
 
         self.assertEqual(result.manifest["relations"][0]["dependencies"], ["public.memory"])
 
@@ -422,6 +495,12 @@ class ManifestValidationTests(unittest.TestCase):
             "referenced_relation": "child",
             "referenced_schema": "public",
         }]
+        replace_member(
+            manifest,
+            members,
+            parent["path"],
+            b'{"pk":["1"],"row":{"child_id":null,"id":"1"}}\n',
+        )
         add_relation(
             manifest,
             members,
@@ -515,6 +594,12 @@ class ManifestValidationTests(unittest.TestCase):
             {"name": "a_id", "ordinal": 2, "pg_type": "bigint"},
         ]
         parent["primary_key"] = ["z_id", "a_id"]
+        replace_member(
+            manifest,
+            members,
+            parent["path"],
+            b'{"pk":["2","1"],"row":{"a_id":"1","z_id":"2"}}\n',
+        )
         add_relation(
             manifest,
             members,
@@ -564,16 +649,48 @@ class ManifestValidationTests(unittest.TestCase):
             with mock.patch.object(validator, "_MANIFEST_SCHEMA_PATH", schema_path):
                 self.assert_code("MANIFEST_STRUCTURE", bundle_bytes())
 
+    def test_release_schema_io_and_parse_errors_are_stable_and_redacted(self):
+        private_path = Path("/private/host/schema.json")
+        for failure in (
+            FileNotFoundError(f"missing: {private_path}"),
+            PermissionError(f"denied: {private_path}"),
+            UnicodeDecodeError("utf-8", b"x", 0, 1, f"private: {private_path}"),
+            json.JSONDecodeError(f"private: {private_path}", "x", 0),
+        ):
+            with self.subTest(failure=type(failure).__name__), mock.patch.object(
+                Path, "open", side_effect=failure
+            ):
+                with self.assertRaises(validator.BundleValidationError) as caught:
+                    validator._validate_release_schema(valid_manifest())
+                self.assertEqual(caught.exception.code, "MANIFEST_SCHEMA")
+                self.assertEqual(str(caught.exception), "release manifest schema is unavailable or invalid")
+                self.assertNotIn(str(private_path), str(caught.exception))
+
+        with mock.patch.object(validator.json, "load", side_effect=RecursionError("parser depth")):
+            with self.assertRaises(validator.BundleValidationError) as caught:
+                validator._validate_release_schema(valid_manifest())
+        self.assertEqual(caught.exception.code, "MANIFEST_SCHEMA")
+        self.assertEqual(str(caught.exception), "release manifest schema is unavailable or invalid")
+
+    def test_deep_manifest_and_json_member_have_stable_codes(self):
+        deep = (b"[" * 2000) + b"0" + (b"]" * 2000) + b"\n"
+        raw = bundle.write_ustar([("manifest.json", deep), *MEMBERS.items()])
+        self.assert_code("MANIFEST_CANONICAL", raw)
+
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        replace_member(manifest, members, "state/sequences.json", deep)
+        self.assert_code("MEMBER_JSON_INVALID", bundle_bytes(manifest, members))
+
     def test_validation_is_bounded_and_never_extracts(self):
         members = dict(MEMBERS)
-        members["reports/source-snapshot.json"] = b"x" * (8 * 1024 * 1024)
         manifest = valid_manifest()
-        source_entry = next(
-            entry for entry in manifest["entries"]
-            if entry["path"] == "reports/source-snapshot.json"
+        replace_member(
+            manifest,
+            members,
+            "migrations/01_core.sql",
+            b"x" * (8 * 1024 * 1024),
         )
-        source_entry["bytes"] = len(members["reports/source-snapshot.json"])
-        source_entry["sha256"] = hashlib.sha256(members["reports/source-snapshot.json"]).hexdigest()
         raw = bundle_bytes(manifest, members)
 
         tracemalloc.start()
