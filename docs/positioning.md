@@ -12,7 +12,7 @@ A memory engine decides how to capture, extract, rank, retrieve, summarize, and 
 | Extraction | Produces facts, observations, summaries, or graph nodes | Requires derived state to retain support and lifecycle relationships |
 | Retrieval | Selects useful context for a question | Does not prescribe ranking, embeddings, graphs, or query planning |
 | Answer synthesis | Instructs or supplies an answer model | Does not prescribe an answer model or answer policy |
-| Authority | Often implicit in the application or service credential | Separates actor, runtime, credential, principal, authorization, and acceptance |
+| Authority | Often implicit in the application or service credential | Separates actor, runtime, credential, principal, authorization, and acceptance[^authority-proof] |
 | Time | Often models recency or fact-validity windows | Requires reconstructable observed, recorded, effective, accepted, superseded, and reverted lineage where applicable |
 | Correction | Updates or supersedes retrieved state | Requires history-preserving correction, conflict, supersession, and invalidation semantics |
 | Portability | May expose an API or database export | Requires a verifiable package, checksums, independent restore, and conformance result |
@@ -37,6 +37,13 @@ Eywa independently supports several design choices that also appear in SMP:
 - failure categories that distinguish coverage, grounding, revision, scope, temporal, retrieval, synthesis, and measurement errors.
 
 These are meaningful points of corroboration, not reasons to collapse the projects together.
+
+The paper's own limits sharpen this boundary. Its numbered Limitation 14 says
+that no benchmark isolates revision and supersession handling, and Limitation
+16 says that GDPR-style erasure has not been validated across all derived
+states. Those are custody and conformance problems SMP must test directly, not
+capabilities it should infer from retrieval results. See [*Eywa*, §9,
+Limitations 14 and 16](https://arxiv.org/abs/2605.30771).
 
 Eywa is primarily a memory architecture and engine. Its paper evaluates extraction, retrieval, context assembly, answer-model separation, and benchmark quality. SMP covers additional custody and governance boundaries that an engine can implement:
 
@@ -70,3 +77,8 @@ Avoid claiming that SMP outperforms, replaces, or subsumes Eywa or other memory 
 ## Status
 
 This boundary is the intended architecture. The current public repository still contains both emerging protocol material and the PostgreSQL reference implementation. Repository separation is being prepared through a reviewed ADR and sanitized, fresh-history extraction plan.
+
+[^authority-proof]: SMP specifies distinctions that the current shared-credential
+    runtime can record and audit but cannot yet prove cryptographically. A
+    service credential does not by itself prove which human principal authorized
+    an agent action.
