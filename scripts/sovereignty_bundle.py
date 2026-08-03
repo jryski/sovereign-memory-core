@@ -157,7 +157,9 @@ _PG_INTEGER_RANGES = {
 _PG_NUMERIC_MAX_INTEGER_DIGITS = 131_072
 _PG_NUMERIC_MAX_FRACTIONAL_DIGITS = 16_383
 _PG_INTEGER_TEXT = re.compile(r"0|-?[1-9][0-9]*")
-_PG_NUMERIC_TEXT = re.compile(r"(?:0|-?[1-9][0-9]*)(?:\.[0-9]*[1-9])?")
+_PG_NUMERIC_TEXT = re.compile(
+    r"(?:0|-?(?:[1-9][0-9]*(?:\.[0-9]*[1-9])?|0\.[0-9]*[1-9]))"
+)
 _PG_TIMESTAMPTZ_TEXT = re.compile(
     r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z"
 )

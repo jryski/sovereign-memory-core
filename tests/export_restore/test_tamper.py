@@ -436,6 +436,7 @@ class ManifestValidationTests(unittest.TestCase):
             ("int4", "-2147483648"),
             ("bigint", "-9223372036854775808"),
             ("int8", "9223372036854775807"),
+            ("numeric", "-0.5"),
             ("numeric", "-12345678901234567890.0000001"),
             ("decimal", "0"),
             ("boolean", False),
