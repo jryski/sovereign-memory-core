@@ -373,6 +373,257 @@ class ManifestValidationTests(unittest.TestCase):
         replace_member(manifest, members, relation["path"], bad_payload)
         self.assert_code("RELATION_JSONL_INVALID", bundle_bytes(manifest, members))
 
+    def test_relation_jsonl_requires_strict_semantic_composite_pk_order(self):
+        manifest = valid_manifest()
+        relation = manifest["relations"][0]
+        relation["columns"] = [
+            {"name": "major", "ordinal": 1, "pg_type": "numeric"},
+            {"name": "minor", "ordinal": 2, "pg_type": "text"},
+            {"name": "stamp", "ordinal": 3, "pg_type": "timestamptz"},
+        ]
+        relation["primary_key"] = ["major", "minor", "stamp"]
+        rows = [
+            {"pk": ["-2.5", "astral 😀", "2025-01-01T00:00:00.000000Z"], "row": {
+                "major": "-2.5", "minor": "astral 😀", "stamp": "2025-01-01T00:00:00.000000Z",
+            }},
+            {"pk": ["2", "a", "2024-12-31T23:59:59.999999Z"], "row": {
+                "major": "2", "minor": "a", "stamp": "2024-12-31T23:59:59.999999Z",
+            }},
+            {"pk": ["10", "a", "2025-01-01T00:00:00.000000Z"], "row": {
+                "major": "10", "minor": "a", "stamp": "2025-01-01T00:00:00.000000Z",
+            }},
+        ]
+        members = dict(MEMBERS)
+        payload = bundle.canonical_jsonl_bytes(rows)
+        replace_member(manifest, members, relation["path"], payload)
+        relation["row_count"] = len(rows)
+        validator.validate_bundle(bundle_bytes(manifest, members))
+
+        for hostile_rows in (list(reversed(rows)), [rows[0], rows[0]]):
+            hostile_manifest = valid_manifest()
+            hostile_relation = hostile_manifest["relations"][0]
+            hostile_relation["columns"] = relation["columns"]
+            hostile_relation["primary_key"] = relation["primary_key"]
+            hostile_members = dict(MEMBERS)
+            hostile_payload = bundle.canonical_jsonl_bytes(hostile_rows)
+            replace_member(hostile_manifest, hostile_members, hostile_relation["path"], hostile_payload)
+            hostile_relation["row_count"] = len(hostile_rows)
+            with self.subTest(keys=[row["pk"] for row in hostile_rows]):
+                self.assert_code(
+                    "RELATION_PK_ORDER",
+                    bundle_bytes(hostile_manifest, hostile_members),
+                )
+
+    def test_relation_jsonl_validates_every_declared_postgresql_encoding(self):
+        valid_cases = (
+            ("text", "snowman ☃"),
+            ("varchar", "varchar"),
+            ("character varying", ""),
+            ("char", "fixed "),
+            ("character", "fixed "),
+            ("bpchar", "fixed "),
+            ("uuid", "12345678-1234-5678-9234-567812345678"),
+            ("timestamptz", "2025-01-02T01:04:05.006000Z"),
+            ("timestamp with time zone", "2025-01-02T01:04:05.006000Z"),
+            ("timestamp", "2025-01-02T03:04:05.006000"),
+            ("timestamp without time zone", "2025-01-02T03:04:05.006000"),
+            ("date", "2025-01-02"),
+            ("time", "03:04:05.006000"),
+            ("time without time zone", "03:04:05.006000"),
+            ("smallint", "-32768"),
+            ("int2", "32767"),
+            ("integer", "2147483647"),
+            ("int4", "-2147483648"),
+            ("bigint", "-9223372036854775808"),
+            ("int8", "9223372036854775807"),
+            ("numeric", "-12345678901234567890.0000001"),
+            ("decimal", "0"),
+            ("boolean", False),
+            ("bool", True),
+            ("text[]", ["a", None, "☃"]),
+            ("bytea", {"$bytea": "AP8="}),
+            ("json", {"nested": [None, True, {"$bytea": "ordinary JSON"}]}),
+            ("jsonb", ["an", {"unwrapped": "canonical value"}]),
+        )
+        for pg_type, value in valid_cases:
+            manifest = valid_manifest()
+            relation = manifest["relations"][0]
+            relation["columns"].append({"name": "value", "ordinal": 2, "pg_type": pg_type})
+            members = dict(MEMBERS)
+            payload = bundle.canonical_jsonl_bytes([
+                {"pk": ["1"], "row": {"id": "1", "value": value}},
+            ])
+            replace_member(manifest, members, relation["path"], payload)
+            with self.subTest(pg_type=pg_type, value=value):
+                validator.validate_bundle(bundle_bytes(manifest, members))
+
+        manifest = valid_manifest()
+        relation = manifest["relations"][0]
+        relation["columns"].append({"name": "nullable", "ordinal": 2, "pg_type": "uuid"})
+        members = dict(MEMBERS)
+        replace_member(
+            manifest,
+            members,
+            relation["path"],
+            b'{"pk":["1"],"row":{"id":"1","nullable":null}}\n',
+        )
+        validator.validate_bundle(bundle_bytes(manifest, members))
+
+    def test_relation_jsonl_rejects_malformed_or_unsupported_postgresql_encodings(self):
+        invalid_cases = (
+            ("text", 1),
+            ("varchar", False),
+            ("bpchar", ["x"]),
+            ("uuid", "12345678-1234-5678-9234-56781234567A"),
+            ("timestamptz", "2025-01-02T01:04:05Z"),
+            ("timestamp", "2025-01-02T01:04:05.000000Z"),
+            ("date", "2025-1-2"),
+            ("time", "03:04:05"),
+            ("smallint", "32768"),
+            ("integer", "01"),
+            ("bigint", "9223372036854775808"),
+            ("numeric", "1.2300"),
+            ("numeric", "-0"),
+            ("boolean", 1),
+            ("bool", "false"),
+            ("text[]", ["ok", 1]),
+            ("bytea", {"$bytea": "not base64"}),
+            ("bytea", {"$bytea": "AP8=", "extra": True}),
+        )
+        for pg_type, value in invalid_cases:
+            manifest = valid_manifest()
+            relation = manifest["relations"][0]
+            relation["columns"].append({"name": "value", "ordinal": 2, "pg_type": pg_type})
+            members = dict(MEMBERS)
+            payload = bundle.canonical_jsonl_bytes([
+                {"pk": ["1"], "row": {"id": "1", "value": value}},
+            ])
+            replace_member(manifest, members, relation["path"], payload)
+            with self.subTest(pg_type=pg_type, value=value):
+                self.assert_code("RELATION_VALUE_INVALID", bundle_bytes(manifest, members))
+
+        for unsupported_type in ("inet", "public.not_an_enum", "public.custom_domain"):
+            unsupported = valid_manifest()
+            unsupported["relations"][0]["columns"][0]["pg_type"] = unsupported_type
+            with self.subTest(unsupported_type=unsupported_type):
+                self.assert_code("RELATION_VALUE_INVALID", bundle_bytes(unsupported))
+
+        null_pk = valid_manifest()
+        members = dict(MEMBERS)
+        replace_member(
+            null_pk,
+            members,
+            null_pk["relations"][0]["path"],
+            b'{"pk":[null],"row":{"id":null}}\n',
+        )
+        self.assert_code("RELATION_VALUE_INVALID", bundle_bytes(null_pk, members))
+
+    def test_relation_value_validation_precedes_pk_equality_and_order(self):
+        manifest = valid_manifest()
+        members = dict(MEMBERS)
+        replace_member(
+            manifest,
+            members,
+            manifest["relations"][0]["path"],
+            b'{"pk":["not-an-integer"],"row":{"id":"not-an-integer"}}\n',
+        )
+        self.assert_code("RELATION_VALUE_INVALID", bundle_bytes(manifest, members))
+
+    def test_enum_declaration_order_cannot_be_inferred_offline(self):
+        manifest = valid_manifest()
+        relation = manifest["relations"][0]
+        relation["columns"][0]["pg_type"] = "public.mood"
+        members = dict(MEMBERS)
+        rows = [
+            {"pk": ["z"], "row": {"id": "z"}},
+            {"pk": ["a"], "row": {"id": "a"}},
+        ]
+        replace_member(manifest, members, relation["path"], bundle.canonical_jsonl_bytes(rows))
+        relation["row_count"] = 2
+
+        self.assert_code("RELATION_VALUE_INVALID", bundle_bytes(manifest, members))
+
+    def test_bpchar_pk_ignores_trailing_ascii_spaces(self):
+        manifest = valid_manifest()
+        relation = manifest["relations"][0]
+        relation["columns"][0]["pg_type"] = "bpchar"
+        members = dict(MEMBERS)
+        rows = [
+            {"pk": ["a"], "row": {"id": "a"}},
+            {"pk": ["a "], "row": {"id": "a "}},
+        ]
+        replace_member(manifest, members, relation["path"], bundle.canonical_jsonl_bytes(rows))
+        relation["row_count"] = 2
+
+        self.assert_code("RELATION_PK_ORDER", bundle_bytes(manifest, members))
+
+    def test_supported_pk_types_use_postgresql_c_semantic_order(self):
+        cases = (
+            ("text", ["a", "é"]),
+            ("varchar", ["2", "a"]),
+            ("uuid", [
+                "00000000-0000-0000-0000-000000000002",
+                "00000000-0000-0000-0000-000000000010",
+            ]),
+            ("timestamptz", [
+                "2024-12-31T23:59:59.999999Z",
+                "2025-01-01T00:00:00.000000Z",
+            ]),
+            ("timestamp", [
+                "2024-12-31T23:59:59.999999",
+                "2025-01-01T00:00:00.000000",
+            ]),
+            ("date", ["2024-12-31", "2025-01-01"]),
+            ("time", ["00:00:00.000001", "23:59:59.999999"]),
+            ("bigint", ["2", "10"]),
+            ("numeric", ["2", "10"]),
+            ("boolean", [False, True]),
+            ("bytea", [{"$bytea": "AA8="}, {"$bytea": "AQA="}]),
+        )
+        for pg_type, values in cases:
+            manifest = valid_manifest()
+            relation = manifest["relations"][0]
+            relation["columns"][0]["pg_type"] = pg_type
+            relation["row_count"] = len(values)
+            members = dict(MEMBERS)
+            rows = [
+                {"pk": [value], "row": {"id": value}}
+                for value in values
+            ]
+            replace_member(
+                manifest,
+                members,
+                relation["path"],
+                bundle.canonical_jsonl_bytes(rows),
+            )
+            with self.subTest(pg_type=pg_type):
+                validator.validate_bundle(bundle_bytes(manifest, members))
+
+    def test_pk_types_without_proven_pg_comparator_fail_closed(self):
+        cases = (
+            ("json", [{"a": 1}, [None]]),
+            ("jsonb", [None, "a"]),
+            ("text[]", [["a", None], ["a", "z"]]),
+        )
+        for pg_type, values in cases:
+            manifest = valid_manifest()
+            relation = manifest["relations"][0]
+            relation["columns"][0]["pg_type"] = pg_type
+            relation["row_count"] = len(values)
+            members = dict(MEMBERS)
+            rows = [
+                {"pk": [value], "row": {"id": value}}
+                for value in values
+            ]
+            replace_member(
+                manifest,
+                members,
+                relation["path"],
+                bundle.canonical_jsonl_bytes(rows),
+            )
+            with self.subTest(pg_type=pg_type, values=values):
+                self.assert_code("RELATION_PK_TYPE_UNSUPPORTED", bundle_bytes(manifest, members))
+
     def assert_code(self, expected, raw, **kwargs):
         with self.assertRaises(validator.BundleValidationError) as caught:
             validator.validate_bundle(raw, **kwargs)

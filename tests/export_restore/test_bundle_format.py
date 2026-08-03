@@ -136,6 +136,12 @@ class PostgreSqlScalarTests(unittest.TestCase):
                     {"z": None, "a": "scalar"},
                 )
 
+        self.assertEqual(bundle.encode_pg_scalar("json", None), None)
+        with self.assertRaisesRegex(ValueError, "top-level JSON null"):
+            bundle.encode_pg_scalar("json", bundle.PgJsonValue(None))
+        with self.assertRaisesRegex(ValueError, "top-level JSON null"):
+            bundle.encode_pg_scalar("jsonb", bundle.PgJsonText(b"null"))
+
         rejected = (
             ("enum", "accepted", {}),
             ("public.example_status", "accepted", {}),
@@ -156,6 +162,9 @@ class PostgreSqlScalarTests(unittest.TestCase):
             ("example_status", "not catalog mapped"),
             ("jsonb", {}),
             ("int8", True),
+            ("smallint", -(2**15) - 1),
+            ("integer", 2**31),
+            ("bigint", 2**63),
             ("numeric", Decimal("NaN")),
             ("numeric", Decimal("-0.00")),
             ("timestamp", dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)),

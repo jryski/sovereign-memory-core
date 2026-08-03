@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import datetime as dt
 from dataclasses import dataclass
 from decimal import Decimal
@@ -10,6 +11,7 @@ import hashlib
 import io
 import json
 from pathlib import PurePosixPath
+import re
 import tarfile
 from typing import Any, Iterable
 from uuid import UUID
@@ -147,6 +149,25 @@ _PG_TYPE_TAGS = {
     "json": "json", "jsonb": "json",
 }
 
+_PG_INTEGER_RANGES = {
+    "smallint": (-(2**15), (2**15) - 1), "int2": (-(2**15), (2**15) - 1),
+    "integer": (-(2**31), (2**31) - 1), "int4": (-(2**31), (2**31) - 1),
+    "bigint": (-(2**63), (2**63) - 1), "int8": (-(2**63), (2**63) - 1),
+}
+_PG_INTEGER_TEXT = re.compile(r"0|-?[1-9][0-9]*")
+_PG_NUMERIC_TEXT = re.compile(r"(?:0|-?[1-9][0-9]*)(?:\.[0-9]*[1-9])?")
+_PG_TIMESTAMPTZ_TEXT = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z"
+)
+_PG_TIMESTAMP_TEXT = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}"
+)
+_PG_TIME_TEXT = re.compile(r"[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}")
+_PG_PK_COMPARABLE_TAGS = {
+    "text", "uuid", "timestamptz", "timestamp", "date", "time", "int",
+    "numeric", "bool", "bytea",
+}
+
 
 @dataclass(frozen=True)
 class PgTextArray:
@@ -252,6 +273,8 @@ def encode_pg_scalar(
         encoded = value.isoformat(timespec="microseconds")
     elif tag == "int":
         _require(isinstance(value, int) and not isinstance(value, bool), "integer type requires int")
+        lower, upper = _PG_INTEGER_RANGES[normalized_type]
+        _require(lower <= value <= upper, "integer value is outside its PostgreSQL type range")
         encoded = str(value)
     elif tag == "numeric":
         _require(isinstance(value, Decimal), "numeric requires Decimal")
@@ -281,6 +304,8 @@ def encode_pg_scalar(
             encoded = value.value
         else:
             raise TypeError("json/jsonb requires PgJsonText or PgJsonValue to disambiguate strings")
+        if encoded is None:
+            raise ValueError("top-level JSON null is ambiguous with SQL null")
     elif tag == "text[]":
         _require(isinstance(value, PgTextArray), "text[] requires validated array metadata")
         _require(
@@ -307,6 +332,137 @@ def encode_pg_scalar(
         _require(isinstance(value, (bytes, bytearray, memoryview)), "bytea requires bytes-like data")
         return {"$bytea": base64.b64encode(bytes(value)).decode("ascii")}
     return encoded
+
+
+def _pg_type_tag(pg_type: str) -> tuple[str, str]:
+    if not isinstance(pg_type, str):
+        raise TypeError("PostgreSQL type name must be str")
+    normalized_type = pg_type.strip().lower()
+    try:
+        tag = _PG_TYPE_TAGS[normalized_type]
+    except KeyError as exc:
+        raise TypeError(f"unsupported PostgreSQL type: {pg_type!r}") from exc
+    return normalized_type, tag
+
+
+def validate_pg_encoded_value(pg_type: str, encoded: Any) -> None:
+    """Validate an encoded value without claiming primary-key ordering support."""
+    normalized_type, tag = _pg_type_tag(pg_type)
+    if encoded is None:
+        return
+
+    if tag == "text":
+        _require(isinstance(encoded, str), "text bundle value must be a string")
+        _validate_string(encoded)
+    elif tag == "uuid":
+        _require(isinstance(encoded, str), "UUID bundle value must be a string")
+        parsed_uuid = UUID(encoded)
+        _require(str(parsed_uuid) == encoded, "UUID bundle value is not canonical")
+    elif tag == "timestamptz":
+        _require(
+            isinstance(encoded, str) and _PG_TIMESTAMPTZ_TEXT.fullmatch(encoded) is not None,
+            "timestamptz bundle value is not canonical",
+        )
+        dt.datetime.fromisoformat(encoded.replace("Z", "+00:00"))
+    elif tag == "timestamp":
+        _require(
+            isinstance(encoded, str) and _PG_TIMESTAMP_TEXT.fullmatch(encoded) is not None,
+            "timestamp bundle value is not canonical",
+        )
+        dt.datetime.fromisoformat(encoded)
+    elif tag == "date":
+        _require(isinstance(encoded, str), "date bundle value must be a string")
+        parsed_date = dt.date.fromisoformat(encoded)
+        _require(parsed_date.isoformat() == encoded, "date bundle value is not canonical")
+    elif tag == "time":
+        _require(
+            isinstance(encoded, str) and _PG_TIME_TEXT.fullmatch(encoded) is not None,
+            "time bundle value is not canonical",
+        )
+        dt.time.fromisoformat(encoded)
+    elif tag == "int":
+        _require(
+            isinstance(encoded, str) and _PG_INTEGER_TEXT.fullmatch(encoded) is not None,
+            "integer bundle value is not canonical",
+        )
+        parsed_integer = int(encoded)
+        lower, upper = _PG_INTEGER_RANGES[normalized_type]
+        _require(
+            lower <= parsed_integer <= upper,
+            "integer bundle value is outside its PostgreSQL type range",
+        )
+    elif tag == "numeric":
+        _require(
+            isinstance(encoded, str) and _PG_NUMERIC_TEXT.fullmatch(encoded) is not None,
+            "numeric bundle value is not canonical",
+        )
+        Decimal(encoded)
+    elif tag == "bool":
+        _require(isinstance(encoded, bool), "boolean bundle value must be boolean")
+    elif tag == "json":
+        _validate_json_value(encoded)
+    elif tag == "text[]":
+        _require(isinstance(encoded, list), "text[] bundle value must be an array")
+        _require(
+            all(item is None or isinstance(item, str) for item in encoded),
+            "text[] bundle elements must be strings or null",
+        )
+        for item in encoded:
+            if item is not None:
+                _validate_string(item)
+    elif tag == "bytea":
+        _require(
+            isinstance(encoded, dict) and set(encoded) == {"$bytea"}
+            and isinstance(encoded["$bytea"], str),
+            "bytea bundle value must use the exact $bytea wrapper",
+        )
+        try:
+            decoded = base64.b64decode(encoded["$bytea"], validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise TypeError("bytea bundle value is not canonical base64") from exc
+        _require(
+            base64.b64encode(decoded).decode("ascii") == encoded["$bytea"],
+            "bytea bundle value is not canonical base64",
+        )
+
+
+def validate_pg_pk_type(pg_type: str) -> None:
+    """Require a type whose C-collation PG15/16 comparator is implemented."""
+    _, tag = _pg_type_tag(pg_type)
+    if tag not in _PG_PK_COMPARABLE_TAGS:
+        raise TypeError(f"PostgreSQL type has no supported primary-key comparator: {pg_type!r}")
+
+
+def canonical_pg_comparison_value(pg_type: str, encoded: Any) -> Any:
+    """Return a PG15/16 C-collation primary-key comparison value."""
+    normalized_type, tag = _pg_type_tag(pg_type)
+    validate_pg_pk_type(pg_type)
+    if encoded is None:
+        raise TypeError("primary-key values must not be SQL null")
+    validate_pg_encoded_value(pg_type, encoded)
+
+    if tag == "text":
+        text = encoded.rstrip(" ") if normalized_type in {"char", "character", "bpchar"} else encoded
+        return text.encode("utf-8")
+    if tag == "uuid":
+        return UUID(encoded).int
+    if tag == "timestamptz":
+        return dt.datetime.fromisoformat(encoded.replace("Z", "+00:00"))
+    if tag == "timestamp":
+        return dt.datetime.fromisoformat(encoded)
+    if tag == "date":
+        return dt.date.fromisoformat(encoded)
+    if tag == "time":
+        return dt.time.fromisoformat(encoded)
+    if tag == "int":
+        return int(encoded)
+    if tag == "numeric":
+        return Decimal(encoded)
+    if tag == "bool":
+        return encoded
+    if tag == "bytea":
+        return base64.b64decode(encoded["$bytea"], validate=True)
+    raise AssertionError("validated primary-key tag lacks a comparator")
 
 
 def _validate_jsonl_row(row: Any) -> None:

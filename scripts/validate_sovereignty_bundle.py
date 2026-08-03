@@ -18,14 +18,16 @@ from typing import Any, NoReturn
 try:
     from scripts.sovereignty_bundle import (
         MAX_ARCHIVE_SIZE, ArchiveMember, canonical_json_bytes,
-        parse_canonical_json_bytes, validate_ustar,
+        canonical_pg_comparison_value, parse_canonical_json_bytes,
+        validate_pg_encoded_value, validate_pg_pk_type, validate_ustar,
     )
 except ModuleNotFoundError as exc:
     if exc.name != "scripts":
         raise
     from sovereignty_bundle import (
         MAX_ARCHIVE_SIZE, ArchiveMember, canonical_json_bytes,
-        parse_canonical_json_bytes, validate_ustar,
+        canonical_pg_comparison_value, parse_canonical_json_bytes,
+        validate_pg_encoded_value, validate_pg_pk_type, validate_ustar,
     )
 
 
@@ -444,12 +446,30 @@ def _validate_manifest(manifest: Any, archive_paths: set[str]) -> dict[str, Any]
             if column["ordinal"] != column_index + 1:
                 _fail("MANIFEST_DEPENDENCY", "column ordinals must be contiguous and ordered")
             column_names.append(_nonempty_string(column["name"], "column name"))
-            _nonempty_string(column["pg_type"], "column PostgreSQL type")
+            pg_type = _nonempty_string(column["pg_type"], "column PostgreSQL type")
+            try:
+                validate_pg_encoded_value(pg_type, None)
+            except (TypeError, ValueError):
+                _fail(
+                    "RELATION_VALUE_INVALID",
+                    "relation column declares an unsupported PostgreSQL type",
+                )
         if len(set(column_names)) != len(column_names):
             _fail("MANIFEST_DEPENDENCY", "relation column names must be unique")
         primary_key = _ordered_unique_strings(relation["primary_key"], "relation primary_key")
         if not primary_key or any(column not in column_names for column in primary_key):
             _fail("MANIFEST_DEPENDENCY", "primary key does not close over relation columns")
+        pg_type_by_column = {
+            column["name"]: column["pg_type"] for column in columns
+        }
+        try:
+            for column in primary_key:
+                validate_pg_pk_type(pg_type_by_column[column])
+        except (TypeError, ValueError):
+            _fail(
+                "RELATION_PK_TYPE_UNSUPPORTED",
+                "relation primary key uses a type without a proven PostgreSQL comparator",
+            )
         foreign_keys = relation["foreign_keys"]
         if not isinstance(foreign_keys, list):
             _fail("MANIFEST_STRUCTURE", "foreign_keys must be an array")
@@ -581,9 +601,13 @@ def _validate_relation_jsonl(
     if (expected_count == 0) != (len(content) == 0):
         _fail("RELATION_JSONL_INVALID", "relation JSONL byte/count invariant is invalid")
     columns = [column["name"] for column in relation["columns"]]
+    pg_type_by_column = {
+        column["name"]: column["pg_type"] for column in relation["columns"]
+    }
     primary_key = relation["primary_key"]
     line_start = 0
     line_count = 0
+    previous_pk: tuple[Any, ...] | None = None
     for offset, byte in enumerate(content):
         if offset - line_start + 1 > max_row_size:
             _fail("RELATION_JSONL_LIMIT", "relation JSONL row exceeds content-validation limit")
@@ -604,11 +628,33 @@ def _validate_relation_jsonl(
             _fail("RELATION_JSONL_INVALID", "relation JSONL row envelope is invalid")
         if set(row["row"]) != set(columns):
             _fail("RELATION_JSONL_INVALID", "relation JSONL row columns do not match the manifest")
+        try:
+            for column in columns:
+                validate_pg_encoded_value(pg_type_by_column[column], row["row"][column])
+        except (TypeError, ValueError, OverflowError):
+            _fail(
+                "RELATION_VALUE_INVALID",
+                "relation JSONL value does not match its declared PostgreSQL type",
+            )
         if len(row["pk"]) != len(primary_key) or any(
             canonical_json_bytes(pk_value) != canonical_json_bytes(row["row"][column])
             for pk_value, column in zip(row["pk"], primary_key)
         ):
             _fail("RELATION_JSONL_INVALID", "relation JSONL primary key does not match its row")
+        if any(row["row"][column] is None for column in primary_key):
+            _fail("RELATION_VALUE_INVALID", "relation JSONL primary key contains SQL null")
+        comparison_pk = tuple(
+            canonical_pg_comparison_value(
+                pg_type_by_column[column], row["row"][column]
+            )
+            for column in primary_key
+        )
+        if previous_pk is not None and comparison_pk <= previous_pk:
+            _fail(
+                "RELATION_PK_ORDER",
+                "relation JSONL primary keys must be strictly increasing and unique",
+            )
+        previous_pk = comparison_pk
         line_count += 1
         line_start = offset + 1
     if line_start != len(content):
