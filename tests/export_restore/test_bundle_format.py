@@ -110,6 +110,19 @@ class PostgreSqlScalarTests(unittest.TestCase):
             with self.subTest(pg_type=pg_type):
                 self.assertEqual(bundle.encode_pg_scalar(pg_type, value), expected)
 
+    def test_numeric_validation_enforces_postgresql_unconstrained_limits(self):
+        bundle.validate_pg_encoded_value("numeric", "1" * 131_072)
+        bundle.validate_pg_encoded_value("numeric", "0." + "1" * 16_383)
+
+        with self.assertRaisesRegex(TypeError, "integer-digit limit"):
+            bundle.validate_pg_encoded_value("numeric", "1" * 131_073)
+        with self.assertRaisesRegex(TypeError, "fractional-digit limit"):
+            bundle.validate_pg_encoded_value("numeric", "0." + "1" * 16_384)
+        with self.assertRaisesRegex(TypeError, "integer-digit limit"):
+            bundle.encode_pg_scalar("numeric", Decimal("1" * 131_073))
+        with self.assertRaisesRegex(TypeError, "fractional-digit limit"):
+            bundle.encode_pg_scalar("numeric", Decimal("0." + "1" * 16_384))
+
     def test_catalog_enums_and_json_types_have_explicit_lossless_metadata(self):
         catalog = (
             bundle.PgEnumCatalog("public.example_status", ("proposed", "accepted")),

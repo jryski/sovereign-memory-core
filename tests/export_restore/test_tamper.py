@@ -508,6 +508,22 @@ class ManifestValidationTests(unittest.TestCase):
             with self.subTest(unsupported_type=unsupported_type):
                 self.assert_code("RELATION_VALUE_INVALID", bundle_bytes(unsupported))
 
+        for value in ("1" * 131_073, "0." + "1" * 16_384):
+            manifest = valid_manifest()
+            relation = manifest["relations"][0]
+            relation["columns"].append({"name": "value", "ordinal": 2, "pg_type": "numeric"})
+            members = dict(MEMBERS)
+            replace_member(
+                manifest,
+                members,
+                relation["path"],
+                bundle.canonical_jsonl_bytes([
+                    {"pk": ["1"], "row": {"id": "1", "value": value}},
+                ]),
+            )
+            with self.subTest(numeric_length=len(value)):
+                self.assert_code("RELATION_VALUE_INVALID", bundle_bytes(manifest, members))
+
         null_pk = valid_manifest()
         members = dict(MEMBERS)
         replace_member(

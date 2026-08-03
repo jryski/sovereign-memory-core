@@ -154,6 +154,8 @@ _PG_INTEGER_RANGES = {
     "integer": (-(2**31), (2**31) - 1), "int4": (-(2**31), (2**31) - 1),
     "bigint": (-(2**63), (2**63) - 1), "int8": (-(2**63), (2**63) - 1),
 }
+_PG_NUMERIC_MAX_INTEGER_DIGITS = 131_072
+_PG_NUMERIC_MAX_FRACTIONAL_DIGITS = 16_383
 _PG_INTEGER_TEXT = re.compile(r"0|-?[1-9][0-9]*")
 _PG_NUMERIC_TEXT = re.compile(r"(?:0|-?[1-9][0-9]*)(?:\.[0-9]*[1-9])?")
 _PG_TIMESTAMPTZ_TEXT = re.compile(
@@ -285,6 +287,7 @@ def encode_pg_scalar(
             encoded = encoded.rstrip("0").rstrip(".")
         if value.is_zero():
             encoded = "0"
+        validate_pg_encoded_value(pg_type, encoded)
     elif tag == "bool":
         _require(isinstance(value, bool), "boolean requires bool")
         encoded = value
@@ -397,6 +400,16 @@ def validate_pg_encoded_value(pg_type: str, encoded: Any) -> None:
             "numeric bundle value is not canonical",
         )
         Decimal(encoded)
+        unsigned = encoded[1:] if encoded.startswith("-") else encoded
+        integer_part, separator, fractional_part = unsigned.partition(".")
+        _require(
+            len(integer_part) <= _PG_NUMERIC_MAX_INTEGER_DIGITS,
+            "numeric bundle value exceeds PostgreSQL's integer-digit limit",
+        )
+        _require(
+            not separator or len(fractional_part) <= _PG_NUMERIC_MAX_FRACTIONAL_DIGITS,
+            "numeric bundle value exceeds PostgreSQL's fractional-digit limit",
+        )
     elif tag == "bool":
         _require(isinstance(encoded, bool), "boolean bundle value must be boolean")
     elif tag == "json":
