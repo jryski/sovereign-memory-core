@@ -21,7 +21,6 @@ declare
     'public.correct_work_lesson_evidence(uuid,text,text,text,text,text,text,text)',
     'public.current_doc_hash(text)',
     'public.hot_touch(text,uuid,text,text)',
-    'public.promote_memory(uuid,text)',
     'public.promote_memory(uuid,text,text)',
     'public.propose_lesson_supersession(uuid,text,text,text,text,text,text,text,text)',
     'public.propose_work_lesson(text,text,text,text,text,text,text,text,text)',
@@ -59,6 +58,14 @@ begin
     and p.proconfig is distinct from array['search_path=pg_catalog, pg_temp'];
   if v_bad is not null then
     raise exception 'SECURITY DEFINER functions are not fully-qualified/search_path empty: %',v_bad;
+  end if;
+
+  if to_regprocedure('public.promote_memory(uuid,text)') is not null
+     or exists(
+       select 1 from public.perimeter_authority_function_registry
+       where function_identity='public.promote_memory(uuid,text)'
+     ) then
+    raise exception 'actorless/defaulted promotion path or stale perimeter entry remains';
   end if;
 
   if pg_get_functiondef('public.hot_touch(text,uuid,text,text)'::regprocedure)

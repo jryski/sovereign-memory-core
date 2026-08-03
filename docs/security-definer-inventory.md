@@ -3,7 +3,7 @@
 Migration `sql/10_security_definer_hardening.sql` is the reviewed fix-forward
 inventory for issue #57. The inventory is exact for the package installed by
 `sql/01_core.sql`, `sql/07_work_lessons.sql`, `sql/08_attention_events.sql`, and
-`sql/09_perimeter_refresh.sql`: 28 `SECURITY DEFINER` routines and 20 helpers
+`sql/09_perimeter_refresh.sql`: 27 `SECURITY DEFINER` routines and 20 helpers
 entered by those routines or by their trigger/write authority chain.
 
 Every listed routine has `SET search_path TO 'pg_catalog', 'pg_temp'`.
@@ -13,7 +13,7 @@ with `public.`; extension calls are qualified with `extensions.`. PostgreSQL
 built-ins, operators, and catalog objects resolve through the trusted
 `pg_catalog` path. No routine retains an unqualified application object.
 
-## SECURITY DEFINER routines (28)
+## SECURITY DEFINER routines (27)
 
 | Function identity | Search path | Qualification disposition |
 |---|---|---|
@@ -31,7 +31,6 @@ built-ins, operators, and catalog objects resolve through the trusted
 | `public.correct_work_lesson_evidence(p_evidence_id uuid, p_evidence_kind text, p_locator text, p_source_authority text, p_actor text, p_correction_reason text, p_resolution_state text, p_integrity_hash text)` | `pg_catalog, pg_temp` | Application relations/type and helper boundary qualified. |
 | `public.current_doc_hash(p_path text)` | `pg_catalog, pg_temp` | Application relation and extension digest boundary qualified. |
 | `public.hot_touch(p_topic_key text, p_memory_id uuid, p_summary text, p_workstream text)` | `pg_catalog, pg_temp` | All durable target/source relations qualified. |
-| `public.promote_memory(p_id uuid, p_note text)` | `pg_catalog, pg_temp` | Overload call qualified. |
 | `public.promote_memory(p_id uuid, p_note text, p_actor text)` | `pg_catalog, pg_temp` | Application relation qualified. |
 | `public.propose_lesson_supersession(p_predecessor_id uuid, p_claim text, p_detail text, p_evidence_kind text, p_evidence_locator text, p_source_authority text, p_created_by text, p_resolution_state text, p_integrity_hash text)` | `pg_catalog, pg_temp` | Application relations/type and helper boundary qualified. |
 | `public.propose_work_lesson(p_kind text, p_claim text, p_detail text, p_evidence_kind text, p_evidence_locator text, p_source_authority text, p_created_by text, p_resolution_state text, p_integrity_hash text)` | `pg_catalog, pg_temp` | Application relations and helper boundary qualified. |
@@ -73,7 +72,7 @@ built-ins, operators, and catalog objects resolve through the trusted
 
 ## Enforcement
 
-`tests/10_security_definer_temp_shadow.sql` compares the installed 28-routine
+`tests/10_security_definer_temp_shadow.sql` compares the installed 27-routine
 `SECURITY DEFINER` identity set exactly, requires the canonical path on every
 member, and proves that omitted, misordered, and untrusted paths fail the
 perimeter assertion. Behavioral probes then demonstrate that temporary shadow

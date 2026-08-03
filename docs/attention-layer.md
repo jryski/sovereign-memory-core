@@ -6,6 +6,11 @@
 
 `memory_activated` exists only when the actual `proposed -> active` status transition trigger records it.
 
+Promotion is fail-closed on actor attribution. The only promotion RPC is
+`promote_memory(id, note, actor)`, and `actor` must contain non-whitespace. One-
+and two-argument calls do not resolve; the runtime never supplies a synthetic
+shared actor for an omitted identity.
+
 The compatibility replay functions are existence-only lookups. Calling them for an older eligible memory with no event returns `NULL`. They never backfill or fabricate an event and never claim a trigger observation that did not occur.
 
 ## Identity and revision keys

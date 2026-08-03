@@ -248,7 +248,8 @@ begin
   delete from perimeter_authority_function_registry where function_identity in (
     'public.perimeter_setting_roles(text)','public.perimeter_policy_roles(text)',
     'public.perimeter_protected_schemas()','public.perimeter_authority_functions()',
-    'public.perimeter_acl_violations()','public.assert_perimeter_closed()'
+    'public.perimeter_acl_violations()','public.assert_perimeter_closed()',
+    'public.promote_memory(uuid,text)'
   );
 
   insert into perimeter_authority_function_registry(function_identity,is_internal) values
@@ -273,7 +274,6 @@ begin
     ('public.record_native_memory_activation(uuid,text)',false),
     ('public.append_attention_event_revision(uuid,text,timestamp with time zone,text,text,jsonb)',false),
     ('public.promote_memory(uuid,text,text)',false),
-    ('public.promote_memory(uuid,text)',false),
     ('public.attention_boot_projection_v2(text,integer,integer)',false),
     ('public.attention_budget_conformance_v2(text,integer,integer)',false),
     ('public.capture_memory_attention_after_insert()',true),

@@ -11,6 +11,11 @@
 -- docs/security-definer-inventory.md.
 -- ============================================================================
 
+-- Fail closed before this non-transactional script recreates any routine.
+-- An older package may still expose this synthetic-actor overload. No CASCADE:
+-- an unexpected database dependency requires operator review.
+DROP FUNCTION IF EXISTS public.promote_memory(uuid,text);
+
 -- Authority-adjacent helpers are hardened too; a qualified call from a
 -- SECURITY DEFINER routine must not enter an unsafe helper-local search path.
 CREATE OR REPLACE FUNCTION public.attention_fixed_point_chars(p_base_chars integer)
@@ -980,14 +985,11 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.promote_memory(p_id uuid, p_note text DEFAULT NULL::text)
- RETURNS text
- LANGUAGE sql
- SECURITY DEFINER
- SET search_path TO 'pg_catalog', 'pg_temp'
-AS $function$
-select public.promote_memory(p_id,p_note,'shared-runtime');
-$function$;
+-- A direct upgrade from the previous accepted head can run SQL10 without
+-- replaying SQL09. Remove the stale text registry entry as well as the routine;
+-- otherwise the final perimeter assertion correctly reports a missing member.
+DELETE FROM public.perimeter_authority_function_registry
+WHERE function_identity='public.promote_memory(uuid,text)';
 
 CREATE OR REPLACE FUNCTION public.promote_memory(p_id uuid, p_note text, p_actor text)
  RETURNS text
