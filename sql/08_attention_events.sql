@@ -7,6 +7,12 @@
 -- hashes the exact persisted source_revision value.
 -- ============================================================================
 
+-- Fail closed before this non-transactional script changes any package object.
+-- Earlier package revisions exposed a defaulted two-argument overload that
+-- supplied a synthetic actor. No CASCADE: an unexpected dependent aborts the
+-- upgrade for operator review without partial reapplication.
+drop function if exists public.promote_memory(uuid,text);
+
 create table if not exists attention_events (
   id                     uuid primary key default gen_random_uuid(),
   contract_version       text not null default 'attention-event/0.3'
@@ -473,11 +479,6 @@ begin
   return 'promoted';
 end;
 $$;
-create or replace function promote_memory(p_id uuid,p_note text default null)
-returns text
-language sql security definer set search_path=public as $$
-select promote_memory(p_id,p_note,'shared-runtime');
-$$;
 
 create or replace function attention_boot_projection_v2(
   p_viewer text,p_char_budget integer default 12000,p_summary_chars integer default 240
@@ -604,6 +605,7 @@ revoke all on function record_native_memory_attention(uuid) from public;
 revoke all on function record_native_memory_activation(uuid,text) from public;
 revoke all on function attention_boot_projection_v2(text,integer,integer) from public;
 revoke all on function attention_budget_conformance_v2(text,integer,integer) from public;
+revoke all on function promote_memory(uuid,text,text) from public;
 
 do $$
 declare r text;
@@ -620,6 +622,7 @@ begin
       execute format('revoke all on function append_attention_event_revision(uuid,text,timestamptz,text,text,jsonb) from %I',r);
       execute format('revoke all on function attention_boot_projection_v2(text,integer,integer) from %I',r);
       execute format('revoke all on function attention_budget_conformance_v2(text,integer,integer) from %I',r);
+      execute format('revoke all on function promote_memory(uuid,text,text) from %I',r);
     end if;
   end loop;
   if exists(select 1 from pg_roles where rolname='service_role') then
@@ -635,7 +638,6 @@ begin
     grant execute on function attention_boot_projection_v2(text,integer,integer) to service_role;
     grant execute on function attention_budget_conformance_v2(text,integer,integer) to service_role;
     grant execute on function promote_memory(uuid,text,text) to service_role;
-    grant execute on function promote_memory(uuid,text) to service_role;
     grant execute on function session_boot(text) to service_role;
   end if;
 end $$;

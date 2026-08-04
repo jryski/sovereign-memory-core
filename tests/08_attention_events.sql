@@ -20,11 +20,40 @@ end $$;
 select set_config('app.test_legacy_id',(select id::text from attention_test_ids where kind='legacy_without_event'),true);
 select set_config('app.test_event_count',(select count(*)::text from public.attention_events),true);
 
+do $$
+begin
+  if to_regprocedure('public.promote_memory(uuid,text)') is not null
+     or to_regprocedure('public.promote_memory(uuid)') is not null then
+    raise exception 'promotion retained an actorless/defaulted call path';
+  end if;
+  if to_regprocedure('public.promote_memory(uuid,text,text)') is null then
+    raise exception 'explicitly attributed promotion function is missing';
+  end if;
+  if (select pronargdefaults from pg_proc
+      where oid='public.promote_memory(uuid,text,text)'::regprocedure)<>0 then
+    raise exception 'promotion arguments must not have defaults';
+  end if;
+end $$;
+
 set local role service_role;
 
 do $$
 declare v uuid;
 begin
+  if not has_function_privilege(
+       'service_role','public.promote_memory(uuid,text,text)','EXECUTE') then
+    raise exception 'service_role cannot execute explicitly attributed promotion';
+  end if;
+  begin
+    execute 'select public.promote_memory(null::uuid)';
+    raise exception 'one-argument promotion unexpectedly resolved';
+  exception when undefined_function then null;
+  end;
+  begin
+    execute 'select public.promote_memory(null::uuid,null::text)';
+    raise exception 'two-argument promotion unexpectedly resolved';
+  exception when undefined_function then null;
+  end;
   v:=public.record_native_memory_attention(current_setting('app.test_legacy_id')::uuid);
   if v is not null then raise exception 'runtime fabricated memory_created'; end if;
   v:=public.record_native_memory_activation(current_setting('app.test_legacy_id')::uuid,'forged');
@@ -86,6 +115,24 @@ begin
   if exists(select 1 from attention_events where memory_id=v_proposed_memory) then
     raise exception 'proposed insert emitted an event';
   end if;
+  for v_payload in select value from jsonb_array_elements('[null,"","   ","\t\n"]'::jsonb)
+  loop
+    begin
+      perform promote_memory(
+        v_proposed_memory,
+        'conformance',
+        case when v_payload='null'::jsonb then null else v_payload#>>'{}' end
+      );
+      raise exception using
+        errcode='ZX001',
+        message='promotion accepted a null/blank/whitespace-only actor';
+    exception when others then
+      if sqlstate='ZX001' then raise; end if;
+    end;
+    if (select status from memories where id=v_proposed_memory) is distinct from 'proposed' then
+      raise exception 'rejected actor changed proposed memory state';
+    end if;
+  end loop;
   perform promote_memory(v_proposed_memory,'conformance','ci-promoter');
   select * into v_activated from attention_events
   where memory_id=v_proposed_memory and source_event_type='memory_activated';
@@ -93,8 +140,10 @@ begin
   if v_activated.source_revision<>'native-revision:1'
      or v_activated.revision_key<>attention_hash_parts(v_activated.identity_key,v_activated.source_revision)
      or v_activated.owner<>'example-partner' or v_activated.visibility<>'private'
+     or v_activated.actor_key is distinct from 'ci-promoter'
+     or (select metadata->>'promoted_by' from memories where id=v_proposed_memory) is distinct from 'ci-promoter'
      or v_activated.observation_method<>'native_status_transition' then
-    raise exception 'activation envelope or independent key recomputation failed';
+    raise exception 'activation envelope, attribution, or independent key recomputation failed';
   end if;
   if record_native_memory_activation(v_proposed_memory,'forged')<>v_activated.id then
     raise exception 'activation replay failed to return existing row';
@@ -108,9 +157,9 @@ begin
     'other:test:revision-2','conformance-observation','{"fixture":true}'::jsonb
   );
   select * into v_revision_row from attention_events where id=v_revision;
-  if v_revision_row.actor_key<>'current-observer'
-     or v_revision_row.credential_ref<>'asserted:test-credential'
-     or v_revision_row.runtime_ref<>'runtime:test' then
+  if v_revision_row.actor_key is distinct from 'current-observer'
+     or v_revision_row.credential_ref is distinct from 'asserted:test-credential'
+     or v_revision_row.runtime_ref is distinct from 'runtime:test' then
     raise exception 'revision copied stale observer attribution';
   end if;
   if v_revision_row.revision_key<>attention_hash_parts(v_revision_row.identity_key,v_revision_row.source_revision) then
