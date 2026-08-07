@@ -29,9 +29,11 @@ declare
     'public.reject_work_lesson(uuid,text,text)',
     'public.remediate_perimeter_acl()',
     'public.remember(text,text,text,text,text,text,text[],text,timestamp with time zone)',
+    'public.search_coverage_receipt(text,jsonb)',
     'public.session_boot(text)',
     'public.supersede_memory(uuid,text,text,text,text[],timestamp with time zone)',
     'public.supersede_wiki(text,text,text,text,jsonb)',
+    'public.topology_profile_boot(text)',
     'public.verify_doc_integrity(text)',
     'public.work_lessons_boot_fragment()'
   ];
