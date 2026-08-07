@@ -111,6 +111,29 @@ begin
   values('local-store','reference','local','default','shared','shared');
 end $$;
 
+-- Loss of the singleton profile row must still return a versioned, deterministic
+-- unknown topology object so read-only boot never degrades to JSON null.
+do $$
+declare v_boot jsonb;v_receipt jsonb;
+begin
+  delete from public.store_topology_profile where singleton;
+  v_boot:=public.session_boot('example-user');
+  v_receipt:=public.search_coverage_receipt(
+    'example-user','{"schema_version":"1","attempts":[]}'::jsonb);
+  if v_boot#>>'{topology,schema}'<>'sovereign-memory/topology-profile'
+     or v_boot#>>'{topology,version}'<>'1'
+     or v_boot#>>'{topology,state}'<>'unknown'
+     or (v_boot#>>'{topology,read_only_local_available}')::boolean is not true
+     or v_receipt->>'classification'<>'unknown_topology'
+     or (v_receipt->>'coverage_complete')::boolean is not false
+     or (v_receipt->>'global_absence_supported')::boolean is not false then
+    raise exception 'missing topology profile row did not fail closed: boot %, receipt %',
+      v_boot->'topology',v_receipt;
+  end if;
+  insert into public.store_topology_profile(singleton,topology_state)
+  values(true,'configured');
+end $$;
+
 -- Exact shape/types/statuses, identities, counts, duplicates, and input bound.
 do $$
 declare r record;v_many jsonb;
