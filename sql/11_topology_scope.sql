@@ -98,7 +98,16 @@ STABLE SECURITY DEFINER
 SET search_path TO 'pg_catalog','pg_temp'
 AS $function$
 WITH raw_profile AS (
-  SELECT * FROM public.store_topology_profile WHERE singleton
+  SELECT singleton,schema_name,schema_version,topology_state,
+         contract_version,contract_digest,observed_contract_version,
+         observed_contract_digest,updated_at
+  FROM public.store_topology_profile WHERE singleton
+  UNION ALL
+  SELECT true,'sovereign-memory/topology-profile','1','unknown',
+         'topology-scope/1',
+         '938976903383ef5cf43af48ffe5e03a3f1be212cff5d1ea947caef2debec82fd',
+         NULL::text,NULL::text,statement_timestamp()
+  WHERE NOT EXISTS(SELECT 1 FROM public.store_topology_profile WHERE singleton)
 ), profile AS (
   SELECT r.*,
          CASE

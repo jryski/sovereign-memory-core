@@ -61,9 +61,9 @@ queried a peer. The server does not connect to peers and stores no routes.
 
 Classification precedence after validation is:
 
-1. `unknown_topology` when topology is `unknown`/`not_configured`, the canonical
-   enabled advertised local-store row is absent, or visible advertised coverage
-   exceeds the bounded contract;
+1. `unknown_topology` when the profile singleton is absent, topology is
+   `unknown`/`not_configured`, the canonical enabled advertised local-store row is
+   absent, or visible advertised coverage exceeds the bounded contract;
 2. `local_hit`;
 3. `remote_hit`;
 4. `unreachable_peer`;
