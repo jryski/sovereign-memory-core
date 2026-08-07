@@ -48,7 +48,7 @@ keys are rejected. `attempts` is an array of at most 32 objects:
 
 `status` is `queried` or `unreachable`; an unreachable attempt has zero hits.
 `hit_count` is an integer from 0 through 1,000,000. Store IDs must identify an
-enabled, advertised store visible to the viewer, scopes must match configuration
+enabled, advertised store in the shared sanitized topology, scopes must match configuration
 evidence, and store IDs may not repeat.
 Store IDs, profiles, owners, and scopes use the lowercase ASCII grammar
 `[a-z0-9][a-z0-9._-]*` at their documented maximum lengths. Receipt attempts are
@@ -61,8 +61,9 @@ queried a peer. The server does not connect to peers and stores no routes.
 
 Classification precedence after validation is:
 
-1. `unknown_topology` when topology is `unknown`/`not_configured` or visible
-   advertised coverage exceeds the bounded contract;
+1. `unknown_topology` when topology is `unknown`/`not_configured`, the canonical
+   enabled advertised local-store row is absent, or visible advertised coverage
+   exceeds the bounded contract;
 2. `local_hit`;
 3. `remote_hit`;
 4. `unreachable_peer`;
@@ -72,8 +73,13 @@ Classification precedence after validation is:
 
 Therefore a local miss while an advertised peer remains unqueried is always
 `partial_miss`, never a complete or global “nothing found.”
+The explicit `global_absence_supported` receipt field is true only for
+`complete_miss` with a configured canonical local store, bounded visible topology,
+all visible stores queried, and no unreachable store. It is false for every other
+classification. `coverage_complete` is likewise false when local identity is
+missing, even if the client submits an empty attempts array.
 
-Validation error precedence is stable: array envelope, 32-attempt bound, object
+Validation error precedence is stable: object/version envelope, 32-attempt bound, object
 and exact keys, JSON scalar types, status, duplicate store ID, visible store
 identity/scope, then count range and unreachable-count semantics.
 
