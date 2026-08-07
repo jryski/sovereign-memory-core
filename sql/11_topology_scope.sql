@@ -97,8 +97,19 @@ LANGUAGE sql
 STABLE SECURITY DEFINER
 SET search_path TO 'pg_catalog','pg_temp'
 AS $function$
-WITH profile AS (
+WITH raw_profile AS (
   SELECT * FROM public.store_topology_profile WHERE singleton
+), profile AS (
+  SELECT r.*,
+         CASE
+           WHEN r.topology_state='configured' AND NOT EXISTS(
+             SELECT 1 FROM public.known_memory_stores s
+             WHERE s.relationship='local' AND s.advertised AND s.enabled
+               AND s.visibility='shared'
+           ) THEN 'unknown'
+           ELSE r.topology_state
+         END effective_topology_state
+  FROM raw_profile r
 ), visible AS (
   SELECT s.*
   FROM public.known_memory_stores s
@@ -120,14 +131,14 @@ WITH profile AS (
     'relationship',b.relationship,
     'search_scope',b.search_scope,
     'configuration_state',CASE
-      WHEN p.topology_state='unknown' THEN 'unknown'
-      WHEN p.topology_state='not_configured' THEN 'not_configured'
+      WHEN p.effective_topology_state='unknown' THEN 'unknown'
+      WHEN p.effective_topology_state='not_configured' THEN 'not_configured'
       WHEN NOT b.enabled THEN 'disabled'
       ELSE 'configured'
     END,
     'coverage_state',CASE
-      WHEN p.topology_state='unknown' THEN 'unknown'
-      WHEN p.topology_state='not_configured' OR NOT b.enabled THEN 'not_applicable'
+      WHEN p.effective_topology_state='unknown' THEN 'unknown'
+      WHEN p.effective_topology_state='not_configured' OR NOT b.enabled THEN 'not_applicable'
       ELSE 'not_queried'
     END
   ) ORDER BY CASE b.relationship WHEN 'local' THEN 0 ELSE 1 END,b.store_id),'[]'::jsonb) payload
@@ -143,7 +154,7 @@ WITH profile AS (
 SELECT jsonb_build_object(
   'schema',p.schema_name,
   'version',p.schema_version,
-  'state',p.topology_state,
+  'state',p.effective_topology_state,
   'local_store',coalesce((SELECT jsonb_build_object('store_id',v.store_id,'profile',v.store_profile)
                           FROM visible v WHERE v.relationship='local' LIMIT 1),
                          jsonb_build_object('store_id','unknown','profile','unknown')),
@@ -215,11 +226,20 @@ BEGIN
     RAISE EXCEPTION 'search coverage attempts exceed maximum 32';
   END IF;
 
-  SELECT (SELECT s.store_id FROM public.known_memory_stores s
-          WHERE s.relationship='local' AND s.advertised AND s.visibility='shared' LIMIT 1),
-         topology_state
+  SELECT l.store_id,
+         CASE
+           WHEN p.topology_state='configured' AND l.store_id IS NULL THEN 'unknown'
+           ELSE p.topology_state
+         END
   INTO v_local_id,v_topology_state
-  FROM public.store_topology_profile WHERE singleton;
+  FROM public.store_topology_profile p
+  LEFT JOIN LATERAL (
+    SELECT s.store_id FROM public.known_memory_stores s
+    WHERE s.relationship='local' AND s.advertised AND s.enabled
+      AND s.visibility='shared'
+    LIMIT 1
+  ) l ON true
+  WHERE p.singleton;
 
   FOR v_attempt IN
     SELECT value FROM jsonb_array_elements(v_attempts)
@@ -304,7 +324,7 @@ BEGIN
   INTO v_attempt_rows FROM jsonb_array_elements(v_attempt_rows);
 
   v_classification:=CASE
-    WHEN v_topology_state<>'configured' OR v_visible_enabled>32 THEN 'unknown_topology'
+    WHEN v_topology_state<>'configured' OR v_local_id IS NULL OR v_visible_enabled>32 THEN 'unknown_topology'
     WHEN v_local_hits>0 THEN 'local_hit'
     WHEN v_remote_hits>0 THEN 'remote_hit'
     WHEN v_unreachable>0 THEN 'unreachable_peer'
@@ -320,7 +340,14 @@ BEGIN
     'viewer',p_viewer,
     'classification',v_classification,
     'coverage_complete',(v_topology_state='configured' AND v_visible_enabled<=32
+                         AND v_local_id IS NOT NULL
                          AND v_queried=v_visible_enabled AND v_unreachable=0),
+    'global_absence_supported',(v_classification='complete_miss'
+                                AND v_topology_state='configured'
+                                AND v_local_id IS NOT NULL
+                                AND v_visible_enabled<=32
+                                AND v_queried=v_visible_enabled
+                                AND v_unreachable=0),
     'visible_advertised_stores',v_visible_enabled,
     'queried_stores',v_queried,
     'unreachable_stores',v_unreachable,

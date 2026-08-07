@@ -66,12 +66,14 @@ begin
 
   v:=public.search_coverage_receipt('example-user','{"schema_version":"1","attempts":[{"store_id":"local-store","scope":"default","status":"queried","hit_count":0}]}');
   if v->>'classification'<>'partial_miss' or (v->>'coverage_complete')::boolean is not false
+     or (v->>'global_absence_supported')::boolean is not false
      or (v->>'advertised_unqueried_stores')::integer<>1 then
     raise exception 'single-store miss was broadened beyond reported coverage: %',v;
   end if;
 
   v:=public.search_coverage_receipt('example-user','{"schema_version":"1","attempts":[{"store_id":"local-store","scope":"default","status":"queried","hit_count":0},{"store_id":"peer-store","scope":"default","status":"queried","hit_count":0}]}');
-  if v->>'classification'<>'complete_miss' or (v->>'coverage_complete')::boolean is not true then
+  if v->>'classification'<>'complete_miss' or (v->>'coverage_complete')::boolean is not true
+     or (v->>'global_absence_supported')::boolean is not true then
     raise exception 'complete miss classification failed: %',v;
   end if;
 
@@ -86,6 +88,27 @@ begin
     raise exception 'unknown topology classification failed: %',v;
   end if;
   update public.store_topology_profile set topology_state='configured' where singleton;
+end $$;
+
+-- A configured profile without its canonical local store is unknown topology,
+-- never complete coverage or support for a global absence claim.
+do $$
+declare v_boot jsonb;v_receipt jsonb;
+begin
+  delete from public.known_memory_stores where relationship='local';
+  v_boot:=public.topology_profile_boot('example-user');
+  v_receipt:=public.search_coverage_receipt(
+    'example-user','{"schema_version":"1","attempts":[]}'::jsonb);
+  if v_boot->>'state'<>'unknown'
+     or v_boot#>>'{local_store,store_id}'<>'unknown'
+     or v_receipt->>'classification'<>'unknown_topology'
+     or (v_receipt->>'coverage_complete')::boolean is not false
+     or (v_receipt->>'global_absence_supported')::boolean is not false then
+    raise exception 'missing local store did not fail closed: boot %, receipt %',v_boot,v_receipt;
+  end if;
+  insert into public.known_memory_stores(
+    store_id,store_profile,relationship,search_scope,owner,visibility)
+  values('local-store','reference','local','default','shared','shared');
 end $$;
 
 -- Exact shape/types/statuses, identities, counts, duplicates, and input bound.
