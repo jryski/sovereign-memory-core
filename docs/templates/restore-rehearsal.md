@@ -30,6 +30,9 @@ Run both. Record which one this is; several criteria below apply to only one.
 
 - Date / operator / target identifier
 - Rehearsal type (above)
+- Perimeter checker contract version, as reported by the perimeter report.
+  **A criterion 6 result is not interpretable without it.** This contract has
+  changed before; a bare pass or fail carries no meaning on its own.
 - Source and target engine versions. **A dump cannot restore into an older
   major version.** Version-matched targets are mandatory.
 
@@ -74,7 +77,7 @@ Record exact commands. Note:
 | 3 | Session entry point executes and returns a payload | | | |
 | 4 | Only acceptable failures | | | |
 | 5 | POSITIVE CONTROL: a known record is VISIBLE and READABLE to an entitled principal | | | |
-| 6 | SOVEREIGNTY ONLY: perimeter check REFUSES rather than reporting clean | | | |
+| 6 | Perimeter REPORT evaluates honestly. Gate on the report, never on the violation primitive | | | |
 | 7 | PAIRED DENIAL: a private record owned by another principal is NOT visible to a reader WHO HOLDS THE SCOPE | | | |
 
 ### Why 5, 6 and 7 exist
@@ -83,11 +86,34 @@ Record exact commands. Note:
 nothing is visible to anyone satisfies every one of them. A denial-only suite
 cannot distinguish "correctly restricted" from "entitled to nothing".
 
-**Criterion 6 is not a precaution.** A perimeter check that filters on
-platform roles returns zero rows where those roles are absent, and zero rows
-reads as clean. On a target lacking them, a clean perimeter is the GUARANTEED
-output of an unfixed checker. If it reports clean here, the artifact predates
-the fix and the rehearsal is void.
+**Criterion 6 is not a precaution, and WHICH FUNCTION YOU CALL decides whether
+it works.**
+
+Gate on `perimeter_report()`. NEVER on `perimeter_assert()`.
+
+`perimeter_assert()` is violation-only by contract: on a target lacking
+the platform roles its filters match nothing, so it returns zero rows, and
+zero rows reads as clean. That is the exact fail-open this criterion exists
+to catch, so a rehearsal that gates on `perimeter_assert()` records a PASS
+precisely where it should refuse.
+
+`perimeter_report()` declares its own evaluability. Read BOTH halves, and
+read them differently depending on which rehearsal you are running:
+
+    CONTINUITY   (platform roles supplied)
+      PASS   evaluation_status = 'evaluated' AND violation_count = 0
+      VOID   anything else
+
+    SOVEREIGNTY  (platform roles withheld)
+      PASS   evaluation_status <> 'evaluated' AND violation_count IS NULL
+             the report correctly refuses, having nothing it can check
+      VOID   evaluation_status = 'evaluated', or a non-NULL violation_count
+             the checker is claiming an answer it cannot have
+
+`violation_count` is NULL rather than 0 when nothing could be checked. That
+is the only value that fails closed: `NULL = 0` evaluates to NULL, so a caller
+gating on it refuses instead of proceeding. Returning 0 would hand a clean
+answer to exactly the target that could not produce one. Do not coalesce it.
 
 **Criterion 7 exists because 5 is not sufficient.** A positive control can be
 genuine and still exercise only ONE DISJUNCT of a two-disjunct predicate. If
