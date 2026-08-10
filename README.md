@@ -162,21 +162,28 @@ sql/07_work_lessons.sql
 sql/08_attention_events.sql
 sql/09_perimeter_refresh.sql
 sql/10_security_definer_hardening.sql
+sql/11_topology_scope.sql
 ```
 
 Two ordering rules that will bite you otherwise:
 
 - `07` through `09` are re-runnable fix-forward migrations. If you need to
   reapply them, do it **before** `10`.
-- `10` is a one-way hardening boundary and must run **last**. Once applied,
+- `10` is a one-way hardening boundary for the historical package. Once applied,
   reapply only `10`, never `07` through `09`, because those historical
   definitions deliberately predate the explicit-`pg_temp` contract that `10`
   establishes.
+- `11` runs after `10` and is independently re-runnable. It adds the versioned
+  topology/search-scope contract without weakening local read-only boot.
 
 `09` closes schema creation, table grants, function execution, default
 privileges, RLS and FORCE RLS, ownership, and trigger-only boundaries. `10`
 recreates the reviewed SECURITY DEFINER and authority-adjacent helper inventory
 with protected names schema-qualified and `pg_temp` listed last.
+
+`11` exposes deployment-neutral, viewer-filtered topology evidence and validated
+client-reported search-coverage receipts. It contains no routing endpoints or
+credentials. See [`docs/topology-and-search-scope.md`](docs/topology-and-search-scope.md).
 
 Permission profiles, allowlists, and perimeter policy inputs live in
 [`docs/perimeter.md`](docs/perimeter.md). Read it before applying to anything

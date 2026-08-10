@@ -11,6 +11,7 @@ permissions:
 env:
   PGPASSWORD: postgres
   PREVIOUS_REVIEW_HEAD: 19912ff2e612d9cc4188f9d0051a7e07a509341e
+  ISSUE_72_EXACT_BASE: 7519a1fa17c93b072c68f1397fffb164350f5834
 
 jobs:
   fresh-install:
@@ -141,6 +142,8 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_topology_scope.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_topology_scope.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           select public.assert_perimeter_closed();
           do $$ declare d text; begin
@@ -158,6 +161,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/09_perimeter_acl.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/09_perimeter_acl_review.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/10_security_definer_temp_shadow.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/11_topology_scope.sql
       - name: Concurrent identical replay
         if: matrix.pg == '16'
         run: |
@@ -173,6 +177,7 @@ jobs:
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/11_topology_scope.sql
           DATABASE_URL="$CONCURRENCY_URL" bash tests/08_attention_concurrency.sh
 
   portable-profile:
@@ -218,6 +223,8 @@ jobs:
           done
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_topology_scope.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_topology_scope.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           do $$ begin
             if (select profile from public.perimeter_acl_policy where singleton)<>'portable' then
@@ -344,8 +351,10 @@ jobs:
           SQL
       - name: Apply v4 perimeter upgrade
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
-      - name: Apply SECURITY DEFINER temp-shadow hardening
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+      - name: Apply SECURITY DEFINER temp-shadow hardening and topology scope
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_topology_scope.sql
       - name: Verify durable control-table repair preserved registry data
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
@@ -417,7 +426,9 @@ jobs:
           end $$;
           select public.assert_perimeter_closed();
           SQL
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/11_topology_scope.sql
       - name: Reapply upgraded package
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_topology_scope.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'select public.assert_perimeter_closed()'

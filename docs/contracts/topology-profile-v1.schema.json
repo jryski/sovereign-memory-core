@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jryski/sovereign-memory-core/blob/main/docs/contracts/topology-profile-v1.schema.json",
+  "title": "Sovereign Memory topology profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "state", "local_store", "visible_known_stores", "coverage", "attestation", "read_only_local_available"],
+  "properties": {
+    "schema": {"const": "sovereign-memory/topology-profile"},
+    "version": {"const": "1"},
+    "state": {"enum": ["configured", "unknown", "not_configured"]},
+    "local_store": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["store_id", "profile"],
+      "properties": {
+        "store_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"},
+        "profile": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"}
+      }
+    },
+    "visible_known_stores": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["store_id", "profile", "relationship", "search_scope", "configuration_state", "coverage_state"],
+        "properties": {
+          "store_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"},
+          "profile": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+          "relationship": {"enum": ["local", "peer"]},
+          "search_scope": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"},
+          "configuration_state": {"enum": ["configured", "disabled", "not_configured", "unknown"]},
+          "coverage_state": {"enum": ["queried", "not_queried", "unreachable", "not_applicable", "unknown"]}
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total_visible", "represented", "omitted", "limit", "status"],
+      "properties": {
+        "total_visible": {"type": "integer", "minimum": 0},
+        "represented": {"type": "integer", "minimum": 0, "maximum": 32},
+        "omitted": {"type": "integer", "minimum": 0},
+        "limit": {"const": 32},
+        "status": {"enum": ["complete", "bounded"]}
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "contract_digest", "observed_version", "observed_digest", "status", "authority"],
+      "properties": {
+        "contract_version": {"type": "string"},
+        "contract_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "observed_version": {"type": ["string", "null"]},
+        "observed_digest": {"type": ["string", "null"]},
+        "status": {"enum": ["match", "mismatch", "unknown"]},
+        "authority": {"const": "deployment-metadata-evidence"}
+      }
+    },
+    "read_only_local_available": {"const": true}
+  }
+}
