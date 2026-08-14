@@ -2,16 +2,9 @@ name: Perimeter evaluability
 
 on:
   pull_request:
-    paths:
-      - "sql/11_perimeter_evaluability.sql"
-      - "tests/11_perimeter_evaluability.sql"
-      - "docs/templates/restore-rehearsal.md"
-      - "docs/perimeter-evaluability.md"
-      - "README.md"
-      - "STATUS.md"
-      - ".github/workflows/perimeter-evaluability.yml"
   push:
     branches:
+      - main
       - "atlas/issue-58-c1-perimeter-evaluability"
 
 permissions:
@@ -89,6 +82,41 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/11_perimeter_evaluability.sql
+
+      - name: Detect out-of-order predecessor reapply and repair C1 seam
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_c1_fresh
+        run: |
+          # Reproduce the exact review finding: migration 10 can be replayed on
+          # a C1-installed target. The report must make that wiring drift
+          # explicit even though the predecessor assertion body itself returns
+          # its legacy success string.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          declare
+            r jsonb;
+            v_assertion_result text;
+          begin
+            r := public.perimeter_report();
+            if r->>'evaluation_status'<>'unsupported'
+               or r->>'perimeter_state'<>'unknown'
+               or r->'violation_count'<>'null'::jsonb
+               or not exists(
+                 select 1 from jsonb_array_elements(r->'coverage'->'gaps') g
+                 where g->>'kind'='assertion_seam_unwired'
+               ) then
+              raise exception 'out-of-order migration 10 replay was not detected: %',r;
+            end if;
+
+            v_assertion_result := public.assert_perimeter_closed();
+            if v_assertion_result='perimeter OK: perimeter-report/1 evaluated clean with zero findings' then
+              raise exception 'predecessor replay unexpectedly retained the C1 assertion seam';
+            end if;
+          end $$;
+          SQL
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/11_perimeter_evaluability.sql
 
