@@ -21,10 +21,20 @@ import shutil
 import subprocess
 import sys
 
+try:
+    from scripts.validate_sovereignty_bundle import BundleValidationError, validate_bundle
+except ModuleNotFoundError as exc:
+    if exc.name != "scripts":
+        raise
+    from validate_sovereignty_bundle import BundleValidationError, validate_bundle
+
 CONTRACT = "sovereign-memory-release-manifest/1"
 REPOSITORY = "https://github.com/jryski/sovereign-memory-core"
+SCHEMA_FINGERPRINT_CONTRACT = "release-schema-fingerprint/1"
+SCHEMA_FINGERPRINT_PATH = "release/v0.3-alpha-schema-fingerprint.json"
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
+EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
 
 
 @dataclass(frozen=True)
@@ -73,6 +83,14 @@ def _git(root: Path, *args: str, input_bytes: bytes | None = None) -> bytes:
     return proc.stdout
 
 
+def _read_git_json(root: Path, commit: str, path: str) -> dict[str, object]:
+    raw = _git(root, "show", f"{commit}:{path}")
+    value = json.loads(raw.decode("utf-8", errors="strict"))
+    if not isinstance(value, dict):
+        raise ValueError(f"{path} at {commit} must contain a JSON object")
+    return value
+
+
 def _artifact(path: Path, relative: str, role: str) -> Artifact:
     raw = path.read_bytes()
     return Artifact(relative, role, _sha256(raw), len(raw))
@@ -107,6 +125,19 @@ def build(args: argparse.Namespace) -> int:
             f"checkout coordinate mismatch: commit {actual_commit}/{args.commit}, tree {actual_tree}/{args.tree}"
         )
 
+    schema_baseline = _read_git_json(root, args.commit, SCHEMA_FINGERPRINT_PATH)
+    if schema_baseline.get("contract") != SCHEMA_FINGERPRINT_CONTRACT:
+        raise ValueError("release schema fingerprint baseline has an unexpected contract")
+    baseline_schema_sha = str(schema_baseline.get("schema_sha256", ""))
+    baseline_schema_bytes = schema_baseline.get("schema_bytes")
+    if (
+        SHA256.fullmatch(baseline_schema_sha) is None
+        or baseline_schema_sha == EMPTY_SHA256
+        or type(baseline_schema_bytes) is not int
+        or baseline_schema_bytes <= 0
+    ):
+        raise ValueError("release schema fingerprint baseline is empty or malformed")
+
     provider_receipt_path = proof / "receipt.json"
     provider_bundle_path = proof / "sovereign-memory-c2.bundle.tar"
     provider_archive_checksum_path = proof / "archive.sha256"
@@ -133,16 +164,20 @@ def build(args: argparse.Namespace) -> int:
     if (
         SHA256.fullmatch(drift_expected_sha) is None
         or SHA256.fullmatch(drift_actual_sha) is None
+        or drift_expected_sha == EMPTY_SHA256
+        or drift_actual_sha == EMPTY_SHA256
         or drift_expected_sha != drift_actual_sha
         or type(drift_expected_bytes) is not int
         or type(drift_actual_bytes) is not int
-        or drift_expected_bytes < 0
-        or drift_actual_bytes < 0
+        or drift_expected_bytes <= 0
+        or drift_actual_bytes <= 0
         or drift_expected_bytes != drift_actual_bytes
         or type(drift_diff_lines) is not int
         or drift_diff_lines != 0
     ):
-        raise ValueError("schema drift comparison is internally inconsistent")
+        raise ValueError("schema drift comparison is internally inconsistent or empty")
+    if drift_expected_sha != baseline_schema_sha or drift_expected_bytes != baseline_schema_bytes:
+        raise ValueError("schema drift expected side does not match the exact-commit release baseline")
 
     source = provider.get("source") or {}
     destination = provider.get("destination") or {}
@@ -169,9 +204,11 @@ def build(args: argparse.Namespace) -> int:
     if (
         SHA256.fullmatch(source_before_fingerprint) is None
         or SHA256.fullmatch(source_after_fingerprint) is None
+        or source_before_fingerprint == EMPTY_SHA256
+        or source_after_fingerprint == EMPTY_SHA256
         or source_before_fingerprint != source_after_fingerprint
     ):
-        raise ValueError("provider-exit receipt does not prove source fingerprint stability")
+        raise ValueError("provider-exit receipt does not prove nonempty source fingerprint stability")
     if verification.get("service_role_direct_memories_select") is not False:
         raise ValueError("provider-exit receipt does not prove service_role direct memories SELECT is denied")
     if destination.get("preflight_public_table_count") != 0:
@@ -181,12 +218,20 @@ def build(args: argparse.Namespace) -> int:
     if not source_system or not destination_system or source_system == destination_system:
         raise ValueError("provider-exit receipt does not prove independent source and destination clusters")
 
+    provider_bundle_raw = provider_bundle_path.read_bytes()
     archive_checksum = provider_archive_checksum_path.read_text(encoding="utf-8").strip().split()[0]
-    if archive_checksum != _sha256(provider_bundle_path.read_bytes()):
+    if archive_checksum != _sha256(provider_bundle_raw):
         raise ValueError("provider bundle checksum file does not match provider bundle")
     provider_bundle_sha = str(provider_bundle.get("archive_sha256", ""))
     if provider_bundle_sha != archive_checksum:
         raise ValueError("provider receipt archive checksum does not match provider bundle")
+    try:
+        bundle_result = validate_bundle(provider_bundle_raw, expected_archive_sha256=archive_checksum)
+    except BundleValidationError as exc:
+        raise ValueError(f"provider bundle validation failed: {exc.code}: {exc}") from exc
+    bundle_source = bundle_result.manifest.get("source") or {}
+    if not isinstance(bundle_source, dict) or bundle_source.get("commit") != args.commit:
+        raise ValueError("validated provider bundle is not bound to the release candidate commit")
 
     known_output = output / "KNOWN_LIMITATIONS.md"
     known_output.write_bytes(_git(root, "show", f"{args.commit}:release/v0.3-alpha-known-limitations.md"))
