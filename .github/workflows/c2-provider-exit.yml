@@ -9,6 +9,7 @@ on:
       - "scripts/validate_sovereignty_bundle.py"
       - "scripts/c2_provider_exit_rehearsal.py"
       - "scripts/schema_drift_inventory.py"
+      - "scripts/build_release_candidate.py"
       - "tests/export_restore/**"
       - ".github/workflows/c2-provider-exit.yml"
   push:
@@ -21,6 +22,7 @@ on:
       - "scripts/validate_sovereignty_bundle.py"
       - "scripts/c2_provider_exit_rehearsal.py"
       - "scripts/schema_drift_inventory.py"
+      - "scripts/build_release_candidate.py"
       - "tests/export_restore/**"
       - ".github/workflows/c2-provider-exit.yml"
 
@@ -116,6 +118,22 @@ jobs:
             --receipt-output "$RUNNER_TEMP/c2-proof/schema-drift-comparison.json" \
             --diff-output "$RUNNER_TEMP/c2-proof/schema-drift.diff" \
             2>&1 | tee "$RUNNER_TEMP/c2-proof/schema-drift-comparison.log"
+
+      - name: Build exact-commit release candidate assets
+        run: |
+          set -o pipefail
+          python -m py_compile scripts/build_release_candidate.py
+          tree_sha="$(git rev-parse HEAD^{tree})"
+          python scripts/build_release_candidate.py \
+            --version v0.3-alpha \
+            --commit "$CANDIDATE_SHA" \
+            --tree "$tree_sha" \
+            --repo-root . \
+            --proof-dir "$RUNNER_TEMP/c2-proof" \
+            --output-dir "$RUNNER_TEMP/c2-proof/release-candidate" \
+            2>&1 | tee "$RUNNER_TEMP/c2-proof/release-candidate.log"
+          (cd "$RUNNER_TEMP/c2-proof/release-candidate" && sha256sum -c CHECKSUMS.sha256) \
+            | tee "$RUNNER_TEMP/c2-proof/release-candidate-checksums.log"
 
       - name: Destroy independent clusters
         if: always()
