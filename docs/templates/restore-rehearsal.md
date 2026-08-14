@@ -2,9 +2,8 @@
 
 Template. Copy per rehearsal, fill DURING the run, retain as evidence.
 
-Addresses STATUS blocker: *no repository-stored evidence template for
-backup/restore rehearsal*. Structure only. Filled records belong in the
-deployment's own notebook, never here.
+Addresses the provider-exit release gate with a repeatable evidence record.
+Filled records belong in the deployment's own notebook, never here.
 
 ---
 
@@ -17,12 +16,12 @@ The coupling under test is then masked by the backup being CORRECT.
 
     [ ] CONTINUITY   platform roles supplied.
                      "Can this system be stood up elsewhere?"
-                     Expected: clean pass.
+                     Expected: evaluated/clean if the perimeter is intact.
 
     [ ] SOVEREIGNTY  platform roles withheld.
                      "What does the schema assume about its platform?"
-                     Expected: refusal or loud failure.
-                     A PASS HERE IS A FINDING, NOT A SUCCESS.
+                     Expected: unsupported / not evaluable where required
+                     platform roles are deliberately absent.
 
 Run both. Record which one this is; several criteria below apply to only one.
 
@@ -30,7 +29,7 @@ Run both. Record which one this is; several criteria below apply to only one.
 
 - Date / operator / target identifier
 - Rehearsal type (above)
-- Perimeter checker contract version, as reported by the perimeter report.
+- Perimeter checker contract version, as reported by `public.perimeter_report()`.
   **A criterion 6 result is not interpretable without it.** This contract has
   changed before; a bare pass or fail carries no meaning on its own.
 - Source and target engine versions. **A dump cannot restore into an older
@@ -77,7 +76,7 @@ Record exact commands. Note:
 | 3 | Session entry point executes and returns a payload | | | |
 | 4 | Only acceptable failures | | | |
 | 5 | POSITIVE CONTROL: a known record is VISIBLE and READABLE to an entitled principal | | | |
-| 6 | Perimeter REPORT evaluates honestly. Gate on the report, never on the violation primitive | | | |
+| 6 | `public.perimeter_report()` evaluates honestly and its contract version is recorded | | | |
 | 7 | PAIRED DENIAL: a private record owned by another principal is NOT visible to a reader WHO HOLDS THE SCOPE | | | |
 
 ### Why 5, 6 and 7 exist
@@ -86,34 +85,43 @@ Record exact commands. Note:
 nothing is visible to anyone satisfies every one of them. A denial-only suite
 cannot distinguish "correctly restricted" from "entitled to nothing".
 
-**Criterion 6 is not a precaution, and WHICH FUNCTION YOU CALL decides whether
-it works.**
+**Criterion 6 is not a precaution.** Use the sanctioned report seam:
 
-Gate on `perimeter_report()`. NEVER on `perimeter_assert()`.
+```sql
+select public.perimeter_report();
+```
 
-`perimeter_assert()` is violation-only by contract: on a target lacking
-the platform roles its filters match nothing, so it returns zero rows, and
-zero rows reads as clean. That is the exact fail-open this criterion exists
-to catch, so a rehearsal that gates on `perimeter_assert()` records a PASS
-precisely where it should refuse.
+Interpret `perimeter-report/1` mechanically:
 
-`perimeter_report()` declares its own evaluability. Read BOTH halves, and
-read them differently depending on which rehearsal you are running:
+    CONTINUITY   (required platform roles supplied)
+      PASS   evaluation_status = 'evaluated'
+             perimeter_state = 'clean'
+             violation_count = 0
+      FAIL   evaluation_status = 'evaluated'
+             perimeter_state = 'not_clean'
+             violation_count > 0
+      VOID   evaluation_status = 'unsupported'
+             violation_count = NULL
 
-    CONTINUITY   (platform roles supplied)
-      PASS   evaluation_status = 'evaluated' AND violation_count = 0
-      VOID   anything else
+    SOVEREIGNTY  (required platform roles intentionally withheld)
+      PASS   evaluation_status = 'unsupported'
+             perimeter_state = 'unknown'
+             violation_count = NULL
+      VOID   evaluation_status = 'evaluated'
+             when the persisted policy still names absent required roles
 
-    SOVEREIGNTY  (platform roles withheld)
-      PASS   evaluation_status <> 'evaluated' AND violation_count IS NULL
-             the report correctly refuses, having nothing it can check
-      VOID   evaluation_status = 'evaluated', or a non-NULL violation_count
-             the checker is claiming an answer it cannot have
+`violation_count` is NULL rather than 0 when the required evaluation population
+is incomplete. That is the fail-closed property: `NULL = 0` is not true, so a
+caller cannot silently certify an unevaluable target.
 
-`violation_count` is NULL rather than 0 when nothing could be checked. That
-is the only value that fails closed: `NULL = 0` evaluates to NULL, so a caller
-gating on it refuses instead of proceeding. Returning 0 would hand a clean
-answer to exactly the target that could not produce one. Do not coalesce it.
+`public.assert_perimeter_closed()` is the matching enforcement wrapper. It
+raises `PERIMETER UNSUPPORTED` for an unevaluable target and `PERIMETER FAIL`
+for an evaluated/not-clean target. The internal
+`public.perimeter_assert_violations_v1()` primitive is not a rehearsal API and
+must not be used as the provider-exit gate.
+
+See [`../perimeter-evaluability.md`](../perimeter-evaluability.md) for the
+versioned report contract and coverage population.
 
 **Criterion 7 exists because 5 is not sufficient.** A positive control can be
 genuine and still exercise only ONE DISJUNCT of a two-disjunct predicate. If
