@@ -4,15 +4,21 @@ on:
   pull_request:
     paths:
       - "release/sovereignty-manifest.schema.json"
+      - "release/v0.3-alpha-schema-fingerprint.json"
       - "scripts/sovereignty_bundle.py"
       - "scripts/validate_sovereignty_bundle.py"
+      - "scripts/schema_drift_inventory.py"
+      - "scripts/build_release_candidate.py"
       - "tests/export_restore/**"
       - ".github/workflows/export-restore-validation.yml"
   push:
     paths:
       - "release/sovereignty-manifest.schema.json"
+      - "release/v0.3-alpha-schema-fingerprint.json"
       - "scripts/sovereignty_bundle.py"
       - "scripts/validate_sovereignty_bundle.py"
+      - "scripts/schema_drift_inventory.py"
+      - "scripts/build_release_candidate.py"
       - "tests/export_restore/**"
       - ".github/workflows/export-restore-validation.yml"
 
@@ -40,7 +46,7 @@ jobs:
         env:
           PYTHONPYCACHEPREFIX: ${{ runner.temp }}/export-restore-pycache
         run: |
-          python -m compileall -q scripts/sovereignty_bundle.py scripts/validate_sovereignty_bundle.py tests/export_restore
+          python -m compileall -q scripts/sovereignty_bundle.py scripts/validate_sovereignty_bundle.py scripts/schema_drift_inventory.py scripts/build_release_candidate.py tests/export_restore
           test -z "$(find scripts tests/export_restore -type d -name __pycache__ -print -quit)"
       - name: Run export/restore suite
         run: python -m unittest discover -s tests/export_restore -p 'test_*.py' -v
