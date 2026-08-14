@@ -76,7 +76,7 @@ Record exact commands. Note:
 | 3 | Session entry point executes and returns a payload | | | |
 | 4 | Only acceptable failures | | | |
 | 5 | POSITIVE CONTROL: a known record is VISIBLE and READABLE to an entitled principal | | | |
-| 6 | `public.perimeter_report()` evaluates honestly and its contract version is recorded | | | |
+| 6 | `public.perimeter_report()` evaluates honestly, its contract version is recorded, and the public assertion seam is exactly C1-wired | | | |
 | 7 | PAIRED DENIAL: a private record owned by another principal is NOT visible to a reader WHO HOLDS THE SCOPE | | | |
 
 ### Why 5, 6 and 7 exist
@@ -114,9 +114,29 @@ Interpret `perimeter-report/1` mechanically:
 is incomplete. That is the fail-closed property: `NULL = 0` is not true, so a
 caller cannot silently certify an unevaluable target.
 
-`public.assert_perimeter_closed()` is the matching enforcement wrapper. It
-raises `PERIMETER UNSUPPORTED` for an unevaluable target and `PERIMETER FAIL`
-for an evaluated/not-clean target. The internal
+Two coverage gaps are implementation drift, not expected provider coupling:
+`assertion_seam_unwired` and `missing_authority_functions`. Either one FAILS
+criterion 6 in both rehearsal types. Do not count it as the expected
+SOVEREIGNTY `unsupported` outcome.
+
+Record the enforcement seam separately:
+
+```sql
+select public.assert_perimeter_closed();
+```
+
+For a clean CONTINUITY rehearsal the only accepted success text is exactly:
+
+```text
+perimeter OK: perimeter-report/1 evaluated clean with zero findings
+```
+
+Any other success string means the public wrapper is not the C1 enforcement
+seam, even if `public.perimeter_report()` still exists. This catches out-of-order
+replay of a predecessor migration that recreates the older assertion body.
+
+For an unevaluable target the C1 wrapper raises `PERIMETER UNSUPPORTED`; for an
+evaluated/not-clean target it raises `PERIMETER FAIL`. The internal
 `public.perimeter_assert_violations_v1()` primitive is not a rehearsal API and
 must not be used as the provider-exit gate.
 
