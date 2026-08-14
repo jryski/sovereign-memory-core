@@ -125,10 +125,39 @@ def build(args: argparse.Namespace) -> int:
     if drift.get("exact_commit") != args.commit or drift.get("exact_tree") != args.tree:
         raise ValueError("schema drift comparison is not bound to the release candidate coordinate")
 
+    source = provider.get("source") or {}
+    destination = provider.get("destination") or {}
+    provider_bundle = provider.get("bundle") or {}
+    verification = provider.get("verification") or {}
+    if not all(isinstance(value, dict) for value in (source, destination, provider_bundle, verification)):
+        raise ValueError("provider-exit receipt has malformed evidence sections")
+
+    required_true = {
+        "source.unchanged": source.get("unchanged"),
+        "destination.clean_before_restore": destination.get("clean_before_restore"),
+        "bundle.byte_deterministic_repeat_export": provider_bundle.get("byte_deterministic_repeat_export"),
+        "verification.positive_control_readable": verification.get("positive_control_readable"),
+        "verification.paired_private_denial": verification.get("paired_private_denial"),
+        "verification.reciprocal_positive_readable": verification.get("reciprocal_positive_readable"),
+        "verification.reciprocal_private_denial": verification.get("reciprocal_private_denial"),
+        "verification.attention_revision_lineage": verification.get("attention_revision_lineage"),
+    }
+    failed_true = [name for name, value in required_true.items() if value is not True]
+    if failed_true:
+        raise ValueError("provider-exit receipt is not successful: " + ", ".join(sorted(failed_true)))
+    if verification.get("service_role_direct_memories_select") is not False:
+        raise ValueError("provider-exit receipt does not prove service_role direct memories SELECT is denied")
+    if destination.get("preflight_public_table_count") != 0:
+        raise ValueError("provider-exit receipt does not prove an empty destination before restore")
+    source_system = str(source.get("system_identifier", ""))
+    destination_system = str(destination.get("system_identifier", ""))
+    if not source_system or not destination_system or source_system == destination_system:
+        raise ValueError("provider-exit receipt does not prove independent source and destination clusters")
+
     archive_checksum = provider_archive_checksum_path.read_text(encoding="utf-8").strip().split()[0]
     if archive_checksum != _sha256(provider_bundle_path.read_bytes()):
         raise ValueError("provider bundle checksum file does not match provider bundle")
-    provider_bundle_sha = str((provider.get("bundle") or {}).get("archive_sha256", ""))
+    provider_bundle_sha = str(provider_bundle.get("archive_sha256", ""))
     if provider_bundle_sha != archive_checksum:
         raise ValueError("provider receipt archive checksum does not match provider bundle")
 
@@ -153,10 +182,11 @@ def build(args: argparse.Namespace) -> int:
         _artifact(drift_output, drift_output.name, "schema-drift-receipt"),
     ]
 
-    perimeter = ((provider.get("verification") or {}).get("perimeter_report") or {})
-    exact_assertion = str((provider.get("verification") or {}).get("assert_perimeter_closed", ""))
+    perimeter = verification.get("perimeter_report") or {}
+    exact_assertion = str(verification.get("assert_perimeter_closed", ""))
     if not (
-        perimeter.get("contract_version") == "perimeter-report/1"
+        isinstance(perimeter, dict)
+        and perimeter.get("contract_version") == "perimeter-report/1"
         and perimeter.get("evaluation_status") == "evaluated"
         and perimeter.get("perimeter_state") == "clean"
         and perimeter.get("violation_count") == 0
@@ -177,11 +207,11 @@ def build(args: argparse.Namespace) -> int:
             "provider_exit": {
                 "contract": provider.get("contract"),
                 "archive_sha256": provider_bundle_sha,
-                "manifest_sha256": (provider.get("bundle") or {}).get("manifest_sha256"),
-                "source_unchanged": (provider.get("source") or {}).get("unchanged"),
-                "destination_clean_before_restore": (provider.get("destination") or {}).get("clean_before_restore"),
-                "positive_control_readable": (provider.get("verification") or {}).get("positive_control_readable"),
-                "paired_private_denial": (provider.get("verification") or {}).get("paired_private_denial"),
+                "manifest_sha256": provider_bundle.get("manifest_sha256"),
+                "source_unchanged": source.get("unchanged"),
+                "destination_clean_before_restore": destination.get("clean_before_restore"),
+                "positive_control_readable": verification.get("positive_control_readable"),
+                "paired_private_denial": verification.get("paired_private_denial"),
             },
             "schema_drift": drift,
             "perimeter": {
