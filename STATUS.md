@@ -2,6 +2,13 @@
 
 Status date: 2026-07-08
 
+> **v0.3-alpha release-path note (2026-08-13):** Issue #55 is the canonical
+> release program and supersedes the older scorecard/development order below
+> wherever they conflict. The immediate provider-exit path is C1 perimeter
+> evaluability followed by C2 independent export/clean-restore proof. See
+> [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md) and the
+> [`restore rehearsal template`](docs/templates/restore-rehearsal.md).
+
 ## Current rating
 
 | Dimension | Current | Target | Notes |
@@ -10,7 +17,7 @@ Status date: 2026-07-08
 | Repo/deployment alignment | 7/10 | 10/10 | The generic source-import/cutover foundation is repo-owned; deployment drift and operational evidence still need periodic verification. |
 | Source import/cutover readiness | 8/10 | 10/10 | Foundation, candidate provenance, richer probes, fatal validation, and the first internal producer slice exist; real adapters and operational dry runs remain. |
 | Security posture | 8/10 | 10/10 | Security model is honest; next step is least-privilege access hardening beyond broad credential operation. |
-| Survivability | 7/10 | 10/10 | Backup/restore guidance exists; needs executable scripts, evidence records, and periodic verification. |
+| Survivability | 7/10 | 10/10 | Backup/restore guidance and an evidence template exist; independent export/clean-restore execution and reproducible receipts remain open. |
 | Personal memory UX/readability | 6/10 | 10/10 | Core has strong data model; browser UI belongs in a separate repo. |
 | Governance/review | 7/10 | 10/10 | Proposed/superseded/review concepts exist; needs complete review and promotion workflow. |
 
@@ -104,12 +111,17 @@ Deployment-specific inventories should be maintained outside this public/reusabl
 1. No real source adapters have completed an end-to-end import and rollback dry run.
 2. Review queue and promotion workflow need UI support.
 3. Hermes orchestration is not implemented.
-4. No repository-stored evidence template for backup/restore rehearsal.
+4. The provider-exit rehearsal template exists, but C1 evaluability and independent C2 clean-restore evidence are not yet accepted.
 5. Broad credential operation remains the practical trust boundary; least-privilege access hardening is not yet implemented.
 6. Drift ledger process is documented here but not yet backed by an executable inventory check.
 7. No formal release tag declares a known-good schema version.
 
 ## Immediate development order
+
+For v0.3-alpha, follow issue #55 rather than this older general roadmap. The release-critical
+sequence is C1 perimeter evaluability, C2 independent provider-exit proof, HOUSE acceptance,
+and the remaining release-manifest/tag receipts. The older product-development order below is
+parked until that finite gate clears.
 
 1. Exercise a real source adapter through export, review, cutover probes, and rollback.
 2. Add review UI without bypassing manifest decisions or conflict posture.
