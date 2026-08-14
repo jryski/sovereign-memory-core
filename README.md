@@ -64,7 +64,7 @@ not become a retrieval engine. Architecture boundary and an Eywa crosswalk:
 | Layer | Responsibility | In this repo? |
 |---|---|---|
 | **SMP protocol** | Implementation-neutral custody, provenance, lifecycle, verification, supersession, erasure, portability, conformance | Partly, while the specification repository is prepared |
-| **Runtime / core** | PostgreSQL reference implementation, perimeter enforcement, replay, tests, and export/restore contracts | **Yes** |
+| **Runtime / core** | PostgreSQL reference implementation, migrations, perimeter enforcement, replay, tests, and export/restore contracts | **Yes** |
 | **Deployment** | A particular person's or organization's policies, credentials, adapters, data, and operating evidence | **No** |
 
 Dependencies run one way. Deployments consume a released runtime; runtimes
