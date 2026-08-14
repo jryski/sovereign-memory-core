@@ -1,0 +1,1 @@
+{"contract":"release-schema-fingerprint/1","schema_bytes":122884,"schema_sha256":"558a6fd49609928992abe2533326489c20e52d855634e626b86751058a8954d5","source":"normalized pg_dump --schema-only from exact C2 source after applying the v0.3-alpha candidate migrations"}
