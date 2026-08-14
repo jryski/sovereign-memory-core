@@ -24,6 +24,7 @@ import sys
 CONTRACT = "sovereign-memory-release-manifest/1"
 REPOSITORY = "https://github.com/jryski/sovereign-memory-core"
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -145,6 +146,14 @@ def build(args: argparse.Namespace) -> int:
     failed_true = [name for name, value in required_true.items() if value is not True]
     if failed_true:
         raise ValueError("provider-exit receipt is not successful: " + ", ".join(sorted(failed_true)))
+    source_before_fingerprint = str(source.get("before_fingerprint", ""))
+    source_after_fingerprint = str(source.get("after_fingerprint", ""))
+    if (
+        SHA256.fullmatch(source_before_fingerprint) is None
+        or SHA256.fullmatch(source_after_fingerprint) is None
+        or source_before_fingerprint != source_after_fingerprint
+    ):
+        raise ValueError("provider-exit receipt does not prove source fingerprint stability")
     if verification.get("service_role_direct_memories_select") is not False:
         raise ValueError("provider-exit receipt does not prove service_role direct memories SELECT is denied")
     if destination.get("preflight_public_table_count") != 0:
