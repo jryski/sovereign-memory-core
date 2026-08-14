@@ -195,6 +195,57 @@ jobs:
 
           candidate, tree = sys.argv[1:3]
           proof = Path(os.environ["RUNNER_TEMP"]) / "c2-proof"
+          drift_path = proof / "schema-drift-comparison.json"
+          original_text = drift_path.read_text(encoding="utf-8")
+          original = json.loads(original_text)
+          probes = [
+              ("hash-mismatch", "actual_sha256", "0" * 64),
+              ("byte-count-mismatch", "actual_bytes", original["actual_bytes"] + 1),
+              ("nonzero-diff", "diff_line_count", 1),
+          ]
+          try:
+              for label, field, bad_value in probes:
+                  mutated = copy.deepcopy(original)
+                  mutated[field] = bad_value
+                  drift_path.write_text(
+                      json.dumps(mutated, sort_keys=True, separators=(",", ":")) + "\n",
+                      encoding="utf-8",
+                  )
+                  proc = subprocess.run(
+                      [
+                          sys.executable,
+                          "scripts/build_release_candidate.py",
+                          "--version", "v0.3-alpha",
+                          "--commit", candidate,
+                          "--tree", tree,
+                          "--repo-root", ".",
+                          "--proof-dir", str(proof),
+                          "--output-dir", str(proof / f"release-candidate-invalid-drift-{label}"),
+                      ],
+                      stdout=subprocess.PIPE,
+                      stderr=subprocess.PIPE,
+                      text=True,
+                      check=False,
+                  )
+                  (proof / f"invalid-drift-{label}.log").write_text(
+                      proc.stdout + proc.stderr, encoding="utf-8"
+                  )
+                  if proc.returncode == 0:
+                      raise SystemExit(f"internally contradictory drift receipt was unexpectedly accepted: {label}")
+          finally:
+              drift_path.write_text(original_text, encoding="utf-8")
+          PY
+
+          python - "$CANDIDATE_SHA" "$tree_sha" <<'PY'
+          import copy
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          candidate, tree = sys.argv[1:3]
+          proof = Path(os.environ["RUNNER_TEMP"]) / "c2-proof"
           receipt_path = proof / "receipt.json"
           original_text = receipt_path.read_text(encoding="utf-8")
           original = json.loads(original_text)
