@@ -64,7 +64,7 @@ not become a retrieval engine. Architecture boundary and an Eywa crosswalk:
 | Layer | Responsibility | In this repo? |
 |---|---|---|
 | **SMP protocol** | Implementation-neutral custody, provenance, lifecycle, verification, supersession, erasure, portability, conformance | Partly, while the specification repository is prepared |
-| **Runtime / core** | PostgreSQL reference implementation, migrations, perimeter enforcement, replay, tests, and export/restore contracts | **Yes** |
+| **Runtime / core** | PostgreSQL reference implementation, perimeter enforcement, replay, tests, and export/restore contracts | **Yes** |
 | **Deployment** | A particular person's or organization's policies, credentials, adapters, data, and operating evidence | **No** |
 
 Dependencies run one way. Deployments consume a released runtime; runtimes
@@ -162,25 +162,32 @@ sql/07_work_lessons.sql
 sql/08_attention_events.sql
 sql/09_perimeter_refresh.sql
 sql/10_security_definer_hardening.sql
+sql/11_perimeter_evaluability.sql
 ```
 
-Two ordering rules that will bite you otherwise:
+Three ordering rules that will bite you otherwise:
 
 - `07` through `09` are re-runnable fix-forward migrations. If you need to
   reapply them, do it **before** `10`.
-- `10` is a one-way hardening boundary and must run **last**. Once applied,
-  reapply only `10`, never `07` through `09`, because those historical
-  definitions deliberately predate the explicit-`pg_temp` contract that `10`
-  establishes.
+- `10` is the SECURITY DEFINER hardening boundary. Do not reapply `07` through
+  `09` after crossing it.
+- `11` is the perimeter-evaluability/report boundary and must remain **last**.
+  It is itself re-runnable. If an operator deliberately reapplies `10`, reapply
+  `11` immediately afterward before treating the perimeter as evaluated.
 
 `09` closes schema creation, table grants, function execution, default
 privileges, RLS and FORCE RLS, ownership, and trigger-only boundaries. `10`
 recreates the reviewed SECURITY DEFINER and authority-adjacent helper inventory
-with protected names schema-qualified and `pg_temp` listed last.
+with protected names schema-qualified and `pg_temp` listed last. `11` preserves
+that reviewed assertion body as an internal violation primitive, adds the
+versioned `public.perimeter_report()` evaluability seam, and makes
+`public.assert_perimeter_closed()` fail closed when required evaluation
+population is unavailable.
 
 Permission profiles, allowlists, and perimeter policy inputs live in
-[`docs/perimeter.md`](docs/perimeter.md). Read it before applying to anything
-you care about.
+[`docs/perimeter.md`](docs/perimeter.md). The report-state contract is in
+[`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md). Read both
+before applying to anything you care about.
 
 ## Repository layout
 
@@ -193,6 +200,8 @@ you care about.
 
 - [`docs/positioning.md`](docs/positioning.md) — custody versus retrieval, Eywa crosswalk
 - [`docs/perimeter.md`](docs/perimeter.md) — permission profiles and policy inputs
+- [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md) — evaluated, not-clean, and unsupported perimeter states
+- [`docs/templates/restore-rehearsal.md`](docs/templates/restore-rehearsal.md) — provider-exit evidence record
 - [`docs/security-definer-inventory.md`](docs/security-definer-inventory.md)
 - [`docs/work-memory.md`](docs/work-memory.md)
 - [`docs/attention-layer.md`](docs/attention-layer.md)
