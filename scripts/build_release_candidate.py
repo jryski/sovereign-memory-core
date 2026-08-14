@@ -122,6 +122,8 @@ def build(args: argparse.Namespace) -> int:
         raise ValueError("provider-exit receipt is not bound to the release candidate commit")
     if drift.get("contract") != "schema-drift-inventory/1" or drift.get("comparison_status") != "clean":
         raise ValueError("schema drift comparison is missing or not clean")
+    if drift.get("exact_commit") != args.commit or drift.get("exact_tree") != args.tree:
+        raise ValueError("schema drift comparison is not bound to the release candidate coordinate")
 
     archive_checksum = provider_archive_checksum_path.read_text(encoding="utf-8").strip().split()[0]
     if archive_checksum != _sha256(provider_bundle_path.read_bytes()):
@@ -130,11 +132,8 @@ def build(args: argparse.Namespace) -> int:
     if provider_bundle_sha != archive_checksum:
         raise ValueError("provider receipt archive checksum does not match provider bundle")
 
-    known_source = root / "release" / "v0.3-alpha-known-limitations.md"
-    if not known_source.is_file():
-        raise FileNotFoundError("release/v0.3-alpha-known-limitations.md is missing")
     known_output = output / "KNOWN_LIMITATIONS.md"
-    shutil.copyfile(known_source, known_output)
+    known_output.write_bytes(_git(root, "show", f"{args.commit}:release/v0.3-alpha-known-limitations.md"))
 
     source_archive = output / f"sovereign-memory-core-{args.version}.tar.gz"
     source_artifact = _build_source_archive(root, args.version, args.commit, source_archive)

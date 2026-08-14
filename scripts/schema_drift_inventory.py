@@ -20,11 +20,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 from urllib.parse import parse_qsl, unquote, urlsplit
 
 CONTRACT = "schema-drift-inventory/1"
+SHA40 = re.compile(r"^[0-9a-f]{40}$")
 
 
 def _canonical_json(value: object) -> str:
@@ -145,7 +147,17 @@ def _capture(dsn_env: str, sql_output: Path, receipt_output: Path) -> int:
     return 0
 
 
-def _compare(expected: Path, actual: Path, receipt_output: Path, diff_output: Path | None) -> int:
+def _compare(
+    expected: Path,
+    actual: Path,
+    receipt_output: Path,
+    diff_output: Path | None,
+    exact_commit: str,
+    exact_tree: str,
+) -> int:
+    if SHA40.fullmatch(exact_commit) is None or SHA40.fullmatch(exact_tree) is None:
+        raise ValueError("--exact-commit and --exact-tree must be exact lowercase 40-character SHAs")
+
     expected_raw = expected.read_bytes()
     actual_raw = actual.read_bytes()
     expected_sha = hashlib.sha256(expected_raw).hexdigest()
@@ -170,6 +182,8 @@ def _compare(expected: Path, actual: Path, receipt_output: Path, diff_output: Pa
     receipt = {
         "contract": CONTRACT,
         "comparison_status": "clean" if clean else "drift",
+        "exact_commit": exact_commit,
+        "exact_tree": exact_tree,
         "expected_sha256": expected_sha,
         "actual_sha256": actual_sha,
         "expected_bytes": len(expected_raw),
@@ -196,6 +210,8 @@ def _parser() -> argparse.ArgumentParser:
     compare.add_argument("--actual", required=True, type=Path)
     compare.add_argument("--receipt-output", required=True, type=Path)
     compare.add_argument("--diff-output", type=Path)
+    compare.add_argument("--exact-commit", required=True)
+    compare.add_argument("--exact-tree", required=True)
     return parser
 
 
@@ -204,7 +220,14 @@ def main() -> int:
     try:
         if args.command == "capture":
             return _capture(args.dsn_env, args.sql_output, args.receipt_output)
-        return _compare(args.expected, args.actual, args.receipt_output, args.diff_output)
+        return _compare(
+            args.expected,
+            args.actual,
+            args.receipt_output,
+            args.diff_output,
+            args.exact_commit,
+            args.exact_tree,
+        )
     except (OSError, UnicodeError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
         print(_canonical_json({"code": "SCHEMA_DRIFT_INVENTORY_ERROR", "error": str(exc)}), file=sys.stderr)
         return 2

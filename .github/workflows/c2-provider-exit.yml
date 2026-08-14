@@ -102,6 +102,7 @@ jobs:
         run: |
           set -o pipefail
           python -m py_compile scripts/schema_drift_inventory.py
+          tree_sha="$(git rev-parse HEAD^{tree})"
           python scripts/schema_drift_inventory.py capture \
             --dsn-env SOURCE_DSN \
             --sql-output "$RUNNER_TEMP/c2-proof/source-schema.sql" \
@@ -117,6 +118,8 @@ jobs:
             --actual "$RUNNER_TEMP/c2-proof/target-schema.sql" \
             --receipt-output "$RUNNER_TEMP/c2-proof/schema-drift-comparison.json" \
             --diff-output "$RUNNER_TEMP/c2-proof/schema-drift.diff" \
+            --exact-commit "$CANDIDATE_SHA" \
+            --exact-tree "$tree_sha" \
             2>&1 | tee "$RUNNER_TEMP/c2-proof/schema-drift-comparison.log"
 
       - name: Build exact-commit release candidate assets
@@ -134,6 +137,53 @@ jobs:
             2>&1 | tee "$RUNNER_TEMP/c2-proof/release-candidate.log"
           (cd "$RUNNER_TEMP/c2-proof/release-candidate" && sha256sum -c CHECKSUMS.sha256) \
             | tee "$RUNNER_TEMP/c2-proof/release-candidate-checksums.log"
+
+      - name: Probe exact release bindings
+        run: |
+          set -o pipefail
+          tree_sha="$(git rev-parse HEAD^{tree})"
+          exact_known="$RUNNER_TEMP/c2-proof/exact-known-limitations.md"
+          git show "$CANDIDATE_SHA:release/v0.3-alpha-known-limitations.md" > "$exact_known"
+          printf '\nDIRTY_RELEASE_BINDING_SENTINEL\n' >> release/v0.3-alpha-known-limitations.md
+          python scripts/build_release_candidate.py \
+            --version v0.3-alpha \
+            --commit "$CANDIDATE_SHA" \
+            --tree "$tree_sha" \
+            --repo-root . \
+            --proof-dir "$RUNNER_TEMP/c2-proof" \
+            --output-dir "$RUNNER_TEMP/c2-proof/release-candidate-dirty-probe" \
+            > "$RUNNER_TEMP/c2-proof/dirty-binding-probe.log"
+          cmp "$exact_known" "$RUNNER_TEMP/c2-proof/release-candidate-dirty-probe/KNOWN_LIMITATIONS.md"
+          if grep -q 'DIRTY_RELEASE_BINDING_SENTINEL' "$RUNNER_TEMP/c2-proof/release-candidate-dirty-probe/KNOWN_LIMITATIONS.md"; then
+            echo 'dirty working-tree limitations escaped exact-commit binding' >&2
+            exit 1
+          fi
+          git checkout -- release/v0.3-alpha-known-limitations.md
+
+          cp "$RUNNER_TEMP/c2-proof/schema-drift-comparison.json" \
+             "$RUNNER_TEMP/c2-proof/schema-drift-comparison.bound.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          path = Path(os.environ["RUNNER_TEMP"]) / "c2-proof" / "schema-drift-comparison.json"
+          value = json.loads(path.read_text(encoding="utf-8"))
+          value["exact_commit"] = "0" * 40
+          path.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+          PY
+          if python scripts/build_release_candidate.py \
+            --version v0.3-alpha \
+            --commit "$CANDIDATE_SHA" \
+            --tree "$tree_sha" \
+            --repo-root . \
+            --proof-dir "$RUNNER_TEMP/c2-proof" \
+            --output-dir "$RUNNER_TEMP/c2-proof/release-candidate-stale-drift-probe" \
+            > "$RUNNER_TEMP/c2-proof/stale-drift-probe.log" 2>&1; then
+            echo 'stale schema-drift receipt was unexpectedly accepted' >&2
+            exit 1
+          fi
+          mv "$RUNNER_TEMP/c2-proof/schema-drift-comparison.bound.json" \
+             "$RUNNER_TEMP/c2-proof/schema-drift-comparison.json"
 
       - name: Destroy independent clusters
         if: always()
