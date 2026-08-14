@@ -90,7 +90,10 @@ more structured ACL rows; that category summary is not emitted again as an
 assertion finding, so the same underlying ACL violation is not double-counted.
 The internal primitive short-circuits at the first non-ACL assertion category,
 so the report is a release gate and bounded diagnostic seam, not an exhaustive
-census of every simultaneously broken category.
+census of every simultaneously broken category. **`findings` is not exhaustive:
+the absence of a category from `findings` is not evidence that the category
+passed.** After fixing a reported finding, rerun the gate because a later
+category can become visible only after an earlier short-circuit is cleared.
 
 For deeper ACL inspection:
 
