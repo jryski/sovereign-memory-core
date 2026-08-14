@@ -74,6 +74,13 @@ declare
     'attention_events',
     'attention_event_assignments'
   ];
+  v_required_authority_functions text[] := array[
+    'public.perimeter_acl_violations()',
+    'public.perimeter_policy_roles(text)',
+    'public.perimeter_protected_schemas()',
+    'public.perimeter_authority_functions()',
+    'public.perimeter_assert_violations_v1()'
+  ];
   v_missing text[];
   v_policy_count integer := 0;
   v_registered_schemas integer := 0;
@@ -83,8 +90,47 @@ declare
   v_profile text;
   v_role_names text[] := array[]::text[];
   v_assertion_error text;
+  v_assertion_oid oid;
+  v_assertion_source text;
   v_count integer;
 begin
+  -- C1 is the final enforcement seam. If a predecessor migration is replayed
+  -- out of order and rewrites assert_perimeter_closed(), the report must expose
+  -- that wiring drift instead of continuing to look clean. This is deliberately
+  -- checked through pg_catalog so the detector does not depend on the seam it
+  -- is validating.
+  v_assertion_oid := to_regprocedure('public.assert_perimeter_closed()');
+  if v_assertion_oid is null then
+    v_gaps := v_gaps || jsonb_build_array(jsonb_build_object(
+      'kind','assertion_seam_unwired',
+      'reason','public.assert_perimeter_closed() is missing'
+    ));
+  else
+    select p.prosrc into v_assertion_source from pg_proc p where p.oid=v_assertion_oid;
+    if position('public.perimeter_report()' in coalesce(v_assertion_source,''))=0 then
+      v_gaps := v_gaps || jsonb_build_array(jsonb_build_object(
+        'kind','assertion_seam_unwired',
+        'reason','public.assert_perimeter_closed() does not route through public.perimeter_report()'
+      ));
+    end if;
+  end if;
+
+  -- These routines are mandatory inputs to the evaluator itself. A restored
+  -- target that is missing one is unsupported, not an implementation error and
+  -- never a clean result.
+  select coalesce(array_agg(f order by f),array[]::text[])
+    into v_missing
+  from unnest(v_required_authority_functions) f
+  where to_regprocedure(f) is null;
+
+  if cardinality(v_missing)>0 then
+    v_gaps := v_gaps || jsonb_build_array(jsonb_build_object(
+      'kind','missing_authority_functions',
+      'count',cardinality(v_missing),
+      'items',to_jsonb(v_missing)
+    ));
+  end if;
+
   -- First establish that the three durable perimeter control tables themselves
   -- exist. Do not query a missing table and turn "cannot evaluate" into an
   -- implementation exception.
@@ -107,6 +153,8 @@ begin
       'perimeter_state','unknown',
       'coverage',jsonb_build_object(
         'complete',false,
+        'required_authority_functions',cardinality(v_required_authority_functions),
+        'authority_functions_required_resolved',cardinality(v_required_authority_functions)-cardinality(coalesce(v_missing,array[]::text[])),
         'gap_count',jsonb_array_length(v_gaps),
         'gaps',v_gaps
       ),
@@ -226,6 +274,10 @@ begin
         'profile',v_profile,
         'policy_rows',v_policy_count,
         'required_policy_roles',cardinality(v_role_names),
+        'required_authority_functions',cardinality(v_required_authority_functions),
+        'authority_functions_required_resolved',cardinality(v_required_authority_functions)-(
+          select count(*) from unnest(v_required_authority_functions) f where to_regprocedure(f) is null
+        ),
         'protected_schemas_registered',v_registered_schemas,
         'protected_schemas_resolved',v_resolved_schemas,
         'authority_functions_registered',v_registered_functions,
@@ -266,10 +318,22 @@ begin
       if v_assertion_error not like 'PERIMETER FAIL:%' then
         raise;
       end if;
-      v_findings := v_findings || jsonb_build_array(jsonb_build_object(
-        'kind','assertion',
-        'message',v_assertion_error
-      ));
+
+      -- The v10 primitive intentionally wraps ACL findings in a category-level
+      -- assertion message. Do not count that message a second time when the
+      -- same category is already represented by structured ACL rows.
+      if jsonb_array_length(v_acl_findings)>0
+         and (
+           v_assertion_error like 'PERIMETER FAIL: owner-global default ACLs:%'
+           or v_assertion_error like 'PERIMETER FAIL: unexpected effective ACL grantees:%'
+         ) then
+        null;
+      else
+        v_findings := v_findings || jsonb_build_array(jsonb_build_object(
+          'kind','assertion',
+          'message',v_assertion_error
+        ));
+      end if;
   end;
 
   v_count := jsonb_array_length(v_findings);
@@ -283,6 +347,8 @@ begin
       'profile',v_profile,
       'policy_rows',v_policy_count,
       'required_policy_roles',cardinality(v_role_names),
+      'required_authority_functions',cardinality(v_required_authority_functions),
+      'authority_functions_required_resolved',cardinality(v_required_authority_functions),
       'protected_schemas_registered',v_registered_schemas,
       'protected_schemas_resolved',v_resolved_schemas,
       'authority_functions_registered',v_registered_functions,
@@ -378,7 +444,9 @@ begin
      or (v_report->>'violation_count')::integer<>0 then
     raise exception 'PERIMETER C1 FAIL: post-install report is not evaluated/clean: %',v_report;
   end if;
-  perform public.assert_perimeter_closed();
+  if public.assert_perimeter_closed()<>'perimeter OK: perimeter-report/1 evaluated clean with zero findings' then
+    raise exception 'PERIMETER C1 FAIL: assertion seam returned an unexpected success string';
+  end if;
 end $$;
 
 commit;
