@@ -125,6 +125,24 @@ def build(args: argparse.Namespace) -> int:
         raise ValueError("schema drift comparison is missing or not clean")
     if drift.get("exact_commit") != args.commit or drift.get("exact_tree") != args.tree:
         raise ValueError("schema drift comparison is not bound to the release candidate coordinate")
+    drift_expected_sha = str(drift.get("expected_sha256", ""))
+    drift_actual_sha = str(drift.get("actual_sha256", ""))
+    drift_expected_bytes = drift.get("expected_bytes")
+    drift_actual_bytes = drift.get("actual_bytes")
+    drift_diff_lines = drift.get("diff_line_count")
+    if (
+        SHA256.fullmatch(drift_expected_sha) is None
+        or SHA256.fullmatch(drift_actual_sha) is None
+        or drift_expected_sha != drift_actual_sha
+        or type(drift_expected_bytes) is not int
+        or type(drift_actual_bytes) is not int
+        or drift_expected_bytes < 0
+        or drift_actual_bytes < 0
+        or drift_expected_bytes != drift_actual_bytes
+        or type(drift_diff_lines) is not int
+        or drift_diff_lines != 0
+    ):
+        raise ValueError("schema drift comparison is internally inconsistent")
 
     source = provider.get("source") or {}
     destination = provider.get("destination") or {}
