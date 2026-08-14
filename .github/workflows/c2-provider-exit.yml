@@ -8,6 +8,7 @@ on:
       - "scripts/sovereignty_bundle.py"
       - "scripts/validate_sovereignty_bundle.py"
       - "scripts/c2_provider_exit_rehearsal.py"
+      - "scripts/schema_drift_inventory.py"
       - "tests/export_restore/**"
       - ".github/workflows/c2-provider-exit.yml"
   push:
@@ -19,6 +20,7 @@ on:
       - "scripts/sovereignty_bundle.py"
       - "scripts/validate_sovereignty_bundle.py"
       - "scripts/c2_provider_exit_rehearsal.py"
+      - "scripts/schema_drift_inventory.py"
       - "tests/export_restore/**"
       - ".github/workflows/c2-provider-exit.yml"
 
@@ -93,6 +95,27 @@ jobs:
             "$RUNNER_TEMP/c2-proof/sovereign-memory-c2.bundle.tar" \
             --expected-sha256 "$(cut -d' ' -f1 "$RUNNER_TEMP/c2-proof/archive.sha256")" \
             2>&1 | tee "$RUNNER_TEMP/c2-proof/validator.log"
+
+      - name: Capture and compare executable schema drift inventory
+        run: |
+          set -o pipefail
+          python -m py_compile scripts/schema_drift_inventory.py
+          python scripts/schema_drift_inventory.py capture \
+            --dsn-env SOURCE_DSN \
+            --sql-output "$RUNNER_TEMP/c2-proof/source-schema.sql" \
+            --receipt-output "$RUNNER_TEMP/c2-proof/source-schema-inventory.json" \
+            2>&1 | tee "$RUNNER_TEMP/c2-proof/source-schema-inventory.log"
+          python scripts/schema_drift_inventory.py capture \
+            --dsn-env TARGET_DSN \
+            --sql-output "$RUNNER_TEMP/c2-proof/target-schema.sql" \
+            --receipt-output "$RUNNER_TEMP/c2-proof/target-schema-inventory.json" \
+            2>&1 | tee "$RUNNER_TEMP/c2-proof/target-schema-inventory.log"
+          python scripts/schema_drift_inventory.py compare \
+            --expected "$RUNNER_TEMP/c2-proof/source-schema.sql" \
+            --actual "$RUNNER_TEMP/c2-proof/target-schema.sql" \
+            --receipt-output "$RUNNER_TEMP/c2-proof/schema-drift-comparison.json" \
+            --diff-output "$RUNNER_TEMP/c2-proof/schema-drift.diff" \
+            2>&1 | tee "$RUNNER_TEMP/c2-proof/schema-drift-comparison.log"
 
       - name: Destroy independent clusters
         if: always()
