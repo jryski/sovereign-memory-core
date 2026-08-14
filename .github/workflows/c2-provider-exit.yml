@@ -35,11 +35,13 @@ jobs:
       PYTHONWARNINGS: error
       SOURCE_DSN: postgresql://postgres:postgres@127.0.0.1:55432/postgres
       TARGET_DSN: postgresql://postgres:postgres@127.0.0.1:55433/postgres
+      CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
       - name: Check out exact candidate
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
 
@@ -54,6 +56,10 @@ jobs:
       - name: Start independent source and destination clusters
         run: |
           mkdir -p "$RUNNER_TEMP/c2-proof"
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          printf 'candidate_sha=%s\nhead_tree=%s\n' \
+            "$CANDIDATE_SHA" "$(git rev-parse HEAD^{tree})" \
+            > "$RUNNER_TEMP/c2-proof/candidate-coordinate.txt"
           docker run -d --name c2-source \
             -e POSTGRES_PASSWORD=postgres -p 55432:5432 postgres:16
           docker run -d --name c2-target \
@@ -77,10 +83,10 @@ jobs:
         run: |
           set -o pipefail
           python -m py_compile scripts/c2_provider_exit_rehearsal.py
-          python scripts/c2_provider_exit_rehearsal.py \
+          python -m scripts.c2_provider_exit_rehearsal \
             --source-dsn "$SOURCE_DSN" \
             --target-dsn "$TARGET_DSN" \
-            --commit "$GITHUB_SHA" \
+            --commit "$CANDIDATE_SHA" \
             --output-dir "$RUNNER_TEMP/c2-proof" \
             2>&1 | tee "$RUNNER_TEMP/c2-proof/rehearsal.log"
           python scripts/validate_sovereignty_bundle.py \
@@ -122,7 +128,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: c2-provider-exit-${{ github.sha }}
+          name: c2-provider-exit-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/c2-proof/
           if-no-files-found: error
           retention-days: 30
