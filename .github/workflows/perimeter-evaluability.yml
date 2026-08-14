@@ -109,7 +109,7 @@ jobs:
           psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 -f /tmp/01_core.sql
           psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           insert into public.memories(content,workstream,owner,visibility,source_agent,source_kind,status)
-          values('C1 predecessor upgrade fixture','c1-upgrade','example-user','private','c1-ci','agent','active');
+          values('C1 predecessor upgrade fixture','c1-upgrade','example-user','private','example-user-chatgpt','agent','active');
           SQL
           psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 -f /tmp/07_work_lessons.sql
           psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 -f /tmp/08_attention_events.sql
