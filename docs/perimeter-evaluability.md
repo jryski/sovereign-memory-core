@@ -9,7 +9,7 @@ The report separates three states that must not be collapsed:
 |---|---|---:|---|
 | `evaluated` | `clean` | `0` | Required evaluation population exists and no perimeter finding was detected. |
 | `evaluated` | `not_clean` | `> 0` | Required population exists and one or more findings were detected. |
-| `unsupported` | `unknown` | `null` | Required roles or protected surfaces are missing, so a clean/not-clean answer cannot be made. |
+| `unsupported` | `unknown` | `null` | Required roles, evaluator functions, protected surfaces, or the enforcement wiring are incomplete, so a clean/not-clean answer cannot be made. |
 
 The contract version is `perimeter-report/1`.
 
@@ -37,6 +37,19 @@ wrapper. It succeeds only when the report is `evaluated`, `clean`, and has zero
 findings. It raises `PERIMETER UNSUPPORTED` when required evaluation population
 is missing and `PERIMETER FAIL` when the evaluated perimeter is not clean.
 
+A correctly wired C1 success returns exactly:
+
+```text
+perimeter OK: perimeter-report/1 evaluated clean with zero findings
+```
+
+The report also checks that the public assertion currently routes through the
+report. This detects out-of-order replay of a predecessor migration that
+silently replaces the C1 wrapper. Such a target is `unsupported` with an
+`assertion_seam_unwired` coverage gap even if the older assertion body can still
+return its legacy success string. Restore/release evidence must therefore record
+both the report and the exact public assertion result.
+
 The pre-C1 assertion body is retained only as the internal
 `public.perimeter_assert_violations_v1()` primitive so existing detailed checks
 are preserved. It is not an operator API and is not granted to runtime roles.
@@ -45,6 +58,12 @@ are preserved. It is not an operator API and is not granted to runtime roles.
 
 The report refuses to evaluate if any of these prerequisites are incomplete:
 
+- the public assertion is present and routes through `public.perimeter_report()`;
+- the evaluator functions it directly depends on are present:
+  `public.perimeter_acl_violations()`, `public.perimeter_policy_roles(text)`,
+  `public.perimeter_protected_schemas()`,
+  `public.perimeter_authority_functions()`, and
+  `public.perimeter_assert_violations_v1()`;
 - the three durable perimeter control tables;
 - exactly one persisted perimeter policy row;
 - every role named by the persisted perimeter policy;
@@ -54,8 +73,9 @@ The report refuses to evaluate if any of these prerequisites are incomplete:
   resolvable;
 - the protected work/attention tables checked by the perimeter assertion.
 
-A missing hosted-provider role is therefore an `unsupported` result, not an
-empty finding set.
+A missing hosted-provider role or evaluator helper is therefore an
+`unsupported` result, not an empty finding set or an uncaught missing-function
+error.
 
 ## Findings
 
@@ -63,6 +83,14 @@ When evaluation is possible, structured ACL findings from
 `public.perimeter_acl_violations()` remain available in the report. Other
 perimeter categories enforced by the existing assertion are surfaced as a
 bounded assertion finding rather than being converted into a false zero.
+
+`violation_count` is the number of entries in `findings`. The preserved v10
+assertion can summarize an ACL category that is already represented by one or
+more structured ACL rows; that category summary is not emitted again as an
+assertion finding, so the same underlying ACL violation is not double-counted.
+The internal primitive short-circuits at the first non-ACL assertion category,
+so the report is a release gate and bounded diagnostic seam, not an exhaustive
+census of every simultaneously broken category.
 
 For deeper ACL inspection:
 
