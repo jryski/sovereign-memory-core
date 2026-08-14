@@ -185,6 +185,92 @@ jobs:
           mv "$RUNNER_TEMP/c2-proof/schema-drift-comparison.bound.json" \
              "$RUNNER_TEMP/c2-proof/schema-drift-comparison.json"
 
+          python - "$CANDIDATE_SHA" "$tree_sha" <<'PY'
+          import copy
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          candidate, tree = sys.argv[1:3]
+          proof = Path(os.environ["RUNNER_TEMP"]) / "c2-proof"
+          receipt_path = proof / "receipt.json"
+          original_text = receipt_path.read_text(encoding="utf-8")
+          original = json.loads(original_text)
+          probes = [
+              ("source-unchanged", ("source", "unchanged"), False),
+              ("destination-clean", ("destination", "clean_before_restore"), False),
+              ("deterministic-export", ("bundle", "byte_deterministic_repeat_export"), False),
+              ("positive-control", ("verification", "positive_control_readable"), False),
+              ("paired-denial", ("verification", "paired_private_denial"), False),
+              ("reciprocal-positive", ("verification", "reciprocal_positive_readable"), False),
+              ("reciprocal-denial", ("verification", "reciprocal_private_denial"), False),
+              ("attention-lineage", ("verification", "attention_revision_lineage"), False),
+              ("direct-select-denial", ("verification", "service_role_direct_memories_select"), True),
+              ("empty-destination", ("destination", "preflight_public_table_count"), 1),
+          ]
+          try:
+              for label, path, bad_value in probes:
+                  mutated = copy.deepcopy(original)
+                  mutated[path[0]][path[1]] = bad_value
+                  receipt_path.write_text(
+                      json.dumps(mutated, sort_keys=True, separators=(",", ":")) + "\n",
+                      encoding="utf-8",
+                  )
+                  proc = subprocess.run(
+                      [
+                          sys.executable,
+                          "scripts/build_release_candidate.py",
+                          "--version", "v0.3-alpha",
+                          "--commit", candidate,
+                          "--tree", tree,
+                          "--repo-root", ".",
+                          "--proof-dir", str(proof),
+                          "--output-dir", str(proof / f"release-candidate-invalid-provider-{label}"),
+                      ],
+                      stdout=subprocess.PIPE,
+                      stderr=subprocess.PIPE,
+                      text=True,
+                      check=False,
+                  )
+                  (proof / f"invalid-provider-{label}.log").write_text(
+                      proc.stdout + proc.stderr, encoding="utf-8"
+                  )
+                  if proc.returncode == 0:
+                      raise SystemExit(f"invalid provider receipt was unexpectedly accepted: {label}")
+
+              mutated = copy.deepcopy(original)
+              mutated["destination"]["system_identifier"] = mutated["source"]["system_identifier"]
+              receipt_path.write_text(
+                  json.dumps(mutated, sort_keys=True, separators=(",", ":")) + "\n",
+                  encoding="utf-8",
+              )
+              proc = subprocess.run(
+                  [
+                      sys.executable,
+                      "scripts/build_release_candidate.py",
+                      "--version", "v0.3-alpha",
+                      "--commit", candidate,
+                      "--tree", tree,
+                      "--repo-root", ".",
+                      "--proof-dir", str(proof),
+                      "--output-dir", str(proof / "release-candidate-invalid-provider-cluster-identity"),
+                  ],
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.PIPE,
+                  text=True,
+                  check=False,
+              )
+              (proof / "invalid-provider-cluster-identity.log").write_text(
+                  proc.stdout + proc.stderr, encoding="utf-8"
+              )
+              if proc.returncode == 0:
+                  raise SystemExit("provider receipt with identical source/destination clusters was unexpectedly accepted")
+          finally:
+              receipt_path.write_text(original_text, encoding="utf-8")
+          PY
+
       - name: Destroy independent clusters
         if: always()
         run: |
