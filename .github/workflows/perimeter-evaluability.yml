@@ -1,0 +1,132 @@
+name: Perimeter evaluability
+
+on:
+  pull_request:
+    paths:
+      - "sql/11_perimeter_evaluability.sql"
+      - "tests/11_perimeter_evaluability.sql"
+      - "docs/templates/restore-rehearsal.md"
+      - "docs/perimeter-evaluability.md"
+      - "README.md"
+      - "STATUS.md"
+      - ".github/workflows/perimeter-evaluability.yml"
+  push:
+    branches:
+      - "atlas/issue-58-c1-perimeter-evaluability"
+
+permissions:
+  contents: read
+
+env:
+  PGPASSWORD: postgres
+  C1_BASE_HEAD: 928dcdcf462116c51685a6467618716fa579abda
+
+jobs:
+  c1-contract:
+    name: C1 fresh, reapply, upgrade (PostgreSQL ${{ matrix.pg }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ["15", "16"]
+
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sovereign_c1_fresh
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sovereign_c1_fresh"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Pin predecessor and protect historical migrations
+        run: |
+          git cat-file -e "${C1_BASE_HEAD}^{commit}"
+          git merge-base --is-ancestor "$C1_BASE_HEAD" HEAD
+          git diff --exit-code "$C1_BASE_HEAD" -- \
+            sql/01_core.sql \
+            sql/07_work_lessons.sql \
+            sql/08_attention_events.sql \
+            sql/09_perimeter_refresh.sql \
+            sql/10_security_definer_hardening.sql
+
+      - name: Bootstrap cluster roles and owner defaults
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_c1_fresh
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          create schema if not exists extensions;
+          do $$ begin
+            if not exists(select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
+            if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
+            if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role nologin; end if;
+          end $$;
+          alter database sovereign_c1_fresh set sovereign_memory.perimeter_profile='supabase';
+          alter default privileges for role postgres revoke execute on functions from public;
+          alter default privileges for role pg_database_owner revoke execute on functions from public;
+          SQL
+
+      - name: Fresh install and exact reapply
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_c1_fresh
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
+          for pass in 1 2; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+          done
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/11_perimeter_evaluability.sql
+
+      - name: Create non-empty predecessor database
+        env:
+          UPGRADE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_c1_upgrade
+        run: |
+          createdb -h localhost -U postgres sovereign_c1_upgrade
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          create schema if not exists extensions;
+          alter database sovereign_c1_upgrade set sovereign_memory.perimeter_profile='supabase';
+          alter default privileges for role postgres revoke execute on functions from public;
+          alter default privileges for role pg_database_owner revoke execute on functions from public;
+          SQL
+          for f in 01_core 07_work_lessons 08_attention_events 09_perimeter_refresh 10_security_definer_hardening; do
+            git show "${C1_BASE_HEAD}:sql/${f}.sql" >"/tmp/${f}.sql"
+          done
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 -f /tmp/01_core.sql
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          insert into public.memories(content,workstream,owner,visibility,source_agent,source_kind,status)
+          values('C1 predecessor upgrade fixture','c1-upgrade','example-user','private','c1-ci','agent','active');
+          SQL
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 -f /tmp/07_work_lessons.sql
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 -f /tmp/08_attention_events.sql
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 -f /tmp/09_perimeter_refresh.sql
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 -f /tmp/10_security_definer_hardening.sql
+
+      - name: Upgrade exact predecessor through C1 and verify
+        env:
+          UPGRADE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_c1_upgrade
+        run: |
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 -f tests/11_perimeter_evaluability.sql
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          do $$ begin
+            if (select count(*) from public.memories
+                where content='C1 predecessor upgrade fixture')<>1 then
+              raise exception 'non-empty predecessor fixture was not preserved';
+            end if;
+          end $$;
+          SQL
