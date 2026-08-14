@@ -154,7 +154,9 @@ begin
       'coverage',jsonb_build_object(
         'complete',false,
         'required_authority_functions',cardinality(v_required_authority_functions),
-        'authority_functions_required_resolved',cardinality(v_required_authority_functions)-cardinality(coalesce(v_missing,array[]::text[])),
+        'authority_functions_required_resolved',cardinality(v_required_authority_functions)-(
+          select count(*) from unnest(v_required_authority_functions) f where to_regprocedure(f) is null
+        ),
         'gap_count',jsonb_array_length(v_gaps),
         'gaps',v_gaps
       ),
