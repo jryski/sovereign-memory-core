@@ -200,6 +200,7 @@ jobs:
           original = json.loads(original_text)
           probes = [
               ("source-unchanged", ("source", "unchanged"), False),
+              ("source-fingerprint-stability", ("source", "before_fingerprint"), "0" * 64),
               ("destination-clean", ("destination", "clean_before_restore"), False),
               ("deterministic-export", ("bundle", "byte_deterministic_repeat_export"), False),
               ("positive-control", ("verification", "positive_control_readable"), False),
