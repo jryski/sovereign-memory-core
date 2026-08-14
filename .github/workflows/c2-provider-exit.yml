@@ -53,6 +53,7 @@ jobs:
 
       - name: Start independent source and destination clusters
         run: |
+          mkdir -p "$RUNNER_TEMP/c2-proof"
           docker run -d --name c2-source \
             -e POSTGRES_PASSWORD=postgres -p 55432:5432 postgres:16
           docker run -d --name c2-target \
@@ -63,51 +64,62 @@ jobs:
                 break
               fi
               if [ "$attempt" -eq 60 ]; then
-                docker logs "$container"
+                docker logs "$container" | tee "$RUNNER_TEMP/c2-proof/${container}-startup.log"
                 exit 1
               fi
               sleep 1
             done
           done
-          docker inspect -f '{{.Id}}' c2-source | tee "$RUNNER_TEMP/source-container-id.txt"
-          docker inspect -f '{{.Id}}' c2-target | tee "$RUNNER_TEMP/target-container-id.txt"
+          docker inspect -f '{{.Id}}' c2-source | tee "$RUNNER_TEMP/c2-proof/source-container-id.txt"
+          docker inspect -f '{{.Id}}' c2-target | tee "$RUNNER_TEMP/c2-proof/target-container-id.txt"
 
       - name: Execute exact-artifact provider-exit rehearsal
         run: |
-          mkdir -p "$RUNNER_TEMP/c2-proof"
-          cp "$RUNNER_TEMP/source-container-id.txt" "$RUNNER_TEMP/c2-proof/"
-          cp "$RUNNER_TEMP/target-container-id.txt" "$RUNNER_TEMP/c2-proof/"
+          set -o pipefail
+          python -m py_compile scripts/c2_provider_exit_rehearsal.py
           python scripts/c2_provider_exit_rehearsal.py \
             --source-dsn "$SOURCE_DSN" \
             --target-dsn "$TARGET_DSN" \
             --commit "$GITHUB_SHA" \
-            --output-dir "$RUNNER_TEMP/c2-proof"
+            --output-dir "$RUNNER_TEMP/c2-proof" \
+            2>&1 | tee "$RUNNER_TEMP/c2-proof/rehearsal.log"
           python scripts/validate_sovereignty_bundle.py \
             "$RUNNER_TEMP/c2-proof/sovereign-memory-c2.bundle.tar" \
-            --expected-sha256 "$(cut -d' ' -f1 "$RUNNER_TEMP/c2-proof/archive.sha256")"
+            --expected-sha256 "$(cut -d' ' -f1 "$RUNNER_TEMP/c2-proof/archive.sha256")" \
+            2>&1 | tee "$RUNNER_TEMP/c2-proof/validator.log"
 
-      - name: Prove destination was disposable and destroy both clusters
-        if: success()
+      - name: Destroy independent clusters
+        if: always()
         run: |
-          target_id="$(cat "$RUNNER_TEMP/c2-proof/target-container-id.txt")"
-          source_id="$(cat "$RUNNER_TEMP/c2-proof/source-container-id.txt")"
-          docker rm -f c2-target >/dev/null
+          set +e
+          target_id="$(cat "$RUNNER_TEMP/c2-proof/target-container-id.txt" 2>/dev/null)"
+          source_id="$(cat "$RUNNER_TEMP/c2-proof/source-container-id.txt" 2>/dev/null)"
+          docker rm -f c2-target >/dev/null 2>&1
+          target_status=$?
           if docker inspect c2-target >/dev/null 2>&1; then
-            echo "destination container still exists" >&2
-            exit 1
+            target_gone=false
+          else
+            target_gone=true
           fi
-          printf 'destroyed=true\ncontainer_id=%s\n' "$target_id" \
+          printf 'destroy_command_status=%s\ndestroyed=%s\ncontainer_id=%s\n' \
+            "$target_status" "$target_gone" "$target_id" \
             > "$RUNNER_TEMP/c2-proof/destination-destroyed.txt"
-          docker rm -f c2-source >/dev/null
+          docker rm -f c2-source >/dev/null 2>&1
+          source_status=$?
           if docker inspect c2-source >/dev/null 2>&1; then
-            echo "source container still exists" >&2
+            source_gone=false
+          else
+            source_gone=true
+          fi
+          printf 'destroy_command_status=%s\ndestroyed=%s\ncontainer_id=%s\n' \
+            "$source_status" "$source_gone" "$source_id" \
+            > "$RUNNER_TEMP/c2-proof/source-destroyed.txt"
+          if [ "$target_gone" != true ] || [ "$source_gone" != true ]; then
             exit 1
           fi
-          printf 'destroyed=true\ncontainer_id=%s\n' "$source_id" \
-            > "$RUNNER_TEMP/c2-proof/source-destroyed.txt"
 
-      - name: Upload proof receipt and deterministic bundle
-        if: success()
+      - name: Upload proof or failure diagnostics
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: c2-provider-exit-${{ github.sha }}
