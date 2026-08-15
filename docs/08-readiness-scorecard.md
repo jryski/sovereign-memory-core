@@ -1,140 +1,107 @@
-# 08 · 10/10 Readiness Scorecard
+# 08 · Readiness criteria
 
-This scorecard defines what `sovereign-memory-core` must satisfy before it should be considered a 10/10 database schema and personal memory system.
+This document is a **reference-implementation readiness checklist**, not a
+numeric score and not a deployment inventory.
+
+The previous version mixed Core quality, one deployment's operating model,
+private-domain concepts, UI work, and agent coordination into a single "10/10"
+score. That made the number subjective and blurred repository boundaries.
+
+For current release state, use [`../STATUS.md`](../STATUS.md). For exact
+`v0.3-alpha` claim limits, use
+[`../release/v0.3-alpha-known-limitations.md`](../release/v0.3-alpha-known-limitations.md).
 
 ## Scoring rule
 
-A category is complete only when it has:
+A Core capability should be called ready only when the relevant combination of
+these exists:
 
-1. versioned repo artifact;
-2. live deployment evidence;
-3. repeatable validation check;
-4. clear rollback or remediation path.
+1. versioned repository artifact;
+2. executable validation;
+3. adversarial/negative coverage where failure matters;
+4. documented rollback or remediation behavior;
+5. release-scoped evidence when the capability is part of a release claim.
 
-Claims without evidence do not count.
+A downstream deployment may require additional acceptance evidence. Deployment
+success does not automatically broaden Core support, and Core CI does not
+certify an unmeasured deployment.
 
-## 1. Source of truth and portability
+## 1. Schema and lifecycle
 
-- [ ] Repo contains every live schema object needed to recreate the system.
-- [ ] Live DB object inventory matches repo migrations or documented intentional drift.
-- [ ] Migrations are mirrored outside the hosting provider.
-- [ ] Restore into vanilla Postgres has been rehearsed.
-- [ ] Data exports exist in human-readable formats.
-- [ ] Provider-exit test has a date, evidence, and findings.
+- [ ] Core schema is versioned and reproducible from the repository.
+- [ ] Accepted/proposed/superseded semantics are explicit.
+- [ ] Corrections preserve history rather than silently replacing it.
+- [ ] Evidence/provenance relationships are reconstructable.
+- [ ] Concurrent replay and duplicate input have deterministic outcomes.
+- [ ] Migration upgrade and reapply behavior is tested.
 
-## 2. Memory model
+## 2. Authority and security
 
-- [ ] Atomic facts live in `memories`.
-- [ ] Durable documents live in `wiki_pages`.
-- [ ] Active/proposed/superseded semantics are enforced and documented.
-- [ ] Corrections supersede rather than overwrite.
-- [ ] Deleted data requires explicit audited override.
-- [ ] Stale historical state is quarantined as proposed or review-required.
+- [ ] The trust boundary is stated honestly.
+- [ ] Direct, inherited, membership-chain, and `PUBLIC` privilege paths are evaluated.
+- [ ] RLS/FORCE RLS posture is measurable where required.
+- [ ] Ownership and default privileges are included in perimeter evaluation.
+- [ ] `SECURITY DEFINER` surfaces are inventoried and hardened against search-path/temp shadowing.
+- [ ] Unevaluable security state fails closed rather than reporting clean.
+- [ ] Broad/shared credential limitations are documented rather than hidden.
 
-## 3. Provenance and authority
+## 3. Portability and recovery
 
-- [ ] Every high-impact or consequential fact carries source/provenance.
-- [ ] Financial figures are guarded by database triggers or equivalent checks.
-- [ ] Accepted provenance bases are documented and consistent across memories, wiki, and vault.
-- [ ] Model-authored claims are not silently promoted to human decisions.
-- [ ] Human decisions are distinguishable from model summaries and inferences.
-- [ ] Review queue surfaces low-confidence, stale, or proposed records.
+- [ ] Export/package format is versioned.
+- [ ] Package validation rejects unsupported or unclassified loss.
+- [ ] Restore is exercised on an independent clean target.
+- [ ] Source-before/source-after checks prove the source was unchanged.
+- [ ] Restored structure and security-relevant objects are compared.
+- [ ] Positive and denial controls prove the restored system is both usable and bounded.
+- [ ] Recovery artifacts and release artifacts have durable integrity receipts.
+- [ ] Supported PostgreSQL/provider ranges are stated explicitly and are not broadened by anecdotal success.
 
-## 4. Recall and attention
+## 4. Drift and reproducibility
 
-- [ ] `session_boot()` returns hot topics, deadlines, review counts, integrity, channel state, and health.
-- [ ] Hot index or equivalent attention layer avoids loading the entire store.
-- [ ] Hot-topic promotion has deterministic rules.
-- [ ] Semantic/vector recall is treated as cache or assistive retrieval, not canon.
-- [ ] Cutover probes prove important facts can be recalled after import or migration.
-- [ ] Failure to recall critical facts creates an actionable remediation item.
+- [ ] Schema drift has an executable comparison contract.
+- [ ] Comparison inputs are bound to the candidate being reviewed where the claim requires it.
+- [ ] Empty/unevaluable comparison inputs cannot pass as clean.
+- [ ] Release artifacts are generated from the exact reviewed candidate.
+- [ ] Checksums cover the intended artifact set and the checksum root is recorded externally.
 
-## 5. Source import and authoritative cutover
+## 5. Source import and adapters
 
-- [ ] Source inventory complete.
-- [ ] Freeze or watermark recorded where the source can change.
-- [ ] Raw exports preserved with file hashes.
-- [ ] Every source item has a manifest decision.
-- [ ] HOUSE/VAULT/HOLD/EVIDENCE classification complete.
-- [ ] Import counts match manifest counts.
-- [ ] Payload hashes verify.
-- [ ] Readiness checks pass.
-- [ ] Critical cutover probes pass.
-- [ ] Prior sources remain readable during rollback window where feasible.
-- [ ] Owner explicitly approves authoritative cutover.
+- [ ] Adapter/source profile declares what was observed and what may be lossy.
+- [ ] Raw/source evidence can be retained or referenced without silently promoting derived claims.
+- [ ] Import decisions distinguish accept, hold, reject, and conflict states where applicable.
+- [ ] Counts/hashes reconcile before a source is treated as successfully transferred.
+- [ ] Rollback or source-continuity posture is documented.
+- [ ] Source-understanding quality is measured independently from package determinism.
 
-## 6. Trust boundaries and security
+## 6. Public-repository quality
 
-- [ ] Security model states the real boundary is the credential/connector/API surface.
-- [ ] Broad credential blast radius is documented.
-- [ ] No anon/authenticated/PUBLIC grants leak on protected objects.
-- [ ] Views use `security_invoker` where appropriate.
-- [ ] SECURITY DEFINER functions pin `search_path`.
-- [ ] Private schemas have no unintended grants.
-- [ ] Least-privilege API or role hardening path is designed and prioritized.
-- [ ] Sensitive domains are separated by schema, project, or credential as appropriate.
+- [ ] README clearly says what Core is and is not.
+- [ ] STATUS reflects the current release rather than an obsolete development phase.
+- [ ] Roadmap does not encode stale version promises as current truth.
+- [ ] Public examples and fixtures are synthetic.
+- [ ] No private deployment identifiers, credentials, topology, or payloads are committed.
+- [ ] High-risk claims are either executable/reviewed or explicitly downgraded.
+- [ ] Issues track defects and follow-ups without requiring private-chat archaeology.
 
-## 7. VAULT readiness
+## 7. Release discipline
 
-- [ ] Raw restricted records are preserved before normalization.
-- [ ] Payload hashes are computed and verified.
-- [ ] Normalized rows link back to preserved source records.
-- [ ] Identity, health, finance, and legal/authority records are person-centered.
-- [ ] Temporal truth is modeled with observed/recorded/effective windows where needed.
-- [ ] Vault audit logs keys only, not duplicate sensitive payloads.
-- [ ] Capability assignments are explicit rows, not implied by role names.
+Before publishing a release that claims a capability:
 
-## 8. Operations
+- [ ] freeze an exact candidate commit/tree;
+- [ ] run the required workflows against that candidate;
+- [ ] preserve reproducible receipts;
+- [ ] record known limitations;
+- [ ] independently review load-bearing evidence;
+- [ ] ensure integration does not silently change the reviewed coordinate;
+- [ ] publish checksummed artifacts from the same candidate;
+- [ ] require owner/release authorization where the release procedure says so.
 
-- [ ] Backup process documented.
-- [ ] Backup checksum process documented.
-- [ ] Restore rehearsal documented and repeated after schema overhauls.
-- [ ] Weekly ops ritual exists and is usable by any approved assistant.
-- [ ] Migration drift check exists.
-- [ ] Derived-index backlog, attention backlog, review queue, and overdue deadlines are surfaced.
-- [ ] Bulk transfers avoid model context and tool stdin when server-side staging or file transfer is available.
-- [ ] Bulk transfers are verified by counts and checksums before import or promotion.
-- [ ] Incident runbook exists for bad writes, leaked credentials, failed restore, integrity mismatch, and corrupted transfer.
+## Deployment acceptance is separate
 
-## 9. Multi-model coordination
+A real deployment should have its own acceptance checklist covering its actual
+provider, PostgreSQL version, credentials, backups/recovery anchors, private
+data, hosted services, connectors, and operational rollback plan.
 
-- [ ] `model_channel` or equivalent is documented.
-- [ ] Model messages are treated as untrusted content.
-- [ ] Replies have deterministic references.
-- [ ] Message retrieval uses ordering/sequence, not semantic search.
-- [ ] Cross-model reviews preserve disagreement without treating models as authority.
-- [ ] Peer-review operating rule exists for schema changes.
-
-## 10. Repo quality
-
-- [ ] README distinguishes core repo from UI repo.
-- [ ] STATUS file tracks repo/live divergence without embedding one deployment's private inventory.
-- [ ] All SQL is versioned and idempotent or clearly migration-scoped.
-- [ ] Acceptance tests are copy-pasteable or scriptable.
-- [ ] Every high-risk claim is either tested or downgraded.
-- [ ] Issues track remaining hardening work.
-- [ ] Release tags mark known-good schema versions.
-
-## Current blockers to 10/10
-
-1. Live source-import/cutover objects are not yet committed as reusable repo SQL.
-2. No executable validation bundle for full cutover readiness.
-3. No stored provider-exit evidence artifact in repo.
-4. Least-privilege access hardening is designed conceptually but not implemented.
-5. UI/review workflow is split to a new repo and not yet complete.
-6. Peer review of the SQL implementation is pending.
-
-## Target definition of done
-
-`sovereign-memory-core` reaches 10/10 when a new approved operator can:
-
-1. clone the repo;
-2. apply migrations to a fresh Postgres/Supabase project;
-3. run acceptance tests;
-4. import or reconcile records from an existing source;
-5. verify payload hashes and readiness checks;
-6. run cutover probes;
-7. restore from backup into vanilla Postgres;
-8. prove service boundaries and grant posture;
-9. boot with `session_boot()`;
-10. continue work without relying on vendor-native memory or any prior non-authoritative source.
+That checklist belongs with the deployment. Only generic defects that can be
+reproduced safely with synthetic evidence should be promoted into this public
+Core repository.
