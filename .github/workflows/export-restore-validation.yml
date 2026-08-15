@@ -9,6 +9,7 @@ on:
       - "scripts/validate_sovereignty_bundle.py"
       - "scripts/schema_drift_inventory.py"
       - "scripts/build_release_candidate.py"
+      - "sql/**"
       - "tests/export_restore/**"
       - ".github/workflows/export-restore-validation.yml"
   push:
@@ -19,6 +20,7 @@ on:
       - "scripts/validate_sovereignty_bundle.py"
       - "scripts/schema_drift_inventory.py"
       - "scripts/build_release_candidate.py"
+      - "sql/**"
       - "tests/export_restore/**"
       - ".github/workflows/export-restore-validation.yml"
 
