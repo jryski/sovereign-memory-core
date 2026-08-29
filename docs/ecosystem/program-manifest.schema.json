@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jryski/sovereign-memory-core/blob/main/docs/ecosystem/program-manifest.schema.json",
+  "title": "Sovereign AI OS Program Manifest",
+  "description": "Machine-readable map of component roles, boundaries, dependencies, maturity, and evidence within the Sovereign AI OS program.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "program_id",
+    "title",
+    "snapshot_date",
+    "canonical_context",
+    "authority_note",
+    "components"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "program_id": {
+      "const": "sovereign-ai-os"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "snapshot_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "canonical_context": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority_note": {
+      "type": "string",
+      "minLength": 1
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/component"
+      }
+    }
+  },
+  "$defs": {
+    "locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "visibility", "value"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "github-repository",
+            "github-path",
+            "private-deployment",
+            "supabase-wiki",
+            "database",
+            "none"
+          ]
+        },
+        "visibility": {
+          "enum": ["public", "private", "restricted"]
+        },
+        "value": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "component_type",
+        "program_layer",
+        "canonical_locator",
+        "role_doc",
+        "status_source",
+        "maturity",
+        "status_as_of",
+        "owns",
+        "non_goals",
+        "upstream_components",
+        "downstream_components",
+        "consumes_contracts",
+        "produces_contracts",
+        "data_classification",
+        "planning_relationship",
+        "evidence_locators",
+        "notes"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "component_type": {
+          "enum": [
+            "protocol",
+            "reference-runtime",
+            "access-layer",
+            "deployment-reference",
+            "deployment-overlay",
+            "operational-deployment",
+            "planning-plane",
+            "agent-runtime",
+            "evidence-system",
+            "user-interface",
+            "skill-library",
+            "portability-profile",
+            "ingestion-system"
+          ]
+        },
+        "program_layer": {
+          "enum": [
+            "custody",
+            "access",
+            "domain",
+            "planning",
+            "runtime",
+            "qualification",
+            "interface",
+            "portability",
+            "ingestion",
+            "deployment"
+          ]
+        },
+        "canonical_locator": {
+          "$ref": "#/$defs/locator"
+        },
+        "role_doc": {
+          "type": ["string", "null"]
+        },
+        "status_source": {
+          "type": ["string", "null"]
+        },
+        "maturity": {
+          "enum": [
+            "seed",
+            "research",
+            "early-architecture",
+            "active-development",
+            "alpha",
+            "beta",
+            "stable",
+            "deployment-specific",
+            "unknown"
+          ]
+        },
+        "status_as_of": {
+          "type": "string",
+          "format": "date"
+        },
+        "owns": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "non_goals": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "upstream_components": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "downstream_components": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "consumes_contracts": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "produces_contracts": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "data_classification": {
+          "enum": [
+            "public-synthetic-only",
+            "private-no-data-in-git",
+            "deployment-data",
+            "mixed"
+          ]
+        },
+        "planning_relationship": {
+          "type": "string"
+        },
+        "evidence_locators": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "notes": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}
