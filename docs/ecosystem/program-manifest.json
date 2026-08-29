@@ -1,0 +1,820 @@
+{
+  "schema_version": "0.1.0",
+  "program_id": "sovereign-ai-os",
+  "title": "Sovereign AI OS",
+  "snapshot_date": "2026-08-29",
+  "canonical_context": "https://github.com/jryski/sovereign-memory-core/blob/main/docs/ecosystem/SOVEREIGN_AI_OS.md",
+  "authority_note": "This manifest is an informative, diffable snapshot of Jesse's accepted program direction. Component repositories remain authoritative for their own implementation and evidence. Private deployment state must not be inferred from this public file.",
+  "components": [
+    {
+      "id": "sovereign-memory-protocol",
+      "title": "Sovereign Memory Protocol",
+      "component_type": "protocol",
+      "program_layer": "custody",
+      "canonical_locator": {
+        "kind": "github-repository",
+        "visibility": "private",
+        "value": "https://github.com/jryski/sovereign-memory-protocol"
+      },
+      "role_doc": "https://github.com/jryski/sovereign-memory-protocol/blob/main/PROGRAM-ROLE.md",
+      "status_source": "https://github.com/jryski/sovereign-memory-protocol/blob/main/README.md",
+      "maturity": "seed",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "implementation-neutral custody semantics",
+        "provenance and authority semantics",
+        "lifecycle, correction, conflict, transfer, and conformance contracts"
+      ],
+      "non_goals": [
+        "PostgreSQL implementation",
+        "household or business ontology",
+        "planning workflow policy",
+        "runtime identity or orchestration"
+      ],
+      "upstream_components": [],
+      "downstream_components": [
+        "sovereign-memory-core",
+        "smp-federated-vault",
+        "household-os",
+        "sovereign-vault"
+      ],
+      "consumes_contracts": [],
+      "produces_contracts": [
+        "smp"
+      ],
+      "data_classification": "private-no-data-in-git",
+      "planning_relationship": "Planning deployments may consume protocol-level provenance and authority semantics, but deployment-specific kanban states, leases, assignments, and synchronization remain outside SMP unless separately generalized and ratified.",
+      "evidence_locators": [
+        "https://github.com/jryski/sovereign-memory-protocol/blob/main/README.md"
+      ],
+      "notes": [
+        "The repository is currently sparse; maturity reflects the repository content observed on the snapshot date, not the importance of the protocol role."
+      ]
+    },
+    {
+      "id": "sovereign-memory-core",
+      "title": "Sovereign Memory Core",
+      "component_type": "reference-runtime",
+      "program_layer": "custody",
+      "canonical_locator": {
+        "kind": "github-repository",
+        "visibility": "public",
+        "value": "https://github.com/jryski/sovereign-memory-core"
+      },
+      "role_doc": "https://github.com/jryski/sovereign-memory-core/blob/main/PROGRAM-ROLE.md",
+      "status_source": "https://github.com/jryski/sovereign-memory-core/blob/main/STATUS.md",
+      "maturity": "alpha",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "PostgreSQL reference custody runtime",
+        "source preservation and review",
+        "promotion, rejection, supersession, and cutover mechanics",
+        "migration, validation, recovery, and provider-exit evidence",
+        "synthetic adversarial fixtures and tests"
+      ],
+      "non_goals": [
+        "domain-specific household or business tables",
+        "permanent principal-bound connection identity",
+        "agent runtime and model routing",
+        "live organizational planning deployment"
+      ],
+      "upstream_components": [
+        "sovereign-memory-protocol"
+      ],
+      "downstream_components": [
+        "supabase-user-mcp",
+        "household-os",
+        "household-os-private",
+        "sovereign-vault",
+        "chat-mine",
+        "planning-work-plane",
+        "personal-wiki-memory-ui"
+      ],
+      "consumes_contracts": [
+        "smp"
+      ],
+      "produces_contracts": [
+        "core-reference-schema",
+        "source-import-package",
+        "readiness-scorecard",
+        "provider-exit-evidence"
+      ],
+      "data_classification": "public-synthetic-only",
+      "planning_relationship": "Provides reusable provenance, review, evidence, audit, migration, and recovery patterns. Planning remains a separate organizational plane with a different lifecycle.",
+      "evidence_locators": [
+        "https://github.com/jryski/sovereign-memory-core/blob/main/STATUS.md",
+        "https://github.com/jryski/sovereign-memory-core/blob/main/docs/00-north-star.md",
+        "https://github.com/jryski/sovereign-memory-core/blob/main/docs/ecosystem/SOVEREIGN_AI_OS.md"
+      ],
+      "notes": [
+        "No privileged database or service-role test should be presented as proof of human or agent connection identity."
+      ]
+    },
+    {
+      "id": "supabase-user-mcp",
+      "title": "Supabase User MCP",
+      "component_type": "access-layer",
+      "program_layer": "access",
+      "canonical_locator": {
+        "kind": "github-repository",
+        "visibility": "public",
+        "value": "https://github.com/jryski/Supabase_user_MCP"
+      },
+      "role_doc": "https://github.com/jryski/Supabase_user_MCP/blob/main/PROGRAM-ROLE.md",
+      "status_source": "https://github.com/jryski/Supabase_user_MCP/blob/main/docs/ROADMAP.md",
+      "maturity": "active-development",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "trusted human and agent identity propagation",
+        "narrow allowlisted data-plane capabilities",
+        "revocation, expiry, limits, idempotency, and audit metadata",
+        "database-enforced RLS integration",
+        "proposal and approval paths for consequential writes"
+      ],
+      "non_goals": [
+        "generic SQL, table, RPC, URL, or REST proxy",
+        "project control-plane administration",
+        "household or business ontology",
+        "agent runtime or model selection"
+      ],
+      "upstream_components": [
+        "sovereign-memory-core"
+      ],
+      "downstream_components": [
+        "household-os",
+        "household-os-private",
+        "sovereign-vault",
+        "planning-work-plane",
+        "hermes",
+        "personal-wiki-memory-ui",
+        "house-deployment",
+        "balanceeq-business-deployment"
+      ],
+      "consumes_contracts": [
+        "core-reference-schema",
+        "capability-policy-v0.1-proposed",
+        "planning-work-plane-v0.1",
+        "action-receipt-v0.1-proposed"
+      ],
+      "produces_contracts": [
+        "principal-bound-data-plane",
+        "planning-data-plane-profile"
+      ],
+      "data_classification": "public-synthetic-only",
+      "planning_relationship": "Enforces board visibility, claim eligibility, worker/reviewer separation, revocation, expiry, and bounded planning tools for both household and business deployments.",
+      "evidence_locators": [
+        "https://github.com/jryski/Supabase_user_MCP/blob/main/README.md",
+        "https://github.com/jryski/Supabase_user_MCP/blob/main/docs/PLANNING_DATA_PLANE_PROFILE.md"
+      ],
+      "notes": [
+        "M0 is active and is not a production data server on the snapshot date.",
+        "The hosted Supabase MCP remains the separate privileged build/control plane."
+      ]
+    },
+    {
+      "id": "household-os",
+      "title": "Household OS",
+      "component_type": "deployment-reference",
+      "program_layer": "domain",
+      "canonical_locator": {
+        "kind": "github-repository",
+        "visibility": "public",
+        "value": "https://github.com/jryski/Household-OS"
+      },
+      "role_doc": "https://github.com/jryski/Household-OS/blob/main/PROGRAM-ROLE.md",
+      "status_source": "https://github.com/jryski/Household-OS/blob/main/README.md",
+      "maturity": "early-architecture",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "public household-domain architecture",
+        "household entity, relationship, observation, event, and capability profiles",
+        "family planning and virtual-kanban profile",
+        "connector observation and reconciliation contracts",
+        "synthetic household fixtures and policy examples"
+      ],
+      "non_goals": [
+        "real household data",
+        "business ontology",
+        "protocol or Core redefinition",
+        "runtime identity implementation",
+        "model routing"
+      ],
+      "upstream_components": [
+        "sovereign-memory-protocol",
+        "sovereign-memory-core",
+        "supabase-user-mcp",
+        "planning-work-plane"
+      ],
+      "downstream_components": [
+        "household-os-private",
+        "house-deployment",
+        "personal-wiki-memory-ui",
+        "hermes"
+      ],
+      "consumes_contracts": [
+        "smp",
+        "core-reference-schema",
+        "principal-bound-data-plane",
+        "context-envelope-v0.1-proposed",
+        "capability-policy-v0.1-proposed",
+        "planning-work-plane-v0.1",
+        "connector-observation-v0.1-proposed",
+        "action-receipt-v0.1-proposed"
+      ],
+      "produces_contracts": [
+        "household-domain-profile",
+        "household-planning-profile"
+      ],
+      "data_classification": "public-synthetic-only",
+      "planning_relationship": "Owns the household-specific profile for family projects, school, activities, events, chores, maintenance, purchases, errands, and household agent coordination.",
+      "evidence_locators": [
+        "https://github.com/jryski/Household-OS/blob/main/README.md",
+        "https://github.com/jryski/Household-OS/blob/main/docs/PLANNING_WORK_PLANE.md"
+      ],
+      "notes": [
+        "Shared household coordination belongs in HOUSE; principal-private annotations belong in the relevant principal trust domain."
+      ]
+    },
+    {
+      "id": "household-os-private",
+      "title": "Household OS Private",
+      "component_type": "deployment-overlay",
+      "program_layer": "deployment",
+      "canonical_locator": {
+        "kind": "github-repository",
+        "visibility": "private",
+        "value": "https://github.com/jryski/Household_os_private"
+      },
+      "role_doc": "https://github.com/jryski/Household_os_private/blob/main/PROGRAM-ROLE.md",
+      "status_source": "https://github.com/jryski/Household_os_private/blob/main/README.md",
+      "maturity": "early-architecture",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "private HOUSE deployment plans",
+        "authentication and principal mapping change plans",
+        "deployment RPC and ACL inventory",
+        "synthetic acceptance and publication boundary"
+      ],
+      "non_goals": [
+        "public generic architecture",
+        "raw household data in Git",
+        "protocol or User MCP implementation",
+        "business deployment policy"
+      ],
+      "upstream_components": [
+        "household-os",
+        "sovereign-memory-core",
+        "supabase-user-mcp"
+      ],
+      "downstream_components": [
+        "house-deployment"
+      ],
+      "consumes_contracts": [
+        "household-domain-profile",
+        "household-planning-profile",
+        "principal-bound-data-plane"
+      ],
+      "produces_contracts": [
+        "house-deployment-profile"
+      ],
+      "data_classification": "private-no-data-in-git",
+      "planning_relationship": "Defines how the generic household planning profile is migrated, tested, secured, recovered, and accepted in HOUSE without putting live board rows in Git.",
+      "evidence_locators": [
+        "https://github.com/jryski/Household_os_private/blob/main/README.md"
+      ],
+      "notes": [
+        "The repository states M0 is documentation-only and does not itself authorize DDL, grants, policy changes, or deployment."
+      ]
+    },
+    {
+      "id": "sovereign-vault",
+      "title": "Sovereign Vault",
+      "component_type": "deployment-reference",
+      "program_layer": "domain",
+      "canonical_locator": {
+        "kind": "github-repository",
+        "visibility": "public",
+        "value": "https://github.com/WireSpeedComputing/Sovereign-Vault"
+      },
+      "role_doc": "https://github.com/jryski/sovereign-memory-core/blob/main/docs/ecosystem/BUSINESS_PLANNING_WORK_PLANE.md",
+      "status_source": "https://github.com/WireSpeedComputing/Sovereign-Vault/blob/main/STATUS.md",
+      "maturity": "alpha",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "generic multi-user business knowledge and operations data layer",
+        "business principal, capability, provenance, temporal, review, compliance, and audit patterns",
+        "bring-your-own business domain schema contracts",
+        "business planning and work profile"
+      ],
+      "non_goals": [
+        "real company data in Git",
+        "Household OS tables",
+        "User MCP implementation",
+        "agent runtime or model routing",
+        "proof of caller identity under one privileged connection"
+      ],
+      "upstream_components": [
+        "sovereign-memory-protocol",
+        "sovereign-memory-core",
+        "supabase-user-mcp",
+        "planning-work-plane"
+      ],
+      "downstream_components": [
+        "balanceeq-business-deployment",
+        "hermes",
+        "personal-wiki-memory-ui"
+      ],
+      "consumes_contracts": [
+        "smp",
+        "core-reference-schema",
+        "principal-bound-data-plane",
+        "context-envelope-v0.1-proposed",
+        "capability-policy-v0.1-proposed",
+        "planning-work-plane-v0.1",
+        "action-receipt-v0.1-proposed"
+      ],
+      "produces_contracts": [
+        "business-domain-profile",
+        "business-planning-profile"
+      ],
+      "data_classification": "public-synthetic-only",
+      "planning_relationship": "Planning is a first-class business capability for projects, launches, suppliers, compliance, incidents, customer work, approvals, human/agent assignment, evidence, and reconciliation.",
+      "evidence_locators": [
+        "https://github.com/WireSpeedComputing/Sovereign-Vault/blob/main/README.md",
+        "https://github.com/WireSpeedComputing/Sovereign-Vault/blob/main/STATUS.md",
+        "https://github.com/jryski/sovereign-memory-core/blob/main/docs/ecosystem/BUSINESS_PLANNING_WORK_PLANE.md"
+      ],
+      "notes": [
+        "The installed GitHub App could read this repository but returned HTTP 403 for file, branch, and issue writes on 2026-08-29. The accepted planning profile is mirrored in the public ecosystem context pending repository-specific adoption."
+      ]
+    },
+    {
+      "id": "planning-work-plane",
+      "title": "Planning and Work Plane",
+      "component_type": "planning-plane",
+      "program_layer": "planning",
+      "canonical_locator": {
+        "kind": "github-path",
+        "visibility": "public",
+        "value": "https://github.com/jryski/sovereign-memory-core/tree/main/docs/ecosystem"
+      },
+      "role_doc": "https://github.com/jryski/sovereign-memory-core/blob/main/docs/ecosystem/SOVEREIGN_AI_OS.md",
+      "status_source": "https://github.com/jryski/sovereign-memory-core/blob/main/docs/ecosystem/SOVEREIGN_AI_OS.md",
+      "maturity": "alpha",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "shared board and work-item lifecycle",
+        "dependency and blocker semantics",
+        "agent lease, heartbeat, release, submission, and review pattern",
+        "activity, evidence, and external-reference pattern",
+        "household and business deployment profiles"
+      ],
+      "non_goals": [
+        "caller identity by self-declared agent name",
+        "security authorization from ready status or capability labels",
+        "replacement of repository or provider-specific evidence authorities",
+        "one universal domain schema for household and business"
+      ],
+      "upstream_components": [
+        "sovereign-memory-core",
+        "supabase-user-mcp"
+      ],
+      "downstream_components": [
+        "household-os",
+        "household-os-private",
+        "sovereign-vault",
+        "hermes",
+        "personal-wiki-memory-ui",
+        "house-deployment",
+        "balanceeq-business-deployment"
+      ],
+      "consumes_contracts": [
+        "core-reference-schema",
+        "principal-bound-data-plane",
+        "capability-policy-v0.1-proposed",
+        "action-receipt-v0.1-proposed"
+      ],
+      "produces_contracts": [
+        "planning-work-plane-v0.1",
+        "household-planning-profile",
+        "business-planning-profile",
+        "planning-data-plane-profile"
+      ],
+      "data_classification": "mixed",
+      "planning_relationship": "This component is the planning relationship. Its public contracts are generic; the live cross-repository build board is privately deployed in Jesse's Vault and real household/business boards belong in their deployment stores.",
+      "evidence_locators": [
+        "https://github.com/jryski/Household-OS/blob/main/docs/PLANNING_WORK_PLANE.md",
+        "https://github.com/jryski/sovereign-memory-core/blob/main/docs/ecosystem/BUSINESS_PLANNING_WORK_PLANE.md",
+        "https://github.com/jryski/Supabase_user_MCP/blob/main/docs/PLANNING_DATA_PLANE_PROFILE.md"
+      ],
+      "notes": [
+        "The build-plane database implementation has boards, work items, dependencies, activity receipts, and atomic lease-token functions; it is not yet a principal-bound production planning service."
+      ]
+    },
+    {
+      "id": "hermes",
+      "title": "Hermes",
+      "component_type": "agent-runtime",
+      "program_layer": "runtime",
+      "canonical_locator": {
+        "kind": "github-repository",
+        "visibility": "private",
+        "value": "https://github.com/jryski/Hermes"
+      },
+      "role_doc": "https://github.com/jryski/Hermes/blob/main/PROGRAM-ROLE.md",
+      "status_source": "https://github.com/jryski/Hermes/blob/main/docs/current-state.md",
+      "maturity": "active-development",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "agent runtime deployment and isolation",
+        "tool routing and provider fallback",
+        "integration execution and reconciliation",
+        "promotion rings and earned-autonomy evidence",
+        "runtime observability and rollback"
+      ],
+      "non_goals": [
+        "durable truth ownership",
+        "self-granted authorization",
+        "model qualification authority",
+        "canonical planning state"
+      ],
+      "upstream_components": [
+        "supabase-user-mcp",
+        "planning-work-plane",
+        "model-radar",
+        "public-ai-skills"
+      ],
+      "downstream_components": [
+        "house-deployment",
+        "balanceeq-business-deployment"
+      ],
+      "consumes_contracts": [
+        "principal-bound-data-plane",
+        "planning-work-plane-v0.1",
+        "worker-qualification-evidence",
+        "skill-contract",
+        "action-receipt-v0.1-proposed"
+      ],
+      "produces_contracts": [
+        "runtime-deployment-profile",
+        "runtime-attempt-receipt"
+      ],
+      "data_classification": "private-no-data-in-git",
+      "planning_relationship": "Consumes authorized ready work, claims expiring leases, records progress and handoffs, submits exact evidence, and waits for required review. The runtime attempt does not own the card's accepted state.",
+      "evidence_locators": [
+        "https://github.com/jryski/Hermes/blob/main/README.md",
+        "https://github.com/jryski/Hermes/blob/main/PROGRAM-ROLE.md"
+      ],
+      "notes": [
+        "The README states the installer is generated and statically validated but not yet executed on the mini PC on the snapshot date."
+      ]
+    },
+    {
+      "id": "model-radar",
+      "title": "Model Radar",
+      "component_type": "evidence-system",
+      "program_layer": "qualification",
+      "canonical_locator": {
+        "kind": "github-repository",
+        "visibility": "private",
+        "value": "https://github.com/jryski/model-radar"
+      },
+      "role_doc": "https://github.com/jryski/model-radar/blob/main/PROGRAM-ROLE.md",
+      "status_source": "https://github.com/jryski/model-radar/blob/main/README.md",
+      "maturity": "active-development",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "model and provider registry",
+        "dated pricing and source evidence",
+        "workload qualification contracts and results",
+        "accepted, rejected, and superseded routing recommendations",
+        "privacy, cost, reliability, quota, and hardware-fit risks"
+      ],
+      "non_goals": [
+        "runtime authorization",
+        "durable household or business truth",
+        "agent orchestration",
+        "planning-card acceptance"
+      ],
+      "upstream_components": [],
+      "downstream_components": [
+        "hermes",
+        "house-deployment",
+        "balanceeq-business-deployment"
+      ],
+      "consumes_contracts": [
+        "workload-evaluation-contract"
+      ],
+      "produces_contracts": [
+        "worker-qualification-evidence",
+        "worker-routing-recommendation"
+      ],
+      "data_classification": "private-no-data-in-git",
+      "planning_relationship": "Maps card workload requirements to dated qualified worker routes. It does not decide whether an identity may read, claim, or act on the card.",
+      "evidence_locators": [
+        "https://github.com/jryski/model-radar/blob/main/README.md",
+        "https://github.com/jryski/model-radar/blob/main/DECISIONS.md"
+      ],
+      "notes": [
+        "Current recommendations are temporal and must be reverified against dated provider and local evidence."
+      ]
+    },
+    {
+      "id": "personal-wiki-memory-ui",
+      "title": "Personal Wiki Memory UI",
+      "component_type": "user-interface",
+      "program_layer": "interface",
+      "canonical_locator": {
+        "kind": "github-repository",
+        "visibility": "private",
+        "value": "https://github.com/jryski/Personal-Wiki-Memory-UI"
+      },
+      "role_doc": "https://github.com/jryski/Personal-Wiki-Memory-UI/blob/main/PROGRAM-ROLE.md",
+      "status_source": "https://github.com/jryski/Personal-Wiki-Memory-UI/blob/main/README.md",
+      "maturity": "seed",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "human-facing knowledge, provenance, conflict, planning, and review views",
+        "correction and adjudication interaction",
+        "program and project dashboards derived from canonical stores"
+      ],
+      "non_goals": [
+        "canonical data ownership",
+        "identity or RLS enforcement",
+        "agent orchestration",
+        "direct provider authority"
+      ],
+      "upstream_components": [
+        "sovereign-memory-core",
+        "supabase-user-mcp",
+        "planning-work-plane"
+      ],
+      "downstream_components": [
+        "house-deployment",
+        "balanceeq-business-deployment"
+      ],
+      "consumes_contracts": [
+        "core-reference-schema",
+        "principal-bound-data-plane",
+        "planning-work-plane-v0.1",
+        "context-envelope-v0.1-proposed"
+      ],
+      "produces_contracts": [
+        "review-interface-profile"
+      ],
+      "data_classification": "private-no-data-in-git",
+      "planning_relationship": "Projects boards, card context, dependencies, leases, activity, evidence, and review without making a drag-and-drop UI transition an authorization or truth decision.",
+      "evidence_locators": [
+        "https://github.com/jryski/Personal-Wiki-Memory-UI/blob/main/PROGRAM-ROLE.md"
+      ],
+      "notes": [
+        "The repository README is minimal on the snapshot date; the role file records intended scope rather than implemented UI capability."
+      ]
+    },
+    {
+      "id": "public-ai-skills",
+      "title": "Public AI Skills",
+      "component_type": "skill-library",
+      "program_layer": "runtime",
+      "canonical_locator": {
+        "kind": "github-repository",
+        "visibility": "public",
+        "value": "https://github.com/jryski/Public_AI_SKills"
+      },
+      "role_doc": "https://github.com/jryski/Public_AI_SKills/blob/main/PROGRAM-ROLE.md",
+      "status_source": "https://github.com/jryski/Public_AI_SKills/blob/main/README.md",
+      "maturity": "active-development",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "versioned reusable behavioral procedures",
+        "skill specifications and manifest",
+        "examples, evaluation guidance, licensing, and usage gates"
+      ],
+      "non_goals": [
+        "data or planning authority",
+        "identity or RLS",
+        "model qualification",
+        "runtime tool wiring"
+      ],
+      "upstream_components": [],
+      "downstream_components": [
+        "hermes"
+      ],
+      "consumes_contracts": [],
+      "produces_contracts": [
+        "skill-contract",
+        "skill-manifest"
+      ],
+      "data_classification": "public-synthetic-only",
+      "planning_relationship": "A card may request a named skill, but the skill requirement is routing metadata and does not prove model competence, grant data access, or authorize action.",
+      "evidence_locators": [
+        "https://github.com/jryski/Public_AI_SKills/blob/main/README.md",
+        "https://github.com/jryski/Public_AI_SKills/blob/main/USAGE-GATE.md"
+      ],
+      "notes": [
+        "Organizational and commercial use remains subject to the repository's explicit licensing terms."
+      ]
+    },
+    {
+      "id": "smp-federated-vault",
+      "title": "SMP Federated Vault",
+      "component_type": "portability-profile",
+      "program_layer": "portability",
+      "canonical_locator": {
+        "kind": "github-repository",
+        "visibility": "private",
+        "value": "https://github.com/jryski/smp-federated-vault"
+      },
+      "role_doc": "https://github.com/jryski/smp-federated-vault/blob/main/PROGRAM-ROLE.md",
+      "status_source": "https://github.com/jryski/smp-federated-vault/blob/main/README.md",
+      "maturity": "research",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "local-file or federated storage profile",
+        "mapping to accepted SMP semantics",
+        "portability and round-trip evidence"
+      ],
+      "non_goals": [
+        "normative SMP ownership",
+        "PostgreSQL feature parity",
+        "household or business ontology",
+        "runtime identity or orchestration"
+      ],
+      "upstream_components": [
+        "sovereign-memory-protocol"
+      ],
+      "downstream_components": [],
+      "consumes_contracts": [
+        "smp"
+      ],
+      "produces_contracts": [
+        "portable-storage-profile"
+      ],
+      "data_classification": "private-no-data-in-git",
+      "planning_relationship": "Portable planning or offline work state is out of scope unless explicitly profiled with stable identity, staleness, conflict, and reconciliation behavior.",
+      "evidence_locators": [
+        "https://github.com/jryski/smp-federated-vault/blob/main/README.md"
+      ],
+      "notes": [
+        "The repository is a private dogfood implementation and remains research-grade on the snapshot date."
+      ]
+    },
+    {
+      "id": "chat-mine",
+      "title": "Chat-Mine",
+      "component_type": "ingestion-system",
+      "program_layer": "ingestion",
+      "canonical_locator": {
+        "kind": "github-path",
+        "visibility": "public",
+        "value": "https://github.com/jryski/sovereign-memory-core/blob/main/docs/10-chat-mine-source-import-exporter.md"
+      },
+      "role_doc": null,
+      "status_source": "https://github.com/jryski/sovereign-memory-core/blob/main/docs/00-north-star.md",
+      "maturity": "research",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "conversation reconstruction research",
+        "deterministic source-import package emission",
+        "candidate evidence and locator generation",
+        "known-answer quality evaluation"
+      ],
+      "non_goals": [
+        "self-authenticating truth",
+        "automatic conflict resolution",
+        "canonical promotion authority",
+        "claim that general long-chat mining is solved"
+      ],
+      "upstream_components": [
+        "sovereign-memory-core"
+      ],
+      "downstream_components": [
+        "sovereign-memory-core",
+        "house-deployment",
+        "balanceeq-business-deployment"
+      ],
+      "consumes_contracts": [
+        "source-import-package"
+      ],
+      "produces_contracts": [
+        "source-import-emitter-profile"
+      ],
+      "data_classification": "public-synthetic-only",
+      "planning_relationship": "May reconstruct candidate projects, tasks, decisions, and unresolved work from source conversations, but emits proposals that require review before entering a canonical board.",
+      "evidence_locators": [
+        "https://github.com/jryski/sovereign-memory-core/blob/main/docs/10-chat-mine-source-import-exporter.md",
+        "https://github.com/jryski/sovereign-memory-core/blob/main/docs/00-north-star.md"
+      ],
+      "notes": [
+        "Research-grade until representative known-answer evaluations establish scoped quality."
+      ]
+    },
+    {
+      "id": "house-deployment",
+      "title": "HOUSE Operational Deployment",
+      "component_type": "operational-deployment",
+      "program_layer": "deployment",
+      "canonical_locator": {
+        "kind": "private-deployment",
+        "visibility": "restricted",
+        "value": null
+      },
+      "role_doc": "https://github.com/jryski/Household_os_private/blob/main/PROGRAM-ROLE.md",
+      "status_source": null,
+      "maturity": "deployment-specific",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "accepted shared household records",
+        "live household planning state when deployed",
+        "household-specific integrations and operational evidence"
+      ],
+      "non_goals": [
+        "public architecture authority",
+        "principal-private VAULT content",
+        "business records",
+        "public repository data"
+      ],
+      "upstream_components": [
+        "household-os",
+        "household-os-private",
+        "supabase-user-mcp",
+        "planning-work-plane",
+        "hermes",
+        "model-radar"
+      ],
+      "downstream_components": [
+        "personal-wiki-memory-ui"
+      ],
+      "consumes_contracts": [
+        "house-deployment-profile",
+        "principal-bound-data-plane",
+        "household-planning-profile",
+        "worker-qualification-evidence"
+      ],
+      "produces_contracts": [
+        "house-operational-evidence"
+      ],
+      "data_classification": "deployment-data",
+      "planning_relationship": "The eventual family board source of truth belongs here. School, events, projects, chores, maintenance, and household-visible agent work remain separate from principal-private annotations.",
+      "evidence_locators": [],
+      "notes": [
+        "No project IDs, URLs, credentials, real household records, or exact private topology are published in this manifest.",
+        "Untrusted multi-principal enrollment remains gated on User MCP identity and the coordinated RLS cutover."
+      ]
+    },
+    {
+      "id": "balanceeq-business-deployment",
+      "title": "BalanceEQ Business OS Deployment",
+      "component_type": "operational-deployment",
+      "program_layer": "deployment",
+      "canonical_locator": {
+        "kind": "private-deployment",
+        "visibility": "restricted",
+        "value": null
+      },
+      "role_doc": "https://github.com/jryski/sovereign-memory-core/blob/main/docs/ecosystem/BUSINESS_PLANNING_WORK_PLANE.md",
+      "status_source": null,
+      "maturity": "deployment-specific",
+      "status_as_of": "2026-08-29",
+      "owns": [
+        "accepted company-specific records and operations",
+        "business-specific ontology and policies",
+        "team and agent planning state when deployed",
+        "business integrations and operational evidence"
+      ],
+      "non_goals": [
+        "public reference schema authority",
+        "Household OS data or policy",
+        "private company data in public repositories",
+        "shared service-role access as final multi-user identity"
+      ],
+      "upstream_components": [
+        "sovereign-vault",
+        "supabase-user-mcp",
+        "planning-work-plane",
+        "hermes",
+        "model-radar"
+      ],
+      "downstream_components": [
+        "personal-wiki-memory-ui"
+      ],
+      "consumes_contracts": [
+        "business-domain-profile",
+        "business-planning-profile",
+        "principal-bound-data-plane",
+        "worker-qualification-evidence",
+        "action-receipt-v0.1-proposed"
+      ],
+      "produces_contracts": [
+        "business-operational-evidence"
+      ],
+      "data_classification": "deployment-data",
+      "planning_relationship": "The business deployment should use the planning plane for team projects, product launches, suppliers, compliance, incidents, customer work, approvals, meetings, and human/agent work. It benefits directly and is not a secondary consumer of a household-only feature.",
+      "evidence_locators": [],
+      "notes": [
+        "No private deployment locator or company payload is published in this manifest.",
+        "Current deployment state must be obtained from the authorized private business source, not inferred from this program map."
+      ]
+    }
+  ]
+}
