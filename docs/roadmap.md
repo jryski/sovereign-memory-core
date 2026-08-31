@@ -1,137 +1,139 @@
 # Roadmap
 
-## Project north star
+## North star
 
-Sovereign Memory Core exists to make AI memory transfer trustworthy.
+Sovereign Memory Core exists to make AI memory custody and transfer
+independently verifiable.
 
 Short form:
 
-> Trustworthy memory transfer.
-
-Operational framing:
-
 > Chain of custody for AI memory.
 
-Formats move bytes. SMP proves memory transfer earned authority.
-
-The project should not compete to become the winning memory-record format. It should provide the custody, verification, provenance, review, and cutover layer around many possible sources, exports, applications, and future memory formats.
+The project should not compete to become the universal memory format or the
+best retrieval engine. It should provide a reference runtime and executable
+evidence for custody, provenance, authority, lifecycle, verification,
+portability, and recovery semantics that other systems can compose with.
 
 ## Current phase
 
-The repo is in `v0.1-alpha - Custody Foundation`.
+`v0.3-alpha` is published.
 
-The custody rails are mostly implemented and are being documented, hardened, and organized for repeatable contribution. The local operator path is next: a contributor should be able to install, validate, import a fixture, run a rollback loader proof, and understand what is safe before touching any live system.
+The alpha established a reviewed PostgreSQL reference runtime with fail-closed
+perimeter evaluability, lifecycle/provenance tests, provider-exit evidence,
+schema-drift checks, release receipts, and a separately exercised deployment
+recovery procedure.
 
-## What is done
+The project is now in a **post-alpha hardening and separation phase**. The next
+work is not "finish the alpha." It is to reduce ambiguity, separate protocol
+semantics from implementation and deployment concerns, improve operator
+experience, and expand evidence only where new measurements justify broader
+claims.
 
-- Core Postgres schema for memory, wiki, attention, provenance, supersession, and operating-doc integrity.
-- Optional vault schemas and provenance guards.
-- Generic source-import/cutover foundation.
-- Candidate locators and candidate-level quote hashes.
-- Richer cutover probe categories.
-- Deterministic Chat-Mine package fixture.
-- Rollback-only loader proof.
-- Negative package mutation tests.
-- Negative SQL corruption tests.
-- Public-readiness scrub of tracked examples and fixtures.
-- Source-import validation with fatal blocker checks.
+## Work streams
 
-## What is next
+### 1. Protocol / specification separation
 
-- Finish project organization, ADRs, and contribution paths.
-- Document durable-write policy for protected memory scopes.
-- Build the local operator flow: `smc doctor`, local Docker install, schema installer, validation runner, and safe database URL checks.
-- Add review workflow for accept, hold, reject, and evidence display.
-- Define adapter profiles without making Chat-Mine quality claims.
+Goal: make implementation-neutral semantics readable and testable without
+requiring PostgreSQL-specific knowledge.
 
-## Tracks
+- identify normative custody semantics currently embedded in Core docs/tests;
+- keep PostgreSQL implementation details in Core;
+- use positive neutrality tests where practical, not only identifier denylists;
+- preserve history while material is copied/reconciled across repository
+  boundaries;
+- do not let downstream deployments redefine protocol semantics locally.
 
-| Track | Purpose | Current posture |
-|---|---|---|
-| Alpha build | Make the custody layer installable, verifiable, reviewable, and recoverable by an operator. | Active near-term work. |
-| Publication | Explain SMP custody concepts, conformance gaps, and adoption path without overclaiming implementation completeness. | Drafting and review. |
-| Research | Improve Chat-Mine and other emitters through evaluation, not claims. | Explicitly separate from alpha build. |
+### 2. Core runtime hardening
 
-## Milestones
+Goal: make the PostgreSQL reference runtime safer and easier to evaluate.
 
-### v0.1-alpha - Custody Foundation
+- continue adversarial perimeter and migration testing;
+- reduce broad/shared credential assumptions;
+- strengthen verifiable principal/runtime attribution where feasible;
+- keep release evidence bound to exact candidate coordinates;
+- improve schema and deployment drift detection without turning approximate
+  checks into stronger claims than they support.
 
-Mostly complete or in documentation-finalization phase.
+### 3. Provider exit and recovery
 
-Includes:
+Goal: broaden portability evidence deliberately.
 
-- source-import foundation
-- candidate locators and quote hashes
-- cutover probe categories
-- deterministic Chat-Mine package fixture
-- rollback loader proof
-- negative package mutation tests
-- negative SQL corruption tests
-- public-readiness scrub
-- north-star docs
-- publication docs
-- conformance gap audit
-- durable-write policy
+- keep PostgreSQL 15/16 as the declared v0.3-alpha provider-exit range;
+- add new PostgreSQL major versions only after independent version-matched proof;
+- evolve bundle profiles where current representation constraints are too
+  narrow;
+- distinguish database portability from hosted-product reconstruction;
+- keep recovery-anchor and rollback rehearsals part of deployment acceptance.
 
-### v0.2-alpha - Local Operator Flow
+### 4. Source adapters and review flows
 
-Includes:
+Goal: connect real source systems without weakening custody semantics.
 
-- `smc doctor`
-- local Docker install
-- schema installer
-- validation runner
-- safe database URL checks
-- operator documentation
+- define adapter profiles and lossiness declarations;
+- exercise import/review/cutover/rollback flows on representative data;
+- keep proposals distinct from human acceptance;
+- preserve conflict and supersession semantics;
+- measure source-understanding quality instead of inferring it from deterministic
+  packaging success.
 
-### v0.3-alpha - Review Workflow
+### 5. Operator ergonomics
 
-Includes:
+Goal: make the safe path obvious to humans.
 
-- review queue
-- accept / hold / reject flow
-- evidence display
-- candidate status transitions
-- basic review UI or CLI review
+Potential work includes:
 
-### v0.4-alpha - Adapter Profiles
+- a doctor/preflight command;
+- safer migration/install wrappers;
+- clearer recovery and rollback tooling;
+- executable drift inventory;
+- clearer release/evidence inspection;
+- local disposable-environment helpers.
 
-Includes:
+Operator convenience must not bypass recovery, validation, authority, or
+perimeter checks.
 
-- adapter profile template
-- generic external source profile
-- lossiness declaration format
-- sample import profile
-- round-trip/export profile
-- no real Chat-Mine quality claims
+### 6. Documentation and adoption
 
-### v0.5-alpha - Publication Candidate
+Goal: make the project understandable without requiring issue archaeology.
 
-Includes:
+- keep README and STATUS aligned with released evidence;
+- maintain explicit "proved / not proved" boundaries;
+- move stale historical plans out of current guidance rather than leaving them
+  mixed with active instructions;
+- document repository boundaries and contribution paths;
+- keep terminology and protocol naming decisions deliberate and durable.
 
-- conformance fixture
-- public docs
-- license/IP checklist
-- history/privacy caveat
-- release notes
-- demo walkthrough
+## Release philosophy
 
-### v1.0 - SMP Custody Layer Reference
+Future releases should be evidence-driven, not calendar-driven.
 
-Includes:
+A release may broaden a claim only when the corresponding executable evidence
+exists. A deployment-specific success does not silently broaden Core support,
+and a Core test does not silently certify every downstream deployment.
 
-- stable custody-layer reference implementation
-- conformance docs
-- adoption/ratification criteria
-- release artifacts
+Each release should answer four questions clearly:
 
-## Release targets
+1. What exact behavior is claimed?
+2. On which runtime/provider/version surface was it measured?
+3. What evidence can an independent reviewer reproduce?
+4. What remains explicitly outside the claim?
 
-| Release | Target outcome |
-|---|---|
-| `v0.1-alpha` | Custody foundation can be reviewed and validated from the repo. |
-| `v0.2-alpha` | A local operator can install and validate the foundation without manually interpreting every SQL file. |
-| `v0.3-alpha` | Candidate review and promotion are visible, testable, and bounded. |
-| `v0.4-alpha` | External sources can declare profile, lossiness, and evidence posture. |
-| `v0.5-alpha` | The repo can support a public release candidate with clear conformance gaps. |
-| `v1.0` | SMP custody-layer reference behavior is stable enough for adoption testing. |
+## What is deliberately not on this roadmap
+
+This repository is not the roadmap for:
+
+- a household UI or household operating system;
+- a business SaaS product;
+- private deployment configuration;
+- a generic vector database or RAG engine;
+- a universal agent orchestrator;
+- hosted-provider control-plane reconstruction.
+
+Those systems may consume Core, but their product roadmaps belong downstream.
+
+## Current release references
+
+- [`README.md`](../README.md) — human-oriented project entry point
+- [`STATUS.md`](../STATUS.md) — current implementation/release state
+- [`release/v0.3-alpha-known-limitations.md`](../release/v0.3-alpha-known-limitations.md) — exact alpha claim boundaries
+- [`docs/project-management.md`](project-management.md) — issue/PR/ADR operating model

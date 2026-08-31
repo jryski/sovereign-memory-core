@@ -1,138 +1,106 @@
-# Sovereign Memory Core Status
+# Sovereign Memory Core status
 
-Status date: 2026-07-08
+Last updated: 2026-08-15
 
-> **v0.3-alpha release-path note (2026-08-13):** Issue #55 is the canonical
-> release program and supersedes the older scorecard/development order below
-> wherever they conflict. The immediate provider-exit path is C1 perimeter
-> evaluability followed by C2 independent export/clean-restore proof. See
-> [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md) and the
-> [`restore rehearsal template`](docs/templates/restore-rehearsal.md).
+## Current state
 
-## Current rating
+`v0.3-alpha` is published as a prerelease.
 
-| Dimension | Current | Target | Notes |
-|---|---:|---:|---|
-| Core schema concept | 9/10 | 10/10 | Strong baseline for memory, wiki, attention index, provenance, supersession, and operating-doc integrity. |
-| Repo/deployment alignment | 7/10 | 10/10 | The generic source-import/cutover foundation is repo-owned; deployment drift and operational evidence still need periodic verification. |
-| Source import/cutover readiness | 8/10 | 10/10 | Foundation, candidate provenance, richer probes, fatal validation, and the first internal producer slice exist; real adapters and operational dry runs remain. |
-| Security posture | 8/10 | 10/10 | Security model is honest; next step is least-privilege access hardening beyond broad credential operation. |
-| Survivability | 7/10 | 10/10 | Backup/restore guidance and an evidence template exist; independent export/clean-restore execution and reproducible receipts remain open. |
-| Personal memory UX/readability | 6/10 | 10/10 | Core has strong data model; browser UI belongs in a separate repo. |
-| Governance/review | 7/10 | 10/10 | Proposed/superseded/review concepts exist; needs complete review and promotion workflow. |
+The alpha release closed the finite release program tracked in issue #55 and
+established a reviewed PostgreSQL reference runtime with:
 
-## Confirmed current repo contents
+- PostgreSQL 15/16 conformance coverage;
+- fail-closed perimeter evaluability;
+- reviewed authority and `SECURITY DEFINER` hardening;
+- lifecycle, provenance, supersession, replay, and concurrency tests;
+- executable provider-exit package/restore evidence on PostgreSQL 16;
+- schema-drift comparison;
+- checksummed release artifacts and exact-coordinate review;
+- a separate HOUSE deployment recovery rehearsal with a retained logical anchor
+  and a PostgreSQL 17.10 public-schema restore.
 
-The repository currently contains:
+The HOUSE rehearsal is deployment-specific and does **not** expand Core's
+provider-exit support range beyond PostgreSQL 15 and 16. See
+[`release/v0.3-alpha-known-limitations.md`](release/v0.3-alpha-known-limitations.md).
 
-- Tier 1 core SQL: `sql/01_core.sql`
-- Tier 2 vault SQL: `sql/02_vault.sql`
-- Provenance guard SQL: `sql/03_provenance_guards.sql`
-- Source-import/cutover foundation: `sql/04_source_import.sql`
-- Candidate locators and quote hashes: `sql/05_candidate_locators.sql`
-- Richer cutover probe categories: `sql/06_cutover_probe_categories.sql`
-- Source-import validation with fatal blocker enforcement and rollback fixtures
-- First internal Chat-Mine producer slice with deterministic package validation and a rollback loader smoke path
-- Architecture, security, agent operations, implementation, operations, and pattern docs
-- Roadmap, ADR, contribution, security, support, issue template, and PR template scaffolding
-- A verified baseline claim against vanilla PostgreSQL 16
+## What this repository owns
 
-## Drift policy
+Core owns the PostgreSQL reference implementation and its executable evidence:
 
-This repository should not carry a detailed inventory of any one private deployment. That information belongs in that deployment's own wiki, issue tracker, or operations log.
+- migrations and database contracts in `sql/`;
+- conformance and adversarial tests in `tests/`;
+- export/restore, schema-drift, and release tooling in `scripts/`;
+- synthetic fixtures in `fixtures/`;
+- implementation and operator documentation in `docs/`;
+- release procedures and limitations in `release/`.
 
-The repo should instead provide a repeatable drift ledger template that any deployment can fill in.
+Core does **not** own a particular household or business deployment, private
+operating evidence, production credentials, a consumer UI, or the
+implementation-neutral protocol specification itself.
 
-### Drift ledger template
+## Current supported release surface
 
-```text
-deployment_name:
-review_date:
-reviewed_by:
-repo_ref:
-database_ref:
+| Surface | v0.3-alpha status |
+|---|---|
+| PostgreSQL 15 | CI/conformance covered |
+| PostgreSQL 16 | CI/conformance + provider-exit rehearsal covered |
+| PostgreSQL 17 | Not in declared provider-exit support range; one deployment-specific recovery procedure was exercised separately |
+| Perimeter evaluability | Fail-closed clean / violated / unsupported contract |
+| Portable package/restore | Proven for the declared synthetic provider-exit profile |
+| Hosted-provider product reconstruction | Not claimed |
+| Cryptographic principal attribution | Not claimed |
+| Full physical erasure across every external copy | Not claimed |
 
-object_inventory_method:
-  tables_query:
-  routines_query:
-  grants_query:
+## Known release limitations
 
-repo_objects_missing_from_deployment:
-  - object:
-    expected_from:
-    severity:
-    action:
+Do not reconstruct the alpha's limitations from issue history. The canonical
+release-scoped list is:
 
-deployment_objects_missing_from_repo:
-  - object:
-    object_type:
-    schema:
-    generic_core_candidate: yes/no
-    deployment_specific: yes/no
-    reason:
-    action:
+[`release/v0.3-alpha-known-limitations.md`](release/v0.3-alpha-known-limitations.md)
 
-semantic_drift:
-  - object_or_doc:
-    repo_behavior:
-    deployment_behavior:
-    risk:
-    action:
+That document includes the important boundaries around hosted-service
+portability, HOUSE's partial plain-PostgreSQL restore, PostgreSQL 17 scope,
+actor attribution, perimeter findings, checksum semantics, schema-drift
+comparison, source-fingerprint binding, and erasure.
 
-known_waivers:
-  - item:
-    reason:
-    owner:
-    review_by:
+## Post-alpha priorities
 
-result:
-  status: aligned / intentional-drift / action-required
-  next_action:
-```
+The release is no longer blocked on the old C1/C2/#59 sequence. New work should
+be justified independently rather than reopening completed release gates.
 
-## Interpretation
+Current classes of follow-up work are:
 
-The reusable source-import/cutover foundation is represented as versioned SQL, validation,
-and docs. It remains generic across source types. The Chat-Mine package exporter is the first
-internal producer aligned with that contract, not a public interchange protocol.
+1. **Protocol/specification separation** — continue extracting
+   implementation-neutral semantics from the PostgreSQL reference runtime
+   without forcing deployment behavior into Core.
+2. **Deployment/runtime boundary cleanup** — keep household and organizational
+   deployment state outside this public reusable repository.
+3. **Least-privilege and attribution hardening** — reduce reliance on broad or
+   shared credential paths and improve independently verifiable actor identity.
+4. **Provider-exit evolution** — expand profiles or PostgreSQL-version support
+   only when new independent evidence exists.
+5. **Source-adapter and review workflows** — exercise real adapter/review flows
+   without weakening custody, provenance, conflict, or rollback semantics.
+6. **Documentation and operator ergonomics** — make safe paths obvious without
+   hiding the limits of the alpha.
 
-The next gap is operational adoption: real source adapters, review UI, Hermes orchestration,
-and dry runs against representative exports. Those layers must preserve the core review and
-conflict posture rather than bypassing it.
+## Public/private boundary
 
-Repository coordination should use `docs/roadmap.md`, `docs/project-management.md`, and
-`docs/adr/` so roadmap, issues, PRs, milestones, decisions, and releases remain visible outside
-any single chat transcript.
+This is a public reference repository.
 
-Deployment-specific inventories should be maintained outside this public/reusable status document.
+Private deployment inventories, real project identifiers, credentials, private
+hostnames, personal records, household records, business records, recovery
+artifacts, and private operating receipts belong outside this repository.
+Synthetic fixtures may model the same behavior without carrying real data.
 
-## 10/10 blockers
+## Development rule
 
-1. No real source adapters have completed an end-to-end import and rollback dry run.
-2. Review queue and promotion workflow need UI support.
-3. Hermes orchestration is not implemented.
-4. The provider-exit rehearsal template exists, but C1 evaluability and independent C2 clean-restore evidence are not yet accepted.
-5. Broad credential operation remains the practical trust boundary; least-privilege access hardening is not yet implemented.
-6. Drift ledger process is documented here but not yet backed by an executable inventory check.
-7. No formal release tag declares a known-good schema version.
+Treat conformance claims as executable claims.
 
-## Immediate development order
+A generic defect discovered in a deployment should be reproduced with sanitized
+synthetic evidence before being promoted into Core. Deployment-specific product
+behavior should stay downstream. Changes to runtime semantics should come with
+appropriate regression/adversarial coverage and should not silently broaden the
+scope of a published release.
 
-For v0.3-alpha, follow issue #55 rather than this older general roadmap. The release-critical
-sequence is C1 perimeter evaluability, C2 independent provider-exit proof, HOUSE acceptance,
-and the remaining release-manifest/tag receipts. The older product-development order below is
-parked until that finite gate clears.
-
-1. Exercise a real source adapter through export, review, cutover probes, and rollback.
-2. Add review UI without bypassing manifest decisions or conflict posture.
-3. Add Hermes orchestration only after the manual producer/loader path is proven.
-4. Add backup/export/restore evidence template.
-5. Add least-privilege access hardening design.
-6. Add an executable deployment drift inventory check.
-7. Coordinate with peer reviewers before applying live DB mutations.
-
-## Rule for this phase
-
-Do not make live schema changes casually. The source-import/cutover foundation is captured and
-validated in the repo, but real deployment work should still use explicit migrations,
-acceptance tests, dry-run evidence, and review.
+For contribution mechanics, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
