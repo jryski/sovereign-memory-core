@@ -1,155 +1,96 @@
 # Sovereign Memory Core
 
-**A PostgreSQL runtime for AI memory you can audit, move, and prove.**
+**The PostgreSQL reference runtime for Sovereign Memory Protocol (SMP).**
 
-> **Status: alpha.** Tested on PostgreSQL 15 and 16 in CI on every pull request.
-> No live deployment has completed independent acceptance. Read
-> [What's not done](#whats-not-done)
-> before relying on it for anything that matters.
+Sovereign Memory Core is where implementation-neutral SMP semantics are exercised as concrete PostgreSQL behavior: migrations, authority/perimeter enforcement, replay, adversarial tests, export/restore, and provider-exit evidence.
 
-## The problem, concretely
+It is **not** the protocol, a consumer application, a generic RAG product, or a deployment repository.
 
-We examined multi-year ChatGPT and Claude exports from real accounts.
+## Program role
 
-Both returned the conversations. **Neither returned which project a
-conversation belonged to.** One returned the project definitions, names,
-instructions, attached documents, with no link from any conversation to any of
-them.
+The wider Sovereign Memory program is deliberately split into separate authority planes:
 
-You get your words back. You do not get your organization of them. That is a
-portability gap even when a compliance export exists.
+1. **Sovereign Memory Protocol** — implementation-neutral meaning, custody/provenance semantics, assurance, conformance, and profiles.
+2. **Sovereign Memory Core** — this repository: one PostgreSQL reference implementation and adversarial proving ground.
+3. **Data-plane capability and deployment/application layers** — user-context MCP, Household OS, Hermes runtimes, and downstream implementations that consume protocol/runtime behavior without redefining it.
 
-This is not an accusation of bad faith. Export formats are built for compliance,
-not continuity. But it means "you can export your data" and "you can leave" are
-different claims, and only one of them is usually true.
+Dependencies flow downward. A PostgreSQL mechanism demonstrated here must not silently become a universal protocol requirement.
 
-## What this is
+## Current status
 
-Most memory products optimize **recall**: extract useful facts, retrieve them
-for a model. That is a real problem, and specialists solve it better than this
-project does.
+**Alpha release closeout is substantially complete in Core, but the wider alpha acceptance is not complete.**
 
-This project asks a different question, **custody**:
+- C1 perimeter evaluability passed independent exact-head adversarial review.
+- C2 provider-exit / clean-restore evidence passed for the synthetic/reference implementation.
+- PR #82, the v0.3-alpha release-closeout package, merged after independent exact-head review of the release-evidence binding and fabrication-resistance path.
+- Live HOUSE issue #59 remains open and P0. The real PostgreSQL 17 household deployment still requires its own recovery-anchor/restore acceptance before the wider alpha claim can be treated as complete.
+- No Core result should be read as proof that a particular deployment has applied the same migrations, perimeter, recovery controls, or acceptance evidence.
 
-- What was the original evidence, and is this record an observation, a derived
-  belief, a proposal, or something a human actually accepted?
-- Who changed it, through which runtime and authority path?
-- What did it supersede, and what superseded it?
-- Can the history be reconstructed independently?
-- Can it be exported, restored, verified, corrected, and erased without trusting
-  one vendor forever?
+See [ROADMAP.md](ROADMAP.md) for the current sequencing and [docs/WIKI.md](docs/WIKI.md) for the repository orientation page.
 
-**Sovereign Memory Protocol (SMP)** is the implementation-neutral contract for
-those questions. **Sovereign Memory Core**, this repository, is the PostgreSQL
-reference implementation where those contracts get built and attacked.
+## What this repository proves
 
-It is not a consumer application and not a complete memory product.
+Core is designed to make the following classes of claims executable rather than aspirational:
 
-## Relationship to memory engines
+- **Lifecycle and lineage** — proposal, evidence, acceptance, supersession, replay, and append-only history.
+- **Authority perimeter** — direct grants, inherited roles, `PUBLIC`, SECURITY DEFINER inventory, search-path hardening, and evaluability of the perimeter itself.
+- **Upgrade/reapply safety** — migration ordering, reapply behavior, and deliberate-drift remediation.
+- **Provider exit** — deterministic export bundle, clean restore into an independent PostgreSQL cluster, reciprocal positive/negative controls, source-unchanged verification, schema-drift comparison, and release evidence bound to exact candidate coordinates.
+- **Claim limits** — unsupported, not-evaluated, incomplete, unknown, and clean results are distinct states.
 
-Engines such as Eywa, Mem0, Zep/Graphiti, Supermemory, and Hindsight handle
-extraction, retrieval, ranking, temporal reasoning, and context assembly.
+Passing CI proves repository behavior at the tested coordinate. It does not certify downstream deployments.
 
-They ask: *what should be remembered, and what context answers this question?*
+## Relationship to SMP
 
-SMP asks: *what is being held, under whose authority, with what lineage, and can
-it be moved, verified, corrected, erased, and restored independently?*
+The protocol repository owns the portable semantics. Core owns PostgreSQL mechanisms.
 
-These compose. A memory engine can implement SMP custody contracts. SMP should
-not become a retrieval engine. Architecture boundary and an Eywa crosswalk:
-[`docs/positioning.md`](docs/positioning.md).
+Examples:
 
-## The three layers
+| Protocol concern | Core mechanism examples |
+| --- | --- |
+| custody / provenance | immutable evidence and event tables, lineage constraints |
+| authority / assurance | ACLs, RLS, SECURITY DEFINER inventory, actor/runtime fields |
+| evaluability | `perimeter_report()` and fail-closed assertions |
+| portability / provider exit | export bundle, validator, clean restore rehearsal |
+| continuity / recovery | migration ledger, restore checks, rollback-safe acceptance harnesses |
 
-| Layer | Responsibility | In this repo? |
-|---|---|---|
-| **SMP protocol** | Implementation-neutral custody, provenance, lifecycle, verification, supersession, erasure, portability, conformance | Partly, while the specification repository is prepared |
-| **Runtime / core** | PostgreSQL reference implementation, migrations, perimeter enforcement, replay, tests, and export/restore contracts | **Yes** |
-| **Deployment** | A particular person's or organization's policies, credentials, adapters, data, and operating evidence | **No** |
+If a requirement only makes sense because PostgreSQL exists, it belongs here or in a PostgreSQL profile — not in the protocol core.
 
-Dependencies run one way. Deployments consume a released runtime; runtimes
-implement the protocol; the protocol must not depend on PostgreSQL, on a hosted
-provider, or on any particular interface.
+## Relationship to current adjacent work
 
-## Principles
+- **Supabase User MCP** is building the authenticated user/agent data-plane capability that preserves user context into PostgREST/RLS. It is not part of Core.
+- **Household OS** is a deployment/application layer and public synthetic reference architecture. It does not define SMP semantics.
+- **Household OS Private** contains deployment-specific planning/evidence and must remain a separate trust/visibility surface.
+- **Model Radar** owns model/provider/workload qualification evidence, not memory authority.
+- **Hermes** owns agent/runtime orchestration, workers, and recovery behavior, not protocol authority.
 
-1. **Evidence before belief.** Derived state stays linked to what supports it.
-2. **Lock custody facts and preserve history.** Accepted custody-semantic fields
-   are write-once in ordinary operation. Corrections append superseding records;
-   authorized erasure is explicit, scoped, and auditable.
-3. **Custody is not retrieval.** Indexes, summaries, graphs, and hot-memory
-   projections are rebuildable views, not independent truth.
-4. **Authority is explicit.** Runtime identity, principal, credential path, and
-   review authority are separate dimensions, even where current infrastructure
-   cannot prove all of them cryptographically.
-5. **Time is state.** Observed, recorded, effective, accepted, superseded, and
-   reverted are not one timestamp.
-6. **Portability must be proven.** Owning the account or the database is not
-   sovereignty. Independent export, restore, and verification are.
-7. **Protect the data and its meaning.** Content, provenance, chain of custody,
-   state history, and interpretive context are the asset.
+The new protocol proposal for an **Agent Access Integrity Boundary** is also intentionally separate from this repository. Core may later provide a PostgreSQL substrate profile/reference implementation for it, but the portable concept is being designed in `sovereign-memory-protocol` first.
 
-## Who this is for
+## What this is not
 
-| You are | Start here |
-|---|---|
-| Deciding whether custody matters for your system | [`docs/positioning.md`](docs/positioning.md) |
-| Building a memory engine, want a custody substrate | [`docs/positioning.md`](docs/positioning.md), then `sql/` |
-| Running it yourself | [Installing](#installing), then [`docs/perimeter.md`](docs/perimeter.md) |
-| Reviewing security | [`docs/security-definer-inventory.md`](docs/security-definer-inventory.md) |
-| Looking for a chat UI, or a RAG product | This is not it |
+Core does not decide:
 
-## What works
+- what a model should remember;
+- how retrieval/ranking/semantic search should work;
+- what UI a deployment should expose;
+- who a real deployment's principals are;
+- which provider, identity service, or runtime must be used;
+- whether a source statement is true.
 
-Verified by the [conformance workflow](.github/workflows/work-memory-conformance.yml)
-in five jobs across PostgreSQL 15 and 16 on every pull request. See
-[recent runs](https://github.com/jryski/sovereign-memory-core/actions/workflows/work-memory-conformance.yml).
+Memory engines and applications can compose with SMP/Core rather than being replaced by them.
 
-- **Lifecycle** — proposals gated on evidence; a rejected record does not block
-  its replacement; exactly one winner under concurrent identical replay.
-- **History** — append-only events, evidence, and authority records; replay that
-  cannot fabricate missing history; revision keys derived from the exact stored
-  source revision rather than recomputed guesses.
-- **Authority perimeter** — detects privilege granted directly, through role
-  inheritance, through membership chains, or via `PUBLIC`; explicit
-  SECURITY DEFINER inventory; temporary-object shadowing defenses including a
-  probe for the perimeter checker shadowing itself.
-- **Upgrade safety** — fresh install on a non-empty database, exact reapply,
-  upgrade from the previous reviewed head, and deliberate drift followed by
-  remediation.
+## Current limitations
 
-**These are repository properties, proven by CI.** Whether any particular
-deployment has them depends on which migrations that deployment has applied.
-The two claims are not the same and this README does not conflate them.
+- HOUSE #59 remains a separate live-deployment gate.
+- PostgreSQL 15/16 Core evidence does not automatically establish PostgreSQL 17 deployment acceptance.
+- Shared/native privileged credentials still limit cryptographic actor attribution in some operational paths.
+- Erasure across every projection/log/export/backup surface is not yet a complete end-to-end release claim.
+- Agent-access enrollment/in-situ legacy-system protection is a protocol design lane, not an implemented Core feature yet.
+- A valid restore can reproduce a snapshot without proving latestness or non-resurrection; recovery/currentness remain separate claims.
 
-## What's not done
+## Installing the reference migrations
 
-- No live deployment has completed independent acceptance.
-- **Export to a portable package and clean restore outside the originating host
-  is not yet proven.** This is the central sovereignty claim and it is open.
-- No end-to-end erasure proof across projections, logs, traces, exports, and
-  backups.
-- **A shared database credential cannot cryptographically distinguish a human
-  principal from an agent acting under it.** Today this is an audit trail, not
-  identity-backed proof. It is a known limitation, not an oversight.
-- The attention and work-memory layer is an early reference implementation, not
-  a ranking policy anyone should adopt.
-- No tagged release, checksums, installer, or deployment profiles beyond the
-  reference ones.
-
-## Not in this repository
-
-Personal, household, health, or financial records. Live project identifiers,
-credentials, secrets, or private operating evidence. A polished user interface.
-A generic RAG or vector-retrieval product. Any mandated model, embedding system,
-graph engine, or hosted provider. Private deployment configuration.
-
-The public test corpus is synthetic.
-
-## Installing
-
-There is no one-command install yet. Apply the migrations in order to a
-**disposable or backed-up** PostgreSQL database first.
+Apply migrations in order to a **disposable or independently recoverable** PostgreSQL database first.
 
 ```text
 sql/01_core.sql
@@ -165,44 +106,35 @@ sql/10_security_definer_hardening.sql
 sql/11_perimeter_evaluability.sql
 ```
 
-Three ordering rules that will bite you otherwise:
+Important ordering rules:
 
-- `07` through `09` are re-runnable fix-forward migrations. If you need to
-  reapply them, do it **before** `10`.
-- `10` is the SECURITY DEFINER hardening boundary. Do not reapply `07` through
-  `09` after crossing it.
-- `11` is the perimeter-evaluability/report boundary and must remain **last**.
-  It is itself re-runnable. If an operator deliberately reapplies `10`, reapply
-  `11` immediately afterward before treating the perimeter as evaluated.
+- `07` through `09` are re-runnable fix-forward migrations. Reapply them before crossing `10`.
+- `10` is the SECURITY DEFINER hardening boundary.
+- `11` is the perimeter-evaluability/report boundary and must remain after `10`.
+- A downstream topology/search-scope migration has separately been assigned slot `12`; do not reuse migration numbers across active branches.
 
-`09` closes schema creation, table grants, function execution, default
-privileges, RLS and FORCE RLS, ownership, and trigger-only boundaries. `10`
-recreates the reviewed SECURITY DEFINER and authority-adjacent helper inventory
-with protected names schema-qualified and `pg_temp` listed last. `11` preserves
-that reviewed assertion body as an internal violation primitive, adds the
-versioned `public.perimeter_report()` evaluability seam, and makes
-`public.assert_perimeter_closed()` fail closed when required evaluation
-population is unavailable.
-
-Permission profiles, allowlists, and perimeter policy inputs live in
-[`docs/perimeter.md`](docs/perimeter.md). The report-state contract is in
-[`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md). Read both
-before applying to anything you care about.
+Read [docs/perimeter.md](docs/perimeter.md) and [docs/perimeter-evaluability.md](docs/perimeter-evaluability.md) before applying to anything important.
 
 ## Repository layout
 
-- `sql/` — portable schema and fix-forward migrations
-- `docs/` — contracts, security inventory, lifecycle, upgrade guidance
+- `sql/` — PostgreSQL reference migrations and fix-forward changes
+- `docs/` — runtime contracts, security inventories, evidence/runbook guidance
 - `tests/` — conformance and adversarial harnesses
-- `.github/workflows/` — PostgreSQL 15 and 16 CI
+- `release/` — release evidence, limitations, and exact-candidate artifacts
+- `.github/workflows/` — executable CI / provider-exit / perimeter proof
 
-## Further reading
+## Documentation
 
-- [`docs/positioning.md`](docs/positioning.md) — custody versus retrieval, Eywa crosswalk
-- [`docs/perimeter.md`](docs/perimeter.md) — permission profiles and policy inputs
-- [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md) — evaluated, not-clean, and unsupported perimeter states
-- [`docs/templates/restore-rehearsal.md`](docs/templates/restore-rehearsal.md) — provider-exit evidence record
-- [`docs/security-definer-inventory.md`](docs/security-definer-inventory.md)
-- [`docs/work-memory.md`](docs/work-memory.md)
-- [`docs/attention-layer.md`](docs/attention-layer.md)
-- [`docs/upgrades/work-memory-v2.md`](docs/upgrades/work-memory-v2.md)
+- [docs/WIKI.md](docs/WIKI.md) — role and program orientation
+- [ROADMAP.md](ROADMAP.md) — current Core work and dependency order
+- [docs/positioning.md](docs/positioning.md) — custody versus retrieval
+- [docs/perimeter.md](docs/perimeter.md) — permission profiles and policy inputs
+- [docs/perimeter-evaluability.md](docs/perimeter-evaluability.md) — evaluated vs unsupported perimeter states
+- [docs/templates/restore-rehearsal.md](docs/templates/restore-rehearsal.md) — provider-exit evidence record
+- [docs/security-definer-inventory.md](docs/security-definer-inventory.md)
+- [docs/work-memory.md](docs/work-memory.md)
+- [docs/attention-layer.md](docs/attention-layer.md)
+
+## Public/private boundary
+
+This public repository must not contain real household/business payloads, live project identifiers, credentials, private topology, recovery artifacts, or deployment security posture. Public defects should be reproduced with synthetic evidence.
