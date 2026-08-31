@@ -1,137 +1,120 @@
-# Roadmap
+# Sovereign Memory Core Roadmap
 
-## Project north star
+_Status: reference-runtime planning document; protocol meaning lives upstream in SMP_
 
-Sovereign Memory Core exists to make AI memory transfer trustworthy.
+## North star
+
+Sovereign Memory Core is the PostgreSQL reference runtime for proving that provenance, custody, authority boundaries, change history, and provider-exit/recovery claims can be made executable rather than aspirational.
 
 Short form:
 
-> Trustworthy memory transfer.
+> **A PostgreSQL reference implementation you can audit, move, restore, and prove.**
 
-Operational framing:
+The protocol should remain substrate-neutral. Core exists to implement and attack one concrete substrate.
 
-> Chain of custody for AI memory.
+## Current release boundary
 
-Formats move bytes. SMP proves memory transfer earned authority.
+`v0.3-alpha` is published at commit `c96b9da749b2d95661973485b2a026897329c8cd`.
 
-The project should not compete to become the winning memory-record format. It should provide the custody, verification, provenance, review, and cutover layer around many possible sources, exports, applications, and future memory formats.
+The alpha freezes a bounded reviewed surface rather than claiming product completeness. It includes PostgreSQL 15/16 conformance/perimeter/provider-exit evidence and a separately scoped HOUSE recovery rehearsal with known hosted-extension/role limitations.
 
-## Current phase
+Future work must not silently widen what `v0.3-alpha` meant. New claims belong to successor coordinates and new evidence.
 
-The repo is in `v0.1-alpha - Custody Foundation`.
+## Track A — Post-alpha reference-runtime hardening
 
-The custody rails are mostly implemented and are being documented, hardened, and organized for repeatable contribution. The local operator path is next: a contributor should be able to install, validate, import a fixture, run a rollback loader proof, and understand what is safe before touching any live system.
+- preserve exact migration/reapply ordering and perimeter evaluability;
+- close successor findings without rewriting release history;
+- keep release evidence bound to independently derived ground truth;
+- expand catalog/perimeter coverage only with explicit positive and broken controls;
+- preserve recovery/provider-exit claim limits by version/profile.
 
-## What is done
+## Track B — Protocol / implementation separation
 
-- Core Postgres schema for memory, wiki, attention, provenance, supersession, and operating-doc integrity.
-- Optional vault schemas and provenance guards.
-- Generic source-import/cutover foundation.
-- Candidate locators and candidate-level quote hashes.
-- Richer cutover probe categories.
-- Deterministic Chat-Mine package fixture.
-- Rollback-only loader proof.
-- Negative package mutation tests.
-- Negative SQL corruption tests.
-- Public-readiness scrub of tracked examples and fixtures.
-- Source-import validation with fatal blocker checks.
+The SMP protocol now has its own repository and review lineage. Core should remove or clearly label material that is normative in meaning but currently duplicated here.
 
-## What is next
+Rules:
 
-- Finish project organization, ADRs, and contribution paths.
-- Document durable-write policy for protected memory scopes.
-- Build the local operator flow: `smc doctor`, local Docker install, schema installer, validation runner, and safe database URL checks.
-- Add review workflow for accept, hold, reject, and evidence display.
-- Define adapter profiles without making Chat-Mine quality claims.
+- protocol defines meaning and conformance semantics;
+- Core defines PostgreSQL mechanisms and reference tests;
+- deployments define local policy/topology/identity;
+- copy/cross-link before any post-alpha deduplication; do not delete useful history just to make the tree tidy;
+- implementation self-description should declare protocol/profile version, mappings, extensions, unsupported requirements, and known deviations.
 
-## Tracks
+## Track C — Agent Access Integrity Boundary reference profile
 
-| Track | Purpose | Current posture |
-|---|---|---|
-| Alpha build | Make the custody layer installable, verifiable, reviewable, and recoverable by an operator. | Active near-term work. |
-| Publication | Explain SMP custody concepts, conformance gaps, and adoption path without overclaiming implementation completeness. | Drafting and review. |
-| Research | Improve Chat-Mine and other emitters through evaluation, not claims. | Explicitly separate from alpha build. |
+The protocol project is evaluating an informative in-situ profile for establishing a forward T0 evidence boundary before agents are granted access to existing systems of record.
 
-## Milestones
+Core's possible role is a **PostgreSQL substrate/reference profile**, not protocol ownership.
 
-### v0.1-alpha - Custody Foundation
+Candidate reference work, only after the protocol design is sufficiently frozen:
 
-Mostly complete or in documentation-finalization phase.
+- protected-surface manifest and canonical serialization rules;
+- catalog/role/write-path enumeration for effective read-only claims;
+- transaction/change-log continuity and gap evidence;
+- baseline/chunk/Merkle commitment reference implementation;
+- shared-credential attribution limits;
+- continuity receipts for migrations, bulk jobs, failover, PITR, restore, and replica relationships;
+- `ACCESS_ENABLED`, drift/UNKNOWN/suspension fixtures;
+- evidence-plane independence declarations;
+- synthetic adversarial fixtures proving omitted surface, capture gaps, restore discontinuity, and indirect write paths fail closed.
 
-Includes:
+Do not add PostgreSQL-specific requirements to the portable protocol simply because Core implements them first.
 
-- source-import foundation
-- candidate locators and quote hashes
-- cutover probe categories
-- deterministic Chat-Mine package fixture
-- rollback loader proof
-- negative package mutation tests
-- negative SQL corruption tests
-- public-readiness scrub
-- north-star docs
-- publication docs
-- conformance gap audit
-- durable-write policy
+## Track D — External data planes
 
-### v0.2-alpha - Local Operator Flow
+Recent user-context/Storage work proved that a policy relation and the data path can be different things. Core/conformance reasoning should generalize beyond "tables are the universe."
 
-Includes:
+Reference work should be able to describe:
 
-- `smc doctor`
-- local Docker install
-- schema installer
-- validation runner
-- safe database URL checks
-- operator documentation
+- relational rows;
+- object/blob bytes authorized by relation policy;
+- file/content-addressed artifacts;
+- queues/events and other external effect paths;
+- read and durability edges separately.
 
-### v0.3-alpha - Review Workflow
+A closure result that ignores an authorized external data plane must be `INCOMPLETE`, not PASS.
 
-Includes:
+## Track E — Neutrality and interoperability
 
-- review queue
-- accept / hold / reject flow
-- evidence display
-- candidate status transitions
-- basic review UI or CLI review
+- align Core with protocol fixtures without making Core's schema normative;
+- provide exact implementation self-description;
+- run protocol vectors through at least one non-PostgreSQL implementation/stub alongside Core;
+- keep generic profile fixtures synthetic and public-safe;
+- treat downstream differences as mappings/extensions/limitations unless they violate protocol semantics.
 
-### v0.4-alpha - Adapter Profiles
+## Track F — Operator and deployment tooling
 
-Includes:
+Useful future Core tooling may include:
 
-- adapter profile template
-- generic external source profile
-- lossiness declaration format
-- sample import profile
-- round-trip/export profile
-- no real Chat-Mine quality claims
+- install/doctor/version checks;
+- migration ordering and drift inventory;
+- export/restore evidence runners;
+- perimeter report collection;
+- implementation self-description export;
+- reference protected-surface enrollment/reconciliation tooling for PostgreSQL.
 
-### v0.5-alpha - Publication Candidate
+Deployment-specific credentials, production data, user interfaces, and operating receipts remain downstream.
 
-Includes:
+## Release strategy
 
-- conformance fixture
-- public docs
-- license/IP checklist
-- history/privacy caveat
-- release notes
-- demo walkthrough
+Successor releases should be defined by evidence gates rather than a feature-count ladder.
 
-### v1.0 - SMP Custody Layer Reference
+Every release candidate should state:
 
-Includes:
+- exact commit/tree;
+- supported PostgreSQL versions/profiles;
+- defined/evaluated/passed conformance dimensions;
+- release evidence and independent review coordinates;
+- known limitations and unsupported coverage;
+- provider-exit/recovery claim scope;
+- whether any new protocol draft dependency is normative, experimental, or unsupported.
 
-- stable custody-layer reference implementation
-- conformance docs
-- adoption/ratification criteria
-- release artifacts
+## Standing rules
 
-## Release targets
-
-| Release | Target outcome |
-|---|---|
-| `v0.1-alpha` | Custody foundation can be reviewed and validated from the repo. |
-| `v0.2-alpha` | A local operator can install and validate the foundation without manually interpreting every SQL file. |
-| `v0.3-alpha` | Candidate review and promotion are visible, testable, and bounded. |
-| `v0.4-alpha` | External sources can declare profile, lossiness, and evidence posture. |
-| `v0.5-alpha` | The repo can support a public release candidate with clear conformance gaps. |
-| `v1.0` | SMP custody-layer reference behavior is stable enough for adoption testing. |
+- **Protocol meaning flows down; deployment policy does not flow up.**
+- **PASS says what was evaluated.**
+- **A checksum is not truth.**
+- **A valid restore is not automatically current.**
+- **A user/agent label is not identity proof.**
+- **A relation-only security model is incomplete when bytes/effects travel through another plane.**
+- **History is preserved; successor work does not rewrite what earlier releases claimed.**

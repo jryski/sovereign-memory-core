@@ -1,138 +1,104 @@
 # Sovereign Memory Core Status
 
-Status date: 2026-07-08
+Status date: 2026-08-27
 
-> **v0.3-alpha release-path note (2026-08-13):** Issue #55 is the canonical
-> release program and supersedes the older scorecard/development order below
-> wherever they conflict. The immediate provider-exit path is C1 perimeter
-> evaluability followed by C2 independent export/clean-restore proof. See
-> [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md) and the
-> [`restore rehearsal template`](docs/templates/restore-rehearsal.md).
+## Current release
 
-## Current rating
+`v0.3-alpha` is published at exact release commit:
 
-| Dimension | Current | Target | Notes |
-|---|---:|---:|---|
-| Core schema concept | 9/10 | 10/10 | Strong baseline for memory, wiki, attention index, provenance, supersession, and operating-doc integrity. |
-| Repo/deployment alignment | 7/10 | 10/10 | The generic source-import/cutover foundation is repo-owned; deployment drift and operational evidence still need periodic verification. |
-| Source import/cutover readiness | 8/10 | 10/10 | Foundation, candidate provenance, richer probes, fatal validation, and the first internal producer slice exist; real adapters and operational dry runs remain. |
-| Security posture | 8/10 | 10/10 | Security model is honest; next step is least-privilege access hardening beyond broad credential operation. |
-| Survivability | 7/10 | 10/10 | Backup/restore guidance and an evidence template exist; independent export/clean-restore execution and reproducible receipts remain open. |
-| Personal memory UX/readability | 6/10 | 10/10 | Core has strong data model; browser UI belongs in a separate repo. |
-| Governance/review | 7/10 | 10/10 | Proposed/superseded/review concepts exist; needs complete review and promotion workflow. |
+`c96b9da749b2d95661973485b2a026897329c8cd`
 
-## Confirmed current repo contents
+The release freezes a bounded reviewed surface. It is not a claim that Core is a complete product or that every downstream deployment is aligned.
 
-The repository currently contains:
+### Verified release gates
 
-- Tier 1 core SQL: `sql/01_core.sql`
-- Tier 2 vault SQL: `sql/02_vault.sql`
-- Provenance guard SQL: `sql/03_provenance_guards.sql`
-- Source-import/cutover foundation: `sql/04_source_import.sql`
-- Candidate locators and quote hashes: `sql/05_candidate_locators.sql`
-- Richer cutover probe categories: `sql/06_cutover_probe_categories.sql`
-- Source-import validation with fatal blocker enforcement and rollback fixtures
-- First internal Chat-Mine producer slice with deterministic package validation and a rollback loader smoke path
-- Architecture, security, agent operations, implementation, operations, and pattern docs
-- Roadmap, ADR, contribution, security, support, issue template, and PR template scaffolding
-- A verified baseline claim against vanilla PostgreSQL 16
+The release record includes:
+
+- work-memory conformance on PostgreSQL 15 and 16;
+- C1 perimeter evaluability on PostgreSQL 15 and 16;
+- C2 independent clean provider-exit restore on PostgreSQL 16;
+- executable schema-drift comparison;
+- release manifest/checksum verification;
+- independent exact-coordinate review;
+- HOUSE rollback-safe recovery rehearsal with explicit scope limits.
+
+See the [`v0.3-alpha` release](https://github.com/jryski/sovereign-memory-core/releases/tag/v0.3-alpha) and its attached evidence/known limitations.
+
+## Scope limits that remain important
+
+- Provider-exit support declared by the alpha remains PostgreSQL 15/16.
+- The HOUSE PostgreSQL 17.10 rehearsal preserved a complete logical anchor but exercised a partial household-owned `public` restore in a plain-PostgreSQL lab because a hosted extension dependency was unavailable.
+- Provider-managed hosted schemas/roles/ACLs were not reconstructed by that rehearsal.
+- Shared or privileged credentials remain an attribution ceiling; a label is not cryptographic identity proof.
+- A reference-runtime PASS does not prove a particular deployment has applied the same migrations, grants, or operational controls.
+
+## Repository role
+
+Core is the **PostgreSQL reference implementation**, not the normative SMP protocol and not a private deployment.
+
+| Plane | Current role |
+| --- | --- |
+| Sovereign Memory Protocol | Separate private pre-release protocol package; owns implementation-neutral meaning/conformance |
+| Sovereign Memory Core | PostgreSQL reference runtime, perimeter, replay, restore/provider-exit, adversarial tests |
+| User/data capability adapters | Separate projects such as Supabase User MCP |
+| Deployments/applications | Private topology, identity, policy, UI, credentials, recovery/acceptance evidence |
+
+## Current development direction
+
+### 1. Post-alpha hardening
+
+New fixes and capabilities must land as successor evidence. Do not retroactively widen `v0.3-alpha` claims.
+
+### 2. Protocol/Core separation
+
+Protocol concepts duplicated in Core should be cross-linked/extracted after review while preserving historical evidence. PostgreSQL mechanisms stay here; portable meaning stays in the protocol.
+
+### 3. Implementation self-description
+
+Core should eventually emit a machine-readable declaration of:
+
+- protocol/profile version;
+- supported PostgreSQL versions;
+- representation mappings;
+- extensions/deviations;
+- evaluated conformance surfaces;
+- unsupported coverage.
+
+### 4. Agent Access Integrity Boundary reference work
+
+The SMP protocol project is evaluating an informative in-situ concept for establishing a forward T0 evidence boundary before agents are introduced to existing systems of record.
+
+Core may later provide a PostgreSQL substrate/reference profile for that concept. No normative profile or production enrollment is implied today.
+
+### 5. External data-plane reasoning
+
+Security/containment evidence must eventually represent data and effects that travel outside ordinary table reads/writes, including object/blob Storage and other external capability planes. A relation-only inventory cannot claim complete closure when the authorized bytes/effects are elsewhere.
 
 ## Drift policy
 
-This repository should not carry a detailed inventory of any one private deployment. That information belongs in that deployment's own wiki, issue tracker, or operations log.
+This public repository should not carry a detailed inventory of any one private deployment.
 
-The repo should instead provide a repeatable drift ledger template that any deployment can fill in.
+Downstream deployments should maintain their own:
 
-### Drift ledger template
+- repo/runtime pin;
+- migration and object inventory;
+- local extensions/deviations;
+- perimeter/identity evidence;
+- recovery/restore receipts;
+- known waivers and review dates.
 
-```text
-deployment_name:
-review_date:
-reviewed_by:
-repo_ref:
-database_ref:
+Generic drift templates and checks belong here only when they are reusable and synthetic/public-safe.
 
-object_inventory_method:
-  tables_query:
-  routines_query:
-  grants_query:
+## Current blockers to stronger claims
 
-repo_objects_missing_from_deployment:
-  - object:
-    expected_from:
-    severity:
-    action:
+These are successor-program gaps, not claims that invalidate the existing alpha coordinate:
 
-deployment_objects_missing_from_repo:
-  - object:
-    object_type:
-    schema:
-    generic_core_candidate: yes/no
-    deployment_specific: yes/no
-    reason:
-    action:
-
-semantic_drift:
-  - object_or_doc:
-    repo_behavior:
-    deployment_behavior:
-    risk:
-    action:
-
-known_waivers:
-  - item:
-    reason:
-    owner:
-    review_by:
-
-result:
-  status: aligned / intentional-drift / action-required
-  next_action:
-```
-
-## Interpretation
-
-The reusable source-import/cutover foundation is represented as versioned SQL, validation,
-and docs. It remains generic across source types. The Chat-Mine package exporter is the first
-internal producer aligned with that contract, not a public interchange protocol.
-
-The next gap is operational adoption: real source adapters, review UI, Hermes orchestration,
-and dry runs against representative exports. Those layers must preserve the core review and
-conflict posture rather than bypassing it.
-
-Repository coordination should use `docs/roadmap.md`, `docs/project-management.md`, and
-`docs/adr/` so roadmap, issues, PRs, milestones, decisions, and releases remain visible outside
-any single chat transcript.
-
-Deployment-specific inventories should be maintained outside this public/reusable status document.
-
-## 10/10 blockers
-
-1. No real source adapters have completed an end-to-end import and rollback dry run.
-2. Review queue and promotion workflow need UI support.
-3. Hermes orchestration is not implemented.
-4. The provider-exit rehearsal template exists, but C1 evaluability and independent C2 clean-restore evidence are not yet accepted.
-5. Broad credential operation remains the practical trust boundary; least-privilege access hardening is not yet implemented.
-6. Drift ledger process is documented here but not yet backed by an executable inventory check.
-7. No formal release tag declares a known-good schema version.
-
-## Immediate development order
-
-For v0.3-alpha, follow issue #55 rather than this older general roadmap. The release-critical
-sequence is C1 perimeter evaluability, C2 independent provider-exit proof, HOUSE acceptance,
-and the remaining release-manifest/tag receipts. The older product-development order below is
-parked until that finite gate clears.
-
-1. Exercise a real source adapter through export, review, cutover probes, and rollback.
-2. Add review UI without bypassing manifest decisions or conflict posture.
-3. Add Hermes orchestration only after the manual producer/loader path is proven.
-4. Add backup/export/restore evidence template.
-5. Add least-privilege access hardening design.
-6. Add an executable deployment drift inventory check.
-7. Coordinate with peer reviewers before applying live DB mutations.
+1. Protocol draft and Core implementation self-description are not yet formally reconciled.
+2. User/agent identity remains a downstream mechanism; Core alone cannot distinguish principals behind a shared privileged credential.
+3. External data-plane containment/durability semantics need generic reference treatment.
+4. Agent-access enrollment/continuity semantics are still an informative protocol proposal, not a frozen profile.
+5. Broader PostgreSQL-version/deployment recovery claims require their own exact evidence rather than inheriting the alpha proof.
 
 ## Rule for this phase
 
-Do not make live schema changes casually. The source-import/cutover foundation is captured and
-validated in the repo, but real deployment work should still use explicit migrations,
-acceptance tests, dry-run evidence, and review.
+Preserve evidence, exact coordinates, and claim limits. New work is allowed to improve the reference implementation, but it must not make older releases or downstream deployments appear to have been evaluated for properties they were not actually tested against.
