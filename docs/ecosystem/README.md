@@ -10,6 +10,7 @@ Component repositories remain authoritative for their own implementation, tests,
 - [`program-manifest.json`](program-manifest.json) — machine-readable component map for agents, tooling, dashboards, and stale-status review.
 - [`program-manifest.schema.json`](program-manifest.schema.json) — open JSON Schema for the manifest.
 - [`BUSINESS_PLANNING_WORK_PLANE.md`](BUSINESS_PLANNING_WORK_PLANE.md) — first-class Business OS planning and work profile.
+- [`../context-envelope-v0.1.md`](../context-envelope-v0.1.md) — candidate implementation-neutral agent-facing Context Envelope v0.1; not a conformance or deployment claim.
 
 Household-specific planning is maintained in:
 
