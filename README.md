@@ -1,5 +1,10 @@
 # Sovereign Memory Core
 
+Maintained as part of the WIRE SPEED COMPUTING LLC program led by Jesse Ryski.
+[Website](https://www.wirespeedcomputers.com/) |
+[Program guide](https://github.com/WireSpeedComputing/sovereign-ai-os).
+Existing license terms and contributor rights are unchanged.
+
 **A PostgreSQL runtime for AI memory you can audit, move, and prove.**
 
 > **Status: alpha.** Tested on PostgreSQL 15 and 16 in CI on every pull request.
@@ -105,16 +110,16 @@ Verified by the [conformance workflow](.github/workflows/work-memory-conformance
 in five jobs across PostgreSQL 15 and 16 on every pull request. See
 [recent runs](https://github.com/jryski/sovereign-memory-core/actions/workflows/work-memory-conformance.yml).
 
-- **Lifecycle** — proposals gated on evidence; a rejected record does not block
+- **Lifecycle**: proposals gated on evidence; a rejected record does not block
   its replacement; exactly one winner under concurrent identical replay.
-- **History** — append-only events, evidence, and authority records; replay that
+- **History**: append-only events, evidence, and authority records; replay that
   cannot fabricate missing history; revision keys derived from the exact stored
   source revision rather than recomputed guesses.
-- **Authority perimeter** — detects privilege granted directly, through role
+- **Authority perimeter**: detects privilege granted directly, through role
   inheritance, through membership chains, or via `PUBLIC`; explicit
   SECURITY DEFINER inventory; temporary-object shadowing defenses including a
   probe for the perimeter checker shadowing itself.
-- **Upgrade safety** — fresh install on a non-empty database, exact reapply,
+- **Upgrade safety**: fresh install on a non-empty database, exact reapply,
   upgrade from the previous reviewed head, and deliberate drift followed by
   remediation.
 
@@ -191,17 +196,17 @@ before applying to anything you care about.
 
 ## Repository layout
 
-- `sql/` — portable schema and fix-forward migrations
-- `docs/` — contracts, security inventory, lifecycle, upgrade guidance
-- `tests/` — conformance and adversarial harnesses
-- `.github/workflows/` — PostgreSQL 15 and 16 CI
+- `sql/`: portable schema and fix-forward migrations
+- `docs/`: contracts, security inventory, lifecycle, upgrade guidance
+- `tests/`: conformance and adversarial harnesses
+- `.github/workflows/`: PostgreSQL 15 and 16 CI
 
 ## Further reading
 
-- [`docs/positioning.md`](docs/positioning.md) — custody versus retrieval, Eywa crosswalk
-- [`docs/perimeter.md`](docs/perimeter.md) — permission profiles and policy inputs
-- [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md) — evaluated, not-clean, and unsupported perimeter states
-- [`docs/templates/restore-rehearsal.md`](docs/templates/restore-rehearsal.md) — provider-exit evidence record
+- [`docs/positioning.md`](docs/positioning.md): custody versus retrieval, Eywa crosswalk
+- [`docs/perimeter.md`](docs/perimeter.md): permission profiles and policy inputs
+- [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md): evaluated, not-clean, and unsupported perimeter states
+- [`docs/templates/restore-rehearsal.md`](docs/templates/restore-rehearsal.md): provider-exit evidence record
 - [`docs/security-definer-inventory.md`](docs/security-definer-inventory.md)
 - [`docs/work-memory.md`](docs/work-memory.md)
 - [`docs/attention-layer.md`](docs/attention-layer.md)
