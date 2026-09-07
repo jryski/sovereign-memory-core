@@ -7,10 +7,11 @@ Existing license terms and contributor rights are unchanged.
 
 **A PostgreSQL runtime for AI memory you can audit, move, and prove.**
 
-> **Status: alpha.** Tested on PostgreSQL 15 and 16 in CI on every pull request.
-> No live deployment has completed independent acceptance. Read
-> [What's not done](#whats-not-done)
-> before relying on it for anything that matters.
+> **Released: v0.3-alpha**, published August 15, 2026.
+> The [release record](https://github.com/jryski/sovereign-memory-core/releases/tag/v0.3-alpha)
+> carries bounded PostgreSQL conformance and restore evidence.
+> Read [What's not done](#whats-not-done) and the attached limitations before
+> extending those claims to another revision or deployment.
 
 ## The problem, concretely
 
@@ -68,7 +69,7 @@ not become a retrieval engine. Architecture boundary and an Eywa crosswalk:
 
 | Layer | Responsibility | In this repo? |
 |---|---|---|
-| **SMP protocol** | Implementation-neutral custody, provenance, lifecycle, verification, supersession, erasure, portability, conformance | Partly, while the specification repository is prepared |
+| **SMP protocol** | Implementation-neutral sovereignty, provenance, custody, authority, lifecycle, portability and conformance semantics | Informative background here; Core is not the normative specification |
 | **Runtime / core** | PostgreSQL reference implementation, migrations, perimeter enforcement, replay, tests, and export/restore contracts | **Yes** |
 | **Deployment** | A particular person's or organization's policies, credentials, adapters, data, and operating evidence | **No** |
 
@@ -106,9 +107,13 @@ provider, or on any particular interface.
 
 ## What works
 
-Verified by the [conformance workflow](.github/workflows/work-memory-conformance.yml)
-in five jobs across PostgreSQL 15 and 16 on every pull request. See
-[recent runs](https://github.com/jryski/sovereign-memory-core/actions/workflows/work-memory-conformance.yml).
+The [v0.3-alpha release](https://github.com/jryski/sovereign-memory-core/releases/tag/v0.3-alpha)
+identifies commit `c96b9da749b2d95661973485b2a026897329c8cd` as its reviewed
+coordinate. It records work-memory conformance and perimeter evaluability on
+PostgreSQL 15/16, independent clean provider-exit restore on PostgreSQL 16,
+schema-drift comparison and release manifest/checksum verification.
+
+The reference test surface covers:
 
 - **Lifecycle**: proposals gated on evidence; a rejected record does not block
   its replacement; exactly one winner under concurrent identical replay.
@@ -123,15 +128,18 @@ in five jobs across PostgreSQL 15 and 16 on every pull request. See
   upgrade from the previous reviewed head, and deliberate drift followed by
   remediation.
 
-**These are repository properties, proven by CI.** Whether any particular
-deployment has them depends on which migrations that deployment has applied.
-The two claims are not the same and this README does not conflate them.
+These are bounded release and reference-test claims, not proof for every
+deployment or later commit. The release also records a separately scoped
+household recovery rehearsal; it did not reconstruct provider-managed schemas,
+hosted roles or their access-control state. Consult the release attachments for
+the exact limits and verification roots.
 
 ## What's not done
 
-- No live deployment has completed independent acceptance.
-- **Export to a portable package and clean restore outside the originating host
-  is not yet proven.** This is the central sovereignty claim and it is open.
+- The alpha does not establish universal production readiness. Each deployment
+  still needs evidence for its own migration state, permissions and recovery.
+- Provider-exit support is declared for PostgreSQL 15/16. The published clean
+  restore result is for PostgreSQL 16, not every database or hosted environment.
 - No end-to-end erasure proof across projections, logs, traces, exports, and
   backups.
 - **A shared database credential cannot cryptographically distinguish a human
@@ -139,8 +147,11 @@ The two claims are not the same and this README does not conflate them.
   identity-backed proof. It is a known limitation, not an oversight.
 - The attention and work-memory layer is an early reference implementation, not
   a ranking policy anyone should adopt.
-- No tagged release, checksums, installer, or deployment profiles beyond the
-  reference ones.
+- SHA-256 receipts establish integrity, not signed authorship.
+- Independent source-before/source-after fingerprint binding remains a
+  documented deferred residual in the release.
+- The alpha release does not establish a supported one-command installer or
+  a stable production contract.
 
 ## Not in this repository
 
