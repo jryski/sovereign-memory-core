@@ -206,3 +206,9 @@ before applying to anything you care about.
 - [`docs/work-memory.md`](docs/work-memory.md)
 - [`docs/attention-layer.md`](docs/attention-layer.md)
 - [`docs/upgrades/work-memory-v2.md`](docs/upgrades/work-memory-v2.md)
+
+## License
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) and
+[NOTICE](NOTICE). Contributions are accepted under the Developer Certificate of
+Origin. See [DCO.md](DCO.md).
