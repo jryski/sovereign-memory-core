@@ -83,3 +83,8 @@ Do not claim Chat-Mine quality is solved. Chat-Mine is currently a research-grad
 ## Merges
 
 Do not merge without human approval.
+
+## Sign-off
+
+Commits must be signed off under the Developer Certificate of Origin. Use
+`git commit -s`. See [DCO.md](DCO.md).
