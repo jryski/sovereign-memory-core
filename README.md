@@ -10,6 +10,10 @@ Existing license terms and contributor rights are unchanged.
 > **Released: v0.3-alpha**, published August 15, 2026.
 > The [release record](https://github.com/jryski/sovereign-memory-core/releases/tag/v0.3-alpha)
 > carries bounded PostgreSQL conformance and restore evidence.
+> That record states three separate facts: release, restore and checksum
+> evidence were proven on a synthetic source built from the reviewed migrations;
+> restore was not exercised on production data; and no independently accepted
+> live deployment exists.
 > Read [What's not done](#whats-not-done) and the attached limitations before
 > extending those claims to another revision or deployment.
 
@@ -128,6 +132,10 @@ The reference test surface covers:
   upgrade from the previous reviewed head, and deliberate drift followed by
   remediation.
 
+**These are repository properties, proven by CI.** Whether any particular
+deployment has them depends on which migrations that deployment has applied.
+The two claims are not the same and this README does not conflate them.
+
 These are bounded release and reference-test claims, not proof for every
 deployment or later commit. The release also records a separately scoped
 household recovery rehearsal; it did not reconstruct provider-managed schemas,
@@ -136,6 +144,8 @@ the exact limits and verification roots.
 
 ## What's not done
 
+- **Export to a portable package and clean restore outside the originating host
+  is not yet proven.** This is the central sovereignty claim and it is open.
 - The alpha does not establish universal production readiness. Each deployment
   still needs evidence for its own migration state, permissions and recovery.
 - Provider-exit support is declared for PostgreSQL 15/16. The published clean
