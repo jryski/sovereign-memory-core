@@ -114,7 +114,7 @@ Deployment-specific inventories should be maintained outside this public/reusabl
 4. The provider-exit rehearsal template exists, but C1 evaluability and independent C2 clean-restore evidence are not yet accepted.
 5. Broad credential operation remains the practical trust boundary; least-privilege access hardening is not yet implemented.
 6. Drift ledger process is documented here but not yet backed by an executable inventory check.
-7. No formal release tag declares a known-good schema version.
+7. Release tag `v0.3-alpha` exists, but no release declares a known-good schema version. A release tag establishes a reviewed coordinate and bounded recorded evidence; it does not establish schema readiness or fitness for any deployment.
 
 ## Immediate development order
 

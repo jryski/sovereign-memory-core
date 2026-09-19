@@ -18,7 +18,7 @@ The project should not compete to become the winning memory-record format. It sh
 
 ## Current phase
 
-The repo is in `v0.1-alpha - Custody Foundation`.
+The repository is released at `v0.3-alpha`, tagged at commit `c96b9da749b2d95661973485b2a026897329c8cd`, with the published [release record](https://github.com/jryski/sovereign-memory-core/releases/tag/v0.3-alpha). This phase statement names the tagged coordinate the repository occupies. It does not assert schema readiness or fitness for any deployment: the tag records a reviewed coordinate and bounded evidence, and nothing more. The `v0.1-alpha - Custody Foundation` phase below is historical, and the milestone sections remain planning history plus forward targets rather than delivered status.
 
 The custody rails are mostly implemented and are being documented, hardened, and organized for repeatable contribution. The local operator path is next: a contributor should be able to install, validate, import a fixture, run a rollback loader proof, and understand what is safe before touching any live system.
 
