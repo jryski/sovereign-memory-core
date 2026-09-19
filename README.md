@@ -132,6 +132,10 @@ The reference test surface covers:
   upgrade from the previous reviewed head, and deliberate drift followed by
   remediation.
 
+Verified by the [conformance workflow](.github/workflows/work-memory-conformance.yml)
+in five jobs across PostgreSQL 15 and 16 on every pull request. See
+[recent runs](https://github.com/jryski/sovereign-memory-core/actions/workflows/work-memory-conformance.yml).
+
 **These are repository properties, proven by CI.** Whether any particular
 deployment has them depends on which migrations that deployment has applied.
 The two claims are not the same and this README does not conflate them.
