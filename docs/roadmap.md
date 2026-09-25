@@ -18,9 +18,11 @@ The project should not compete to become the winning memory-record format. It sh
 
 ## Current phase
 
-The repo is in `v0.1-alpha - Custody Foundation`.
+Public posture is **alpha**, the same posture as the README. Tag `v0.3-alpha` names commit `c96b9da749b2d95661973485b2a026897329c8cd` (2026-08-15). That tag is a reviewed coordinate with bounded limitations. It is not independent live acceptance. Export to a portable package and clean restore outside the originating host remain unproven. Issue #92 holds recovery and live acceptance as implementation work. Related open issues are #58 and #52. Closed issue #55 is historical program context for the v0.3-alpha program. Current pointers live in [`STATUS.md`](../STATUS.md).
 
-The custody rails are mostly implemented and are being documented, hardened, and organized for repeatable contribution. The local operator path is next: a contributor should be able to install, validate, import a fixture, run a rollback loader proof, and understand what is safe before touching any live system.
+The phase names later in this file (`v0.1-alpha - Custody Foundation`, `v0.3-alpha - Review Workflow`, and the rest) are older product-milestone vocabulary. They are a different statement from the `v0.3-alpha` git tag. Where a milestone name and STATUS disagree, STATUS and the README win.
+
+Custody rails that are in the repository can be reviewed from the migrations and CI. The local operator path, and the review-workflow milestone below, remain forward targets. Export, clean restore, and live acceptance are blocked.
 
 ## What is done
 

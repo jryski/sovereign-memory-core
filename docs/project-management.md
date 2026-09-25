@@ -54,6 +54,8 @@ Use the milestones from [roadmap.md](roadmap.md):
 - `v0.5-alpha - Publication Candidate`
 - `v1.0 - SMP Custody Layer Reference`
 
+These names are planning vocabulary. The git tag `v0.3-alpha` is a separate reviewed coordinate. See [STATUS.md](../STATUS.md). The tag does not mean the Review Workflow milestone is finished, and it does not close export, clean restore, or live acceptance (#92, with #58 and #52 still open).
+
 ## Label taxonomy
 
 Documented labels:
