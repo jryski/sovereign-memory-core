@@ -82,7 +82,22 @@ Do not claim Chat-Mine quality is solved. Chat-Mine is currently a research-grad
 
 ## Merges
 
-Do not merge without human approval.
+Locked **D3** ([WireSpeedComputing/sovereign-ai-os#11](https://github.com/WireSpeedComputing/sovereign-ai-os/issues/11)) allows **docs-only** bot merges after CI is green and an independent reviewer has approved. The pull request author and the independent reviewer must be different (`author ≠ reviewer`). Primary Users do not have to click merge on every docs-only pull request.
+
+A pull request is not docs-only when it changes an agent-executable or policy surface. Those changes still need Primary Users or an explicit delegation. Exclusions:
+
+- `AGENTS.md`, `CONTEXT.md`, `CLAUDE.md`, and equivalent agent-instruction files
+- `.cursor/`
+- `.github/` changes that alter workflow, action, template, or other bot behavior
+- `SECURITY.md`
+- auth, row-level security (RLS), or protocol semantics
+- any other file that grants or describes executable agent instructions
+
+Non-docs merges still need Primary Users or an explicit delegation. Release, deploy, and access expansion use that same bar. Opening an issue, branch, or pull request does not grant merge, release, deploy, or access authority.
+
+The docs-only exclusion list and the cross-repo steward map live on [WireSpeedComputing/sovereign-ai-os#55](https://github.com/WireSpeedComputing/sovereign-ai-os/issues/55). The steward map is **PROPOSED** until Primary Users lock it. The proposed assigning steward for this repository is **memory-lane** (locutus / grok-memory). Steward assignment is not merge authority.
+
+Docs-only merge does not relax the public-safety expectations in this document. Recording D3 here is a contributing-policy amendment only. Cutover status, launch gates A/B, and architecture stay outside this section.
 
 ## Sign-off
 
