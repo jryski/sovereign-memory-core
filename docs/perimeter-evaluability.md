@@ -109,7 +109,9 @@ rehearsal with its required roles present should evaluate normally. A
 sovereignty rehearsal that intentionally withholds required platform roles
 should record `unsupported` with `violation_count = null`.
 
-Neither result alone establishes provider exit. The complete release gate also
-requires the independent export, clean restore, conformance, source-unchanged,
-destination-disposable, manifest, and HOUSE acceptance evidence tracked by the
-v0.3-alpha completion program.
+Neither result alone establishes provider exit. The v0.3-alpha
+known-limitations record proves package/restore on a representative synthetic
+source. Live and production export, clean restore of private data, and
+independent live acceptance remain open and blocked under issue #92. Related
+open work is #58 and #52. Closed issue #55 is historical v0.3-alpha program
+context. This document does not record a completed live-acceptance proof.

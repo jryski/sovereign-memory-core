@@ -7,7 +7,15 @@
 
 ## Mission
 
-Sovereign Memory Core is the PostgreSQL reference implementation and adversarial proof surface for durable AI memory custody. It demonstrates that provenance, review, temporal truth, conflict preservation, migration, cutover, recovery, and provider exit can be enforced and evaluated independently of any model or application.
+Sovereign Memory Core is the PostgreSQL reference implementation and adversarial proof surface for durable AI memory custody. Provenance, review, temporal truth, conflict preservation, migration, cutover, recovery, and provider exit are specified here as database behavior and attacked with synthetic tests. Emerging protocol text still lives in this tree under [`docs/publication/`](docs/publication/); the intended normative home is the protocol repository. See [`docs/positioning.md`](docs/positioning.md). A green repository test is not independent live acceptance. The v0.3-alpha known-limitations record proves synthetic package/restore for that rehearsal profile. Live and production export, clean restore of private data, and independent live acceptance remain open and blocked on issue #92. See [`STATUS.md`](STATUS.md).
+
+## Dependency direction
+
+Dependencies run one way: protocol, then this core, then a deployment.
+
+- Sovereign Memory Protocol stays implementation-neutral. It does not depend on this PostgreSQL runtime, on a hosted provider, or on any deployment.
+- This repository implements and tests those contracts. It does not depend on a household, business, or other deployment, and it does not store that deployment's policies, credentials, or operating evidence.
+- Deployments consume a released runtime. They do not redefine protocol meaning inside this repository.
 
 ## This repository owns
 

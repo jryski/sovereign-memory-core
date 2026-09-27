@@ -3,9 +3,14 @@
 **A PostgreSQL runtime for AI memory you can audit, move, and prove.**
 
 > **Status: alpha.** Tested on PostgreSQL 15 and 16 in CI on every pull request.
+> The v0.3-alpha provider-exit rehearsal proves package and restore on a
+> representative synthetic source. See
+> [`release/v0.3-alpha-known-limitations.md`](release/v0.3-alpha-known-limitations.md).
 > No live deployment has completed independent acceptance. Read
 > [What's not done](#whats-not-done)
 > before relying on it for anything that matters.
+> Current program pointers, including the open recovery hold, are in
+> [`STATUS.md`](STATUS.md).
 
 ## The problem, concretely
 
@@ -63,13 +68,21 @@ not become a retrieval engine. Architecture boundary and an Eywa crosswalk:
 
 | Layer | Responsibility | In this repo? |
 |---|---|---|
-| **SMP protocol** | Implementation-neutral custody, provenance, lifecycle, verification, supersession, erasure, portability, conformance | Partly, while the specification repository is prepared |
+| **SMP protocol** | Implementation-neutral custody, provenance, lifecycle, verification, supersession, erasure, portability, conformance | Partly, and transitional. Emerging normative text still lives in this tree under [`docs/publication/`](docs/publication/), including [`smp-custody-layer.md`](docs/publication/smp-custody-layer.md). The intended long-term home is the protocol repository. This repository's primary role is the PostgreSQL reference runtime. |
 | **Runtime / core** | PostgreSQL reference implementation, migrations, perimeter enforcement, replay, tests, and export/restore contracts | **Yes** |
 | **Deployment** | A particular person's or organization's policies, credentials, adapters, data, and operating evidence | **No** |
 
 Dependencies run one way. Deployments consume a released runtime; runtimes
 implement the protocol; the protocol must not depend on PostgreSQL, on a hosted
 provider, or on any particular interface.
+
+That separation is the intended architecture. It is not the current file
+layout. This public repository still contains both emerging protocol material
+and the PostgreSQL reference implementation, as
+[`docs/positioning.md`](docs/positioning.md) records. Repository separation is
+being prepared. Until then, normative protocol text in
+[`docs/publication/smp-custody-layer.md`](docs/publication/smp-custody-layer.md)
+remains in this tree.
 
 ## Principles
 
@@ -125,8 +138,15 @@ The two claims are not the same and this README does not conflate them.
 ## What's not done
 
 - No live deployment has completed independent acceptance.
-- **Export to a portable package and clean restore outside the originating host
-  is not yet proven.** This is the central sovereignty claim and it is open.
+- **Live and production export, and clean restore of private data, remain open.**
+  Issue #92 is an implementation HOLD for that work. Related open issues are
+  #58 and #52. This is separate from the v0.3-alpha synthetic rehearsal:
+  [`release/v0.3-alpha-known-limitations.md`](release/v0.3-alpha-known-limitations.md)
+  records that the package/restore mechanism was proven on a representative
+  synthetic source built from the exact reviewed migrations.
+  [`.github/workflows/c2-provider-exit.yml`](.github/workflows/c2-provider-exit.yml)
+  runs that rehearsal on independent clusters. Synthetic mechanism proof is not
+  live acceptance.
 - No end-to-end erasure proof across projections, logs, traces, exports, and
   backups.
 - **A shared database credential cannot cryptographically distinguish a human
@@ -134,8 +154,15 @@ The two claims are not the same and this README does not conflate them.
   identity-backed proof. It is a known limitation, not an oversight.
 - The attention and work-memory layer is an early reference implementation, not
   a ranking policy anyone should adopt.
-- No tagged release, checksums, installer, or deployment profiles beyond the
-  reference ones.
+- Tag `v0.3-alpha` (commit `c96b9da749b2d95661973485b2a026897329c8cd`) is a
+  reviewed coordinate. Its limitations record is
+  [`release/v0.3-alpha-known-limitations.md`](release/v0.3-alpha-known-limitations.md).
+  Later commits on `main` sit outside that tag. For that tag, synthetic
+  package/restore is the rehearsal named above. Live and production export,
+  clean restore of private data, and independent live acceptance stay open on
+  #92. There is still no one-command installer or deployment profiles beyond
+  the reference ones. Checksums, where a release record has them, show
+  integrity. Signed authorship is still absent.
 
 ## Not in this repository
 
@@ -175,6 +202,10 @@ Three ordering rules that will bite you otherwise:
   It is itself re-runnable. If an operator deliberately reapplies `10`, reapply
   `11` immediately afterward before treating the perimeter as evaluated.
 
+`sql/validation/` is not in the ordered list. It holds
+`source_import_readiness.sql` and `load_chat_mine_package.sql`. Those are
+validation helpers. Applying `01` through `11` does not run them.
+
 `09` closes schema creation, table grants, function execution, default
 privileges, RLS and FORCE RLS, ownership, and trigger-only boundaries. `10`
 recreates the reviewed SECURITY DEFINER and authority-adjacent helper inventory
@@ -198,6 +229,9 @@ before applying to anything you care about.
 
 ## Further reading
 
+- [`STATUS.md`](STATUS.md) — repository posture, open program pointers, and the recovery hold
+- [`PROGRAM-ROLE.md`](PROGRAM-ROLE.md) — one-way protocol, core, and deployment boundaries
+- [`docs/roadmap.md`](docs/roadmap.md) — older milestone vocabulary, read with STATUS
 - [`docs/positioning.md`](docs/positioning.md) — custody versus retrieval, Eywa crosswalk
 - [`docs/perimeter.md`](docs/perimeter.md) — permission profiles and policy inputs
 - [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md) — evaluated, not-clean, and unsupported perimeter states
