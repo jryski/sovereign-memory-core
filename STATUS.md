@@ -17,10 +17,12 @@ Status date: 2026-09-25
 > Tag `v0.3-alpha` points at commit `c96b9da749b2d95661973485b2a026897329c8cd`
 > (2026-08-15). `main` has commits after that tag. The tag and
 > [`release/v0.3-alpha-known-limitations.md`](release/v0.3-alpha-known-limitations.md)
-> are a bounded coordinate and a limitations record. They are not independent
-> live acceptance, and they do not close the README claim that export to a
-> portable package and clean restore outside the originating host is still
-> unproven. See
+> are a bounded coordinate and a limitations record. That record proves the
+> package/restore mechanism on a representative synthetic source built from the
+> exact reviewed migrations. It does not export private production data, and it
+> is not independent live acceptance. Live and production export, clean restore
+> of private data, and independent live acceptance remain an implementation HOLD
+> on #92, with #58 and #52 still open. See
 > [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md) and the
 > [`restore rehearsal template`](docs/templates/restore-rehearsal.md).
 
@@ -32,7 +34,7 @@ Status date: 2026-09-25
 | Repo/deployment alignment | 7/10 | 10/10 | The generic source-import/cutover foundation is repo-owned; deployment drift and operational evidence still need periodic verification. |
 | Source import/cutover readiness | 8/10 | 10/10 | Foundation, candidate provenance, richer probes, fatal validation, and the first internal producer slice exist; real adapters and operational dry runs remain. |
 | Security posture | 8/10 | 10/10 | Security model is honest; next step is least-privilege access hardening beyond broad credential operation. |
-| Survivability | 7/10 | 10/10 | Backup/restore guidance and an evidence template exist. Independent export, clean restore, and live acceptance remain open and blocked on #92, with #58 and #52 still open. |
+| Survivability | 7/10 | 10/10 | Backup/restore guidance and an evidence template exist. The v0.3-alpha known-limitations record proves synthetic package/restore for that rehearsal profile. Live and production export, clean restore of private data, and independent live acceptance remain open and blocked on #92, with #58 and #52 still open. |
 | Personal memory UX/readability | 6/10 | 10/10 | Core has strong data model; browser UI belongs in a separate repo. |
 | Governance/review | 7/10 | 10/10 | Proposed/superseded/review concepts exist; needs complete review and promotion workflow. |
 
@@ -70,7 +72,8 @@ Also in the repository:
 - CI conformance on PostgreSQL 15 and 16, as described in the README
 
 That list is repository contents. It is not a deployment inventory and it is
-not a completed export, clean-restore, or live-acceptance receipt.
+not an independent live-acceptance receipt. Synthetic package/restore for the
+v0.3-alpha rehearsal profile is the known-limitations record named above.
 
 ## Drift policy
 
@@ -133,8 +136,10 @@ internal producer aligned with that contract, not a public interchange protocol.
 
 The next product gap is operational adoption: real source adapters, review UI, Hermes orchestration,
 and dry runs against representative exports. Those layers must preserve the core review and
-conflict posture rather than bypassing it. Separately, export, clean restore, and live
-acceptance stay open and blocked on #92. This status file does not close that hold.
+conflict posture rather than bypassing it. Separately, live and production export,
+clean restore of private data, and independent live acceptance stay open and blocked
+on #92. The synthetic package/restore rehearsal for v0.3-alpha is already recorded
+in `release/v0.3-alpha-known-limitations.md`. This status file does not close #92.
 
 Repository coordination should use `docs/roadmap.md`, `docs/project-management.md`, and
 `docs/adr/` so roadmap, issues, PRs, milestones, decisions, and releases remain visible outside
@@ -147,7 +152,7 @@ Deployment-specific inventories should be maintained outside this public/reusabl
 1. No real source adapters have completed an end-to-end import and rollback dry run.
 2. Review queue and promotion workflow need UI support.
 3. Hermes orchestration is not implemented.
-4. The provider-exit rehearsal template and the C1 perimeter-evaluability migration are in the repository. Independent export, clean restore, and live acceptance are not accepted. That work is an implementation HOLD on #92. Related open issues are #58 and #52. Closed #55 is historical context for the v0.3-alpha program, not a closeout of those issues.
+4. The provider-exit rehearsal template and the C1 perimeter-evaluability migration are in the repository. The v0.3-alpha known-limitations record proves synthetic package/restore for that rehearsal profile. Live and production export, clean restore of private data, and independent live acceptance are an implementation HOLD on #92. Related open issues are #58 and #52. Closed #55 is historical context for the v0.3-alpha program, not a closeout of those issues.
 5. Broad credential operation remains the practical trust boundary; least-privilege access hardening is not yet implemented.
 6. Drift ledger process is documented here but not yet backed by an executable inventory check.
 7. Tag `v0.3-alpha` exists at `c96b9da749b2d95661973485b2a026897329c8cd`. A release tag records a reviewed coordinate and bounded limitations. It does not declare a known-good schema for later commits on `main`, and it does not establish schema readiness or fitness for any deployment.
@@ -159,18 +164,20 @@ Current work follows the open program in the table below. The 2026-08-13 note th
 | Item | State on 2026-09-25 |
 |---|---|
 | #55 v0.3-alpha completion program | Closed. Historical program context. |
-| #58 export, clean restore, and provider-exit conformance | Open. |
+| #58 export, clean restore, and provider-exit conformance | Open. The synthetic v0.3-alpha rehearsal does not close this issue. |
 | #52 clean restore verification and custody receipts | Open. |
 | #92 recovery and live acceptance | Open. Implementation HOLD. Docs may name the hold. They must not mark the work done. |
 | #91 README, status, and roadmap reconcile | Open until an independent reviewer accepts the docs change under D3. |
 | [sovereign-ai-os#14](https://github.com/WireSpeedComputing/sovereign-ai-os/issues/14) | Parent cutover of planning onto GitHub. |
 | [sovereign-ai-os#52](https://github.com/WireSpeedComputing/sovereign-ai-os/issues/52) | Program map. Proposed edges are not committed dependencies. |
 
-Export to a portable package, clean restore outside the originating host, and
-independent live acceptance remain open and blocked. The older product-development
-order below stays parked. Some of its early items now exist in the repository as
-artifacts (the rehearsal template, `sql/11_perimeter_evaluability.sql`, and tag
-`v0.3-alpha`). Those artifacts are not the blocked acceptance.
+The v0.3-alpha synthetic package/restore rehearsal is recorded in
+`release/v0.3-alpha-known-limitations.md`. Live and production export, clean
+restore of private data, and independent live acceptance remain open and blocked
+on #92. The older product-development order below stays parked. Some of its early
+items now exist in the repository as artifacts (the rehearsal template,
+`sql/11_perimeter_evaluability.sql`, and tag `v0.3-alpha`). Those artifacts are
+not the blocked live acceptance.
 
 1. Exercise a real source adapter through export, review, cutover probes, and rollback.
 2. Add review UI without bypassing manifest decisions or conflict posture.

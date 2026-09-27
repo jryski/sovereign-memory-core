@@ -7,7 +7,7 @@
 
 ## Mission
 
-Sovereign Memory Core is the PostgreSQL reference implementation and adversarial proof surface for durable AI memory custody. Provenance, review, temporal truth, conflict preservation, migration, cutover, recovery, and provider exit are specified here as database behavior and attacked with synthetic tests. A green repository test is not independent live acceptance. Export, clean restore, and live acceptance remain open and blocked on issue #92. See [`STATUS.md`](STATUS.md).
+Sovereign Memory Core is the PostgreSQL reference implementation and adversarial proof surface for durable AI memory custody. Provenance, review, temporal truth, conflict preservation, migration, cutover, recovery, and provider exit are specified here as database behavior and attacked with synthetic tests. Emerging protocol text still lives in this tree under [`docs/publication/`](docs/publication/); the intended normative home is the protocol repository. See [`docs/positioning.md`](docs/positioning.md). A green repository test is not independent live acceptance. The v0.3-alpha known-limitations record proves synthetic package/restore for that rehearsal profile. Live and production export, clean restore of private data, and independent live acceptance remain open and blocked on issue #92. See [`STATUS.md`](STATUS.md).
 
 ## Dependency direction
 

@@ -121,7 +121,7 @@ Reconciled with repository contents on 2026-09-25. Unchecked boxes above stay un
 
 1. Source-import and cutover SQL is in the repository (`sql/04_source_import.sql` through `sql/06_cutover_probe_categories.sql`). An end-to-end import and rollback dry run against a non-synthetic source is still not accepted here.
 2. `sql/validation/source_import_readiness.sql` is a local validation helper. It is not a full cutover-readiness bundle and it is not live acceptance.
-3. A restore-rehearsal template and `release/v0.3-alpha-known-limitations.md` are in the repository. Independent export, clean restore, and live acceptance remain open and blocked on #92, with #58 and #52 still open.
+3. A restore-rehearsal template and `release/v0.3-alpha-known-limitations.md` are in the repository. That limitations record proves synthetic package/restore for the v0.3-alpha rehearsal profile. Live and production export, clean restore of private data, and independent live acceptance remain open and blocked on #92, with #58 and #52 still open.
 4. Least-privilege access hardening is designed conceptually but not implemented.
 5. UI/review workflow is split to a new repo and not yet complete.
 6. Further schema claims still need independent review. This scorecard does not record a completed peer review of the whole schema.
