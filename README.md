@@ -203,8 +203,9 @@ Three ordering rules that will bite you otherwise:
   `11` immediately afterward before treating the perimeter as evaluated.
 
 `sql/validation/` is not in the ordered list. It holds
-`source_import_readiness.sql` and `load_chat_mine_package.sql`. Those are
-validation helpers. Applying `01` through `11` does not run them.
+`source_import_readiness.sql`, `candidate_span_contract.sql`, and
+`load_chat_mine_package.sql`. Those are validation helpers. Applying `01`
+through `11` does not run them.
 
 `09` closes schema creation, table grants, function execution, default
 privileges, RLS and FORCE RLS, ownership, and trigger-only boundaries. `10`

@@ -104,7 +104,11 @@ create view source_readiness with (security_invoker=true) as
         where si.batch_id=b.batch_id
           and sm.action in ('import','hold')
           and sm.review_state not in ('rejected')
-          and (sm.source_locator='{}'::jsonb or sm.source_quote_hash is null)) as candidate_locator_gap,
+          and (
+            not public.source_locator_has_span(sm.source_locator)
+            or sm.source_quote_hash is null
+            or length(trim(sm.source_quote_hash)) = 0
+          )) as candidate_locator_gap,
       (select count(distinct cp.probe_category) from cutover_probes cp
         where cp.batch_id=b.batch_id and cp.active) as active_probe_categories,
       (select bool_or(coalesce(cs.critical_all_pass,false)) from cutover_scorecard cs
@@ -158,7 +162,7 @@ create view source_readiness with (security_invoker=true) as
   select b.batch_id, b.source_key, b.batch_key, 'candidate_locators_and_quote_hashes',
          case when c.candidate_locator_gap=0 then 'pass' else 'fail' end,
          'blocker',
-         'Import/HOLD candidates must include a source locator and quote hash.'
+         'Import/HOLD candidates must include a source span and quote hash.'
   from batches b join counts c using (batch_id)
   union all
   select b.batch_id, b.source_key, b.batch_key, 'cutover_probe_category_coverage',
