@@ -44,7 +44,7 @@ Custody rails that are in the repository can be reviewed from the migrations and
 - Document durable-write policy for protected memory scopes.
 - Build the local operator flow: `smc doctor`, local Docker install, schema installer, validation runner, and safe database URL checks.
 - Add review workflow for accept, hold, reject, and evidence display.
-- Define adapter profiles without making Chat-Mine quality claims.
+- Define adapter profiles from [`docs/templates/adapter-profile.md`](templates/adapter-profile.md), without making Chat-Mine quality claims.
 
 ## Tracks
 
@@ -100,7 +100,7 @@ Includes:
 
 Includes:
 
-- adapter profile template
+- adapter profile template — blank form only: [`docs/templates/adapter-profile.md`](templates/adapter-profile.md)
 - generic external source profile
 - lossiness declaration format
 - sample import profile

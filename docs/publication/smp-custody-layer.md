@@ -211,6 +211,8 @@ An adapter profile **MUST** declare its **lossiness**: precisely which source fi
 
 Candidate source families include vendor AI memory exports, assistant chat exports, open memory-interchange formats, MCP-based memory tools, notes and project-management exports, collaboration systems, local agent stores, and personal knowledge bases. None of these are canonical; all are sources.
 
+**INFORMATIVE:** The blank declaration form is [`docs/templates/adapter-profile.md`](../templates/adapter-profile.md). Copying and filling it records a profile. It does not by itself complete an adapter, pass probes, or establish conformance.
+
 ---
 
 ## 12. Conformance (NORMATIVE)
