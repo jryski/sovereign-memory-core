@@ -1,0 +1,4 @@
+# SYNTHETIC NEAR-MISS. This file must not produce a public-safety finding.
+# covers-rule: local-home-path
+Do not commit a home-directory path or a drive-letter user profile.
+The words Users and home are not themselves a path.

@@ -1,0 +1,7 @@
+# SYNTHETIC FIXTURE. Unmistakably fake. Not a custody record.
+# expected-rule: operational-receipt
+# min-findings: 4
+custody_receipt: cr-0001-not-real
+routing_record: rr-0001-not-real
+exact_private_count: 184729
+stable_watermark: wm-0001-not-real

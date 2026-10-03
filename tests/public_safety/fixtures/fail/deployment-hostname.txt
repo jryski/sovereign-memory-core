@@ -1,0 +1,5 @@
+# SYNTHETIC FIXTURE. Unmistakably fake. Not a real network.
+# expected-rule: deployment-hostname
+# min-findings: 2
+db-01.internal
+synthetic-device.local

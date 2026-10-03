@@ -1,0 +1,6 @@
+# SYNTHETIC FIXTURE. Unmistakably fake. Not a real machine.
+# expected-rule: local-home-path
+# min-findings: 3
+/Users/example-owner/notes.txt
+/home/example-owner/notes.txt
+C:\Users\example-owner\notes.txt

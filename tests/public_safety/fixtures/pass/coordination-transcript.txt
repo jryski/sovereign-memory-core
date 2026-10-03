@@ -1,0 +1,5 @@
+# SYNTHETIC NEAR-MISS. This file must not produce a public-safety finding.
+# covers-rule: coordination-transcript
+Do not paste an internal coordination transcript or a sequence reconstruction.
+Discuss the publication rule in prose.
+contact: you@example.com

@@ -1,0 +1,4 @@
+# SYNTHETIC FIXTURE. Unmistakably fake. Not a real person.
+# expected-rule: contact-email
+# min-findings: 1
+contact: not-real.person@invalid.test

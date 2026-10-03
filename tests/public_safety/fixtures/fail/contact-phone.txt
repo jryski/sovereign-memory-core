@@ -1,0 +1,4 @@
+# SYNTHETIC FIXTURE. Unmistakably fake. Not a real subscriber.
+# expected-rule: contact-phone
+# min-findings: 1
+contact: +1-415-555-2671

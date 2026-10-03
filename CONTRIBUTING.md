@@ -46,6 +46,7 @@ Use [.github/pull_request_template.md](.github/pull_request_template.md) as the 
 Run the checks appropriate to the files changed:
 
 - Always: `git diff --check`
+- Always: `bash scripts/public_safety_scan.sh` (changed-file public-safety scan; see [docs/public-safety.md](docs/public-safety.md))
 - Docs: markdown/link checks if available
 - SQL: source-import validation and relevant local/disposable database checks
 - Python: syntax checks and relevant test scripts
@@ -66,7 +67,23 @@ Do not introduce:
 - private chat snippets or private fixture content
 - private employer, client, account, or project names
 
-Use generic placeholders such as `example-user`, `example-owner`, `example-memory-core`, `example-source-system`, `example-chat-export`, `Example Assistant`, `Example Project`, `example.local`, or `REDACTED`.
+Use generic placeholders such as `example-user`, `example-owner`, `example-memory-core`, `example-source-system`, `example-chat-export`, `Example Assistant`, `Example Project`, `example.local`, `you@example.com`, or `REDACTED`.
+
+### Publication surfaces
+
+Tracker text is publication. So are reviews, release notes, workflow logs, and uploaded artifacts. The changed-file scan does not read those surfaces. Before publishing any of them, complete the checklist in the issue templates and in [.github/pull_request_template.md](.github/pull_request_template.md).
+
+That includes:
+
+- issue titles, bodies, and comments
+- pull-request titles, bodies, review comments, and inline suggestions
+- release notes and tag messages
+- workflow logs
+- uploaded artifacts
+
+Do not upload private exports, live schema or RPC inventories, or credential-bearing logs. Do not print matched secrets into workflow logs. Run `bash scripts/public_safety_scan.sh --all` before a release and apply the same checklist to the release notes and any uploaded artifact. Details, placeholders the scanner allows, and the local commands are in [docs/public-safety.md](docs/public-safety.md).
+
+A green scan is not clearance. Pattern matching cannot establish context or attack value.
 
 ## Supabase and live state
 
