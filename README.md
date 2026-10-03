@@ -232,6 +232,7 @@ before applying to anything you care about.
 - [`STATUS.md`](STATUS.md) — repository posture, open program pointers, and the recovery hold
 - [`PROGRAM-ROLE.md`](PROGRAM-ROLE.md) — one-way protocol, core, and deployment boundaries
 - [`docs/roadmap.md`](docs/roadmap.md) — older milestone vocabulary, read with STATUS
+- [`docs/offline-smp-verifier-fixture.md`](docs/offline-smp-verifier-fixture.md) — synthetic offline verifier fixture; not Draft 0.3 conformance
 - [`docs/positioning.md`](docs/positioning.md) — custody versus retrieval, Eywa crosswalk
 - [`docs/perimeter.md`](docs/perimeter.md) — permission profiles and policy inputs
 - [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md) — evaluated, not-clean, and unsupported perimeter states

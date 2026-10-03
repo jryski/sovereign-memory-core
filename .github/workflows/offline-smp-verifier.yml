@@ -1,0 +1,47 @@
+name: Offline SMP verifier
+
+on:
+  pull_request:
+    paths:
+      - "fixtures/smp_offline/**"
+      - "scripts/validate_smp_offline_fixture.py"
+      - "scripts/sovereignty_bundle.py"
+      - "tests/offline_verifier/**"
+      - "docs/offline-smp-verifier-fixture.md"
+      - ".github/workflows/offline-smp-verifier.yml"
+  push:
+    paths:
+      - "fixtures/smp_offline/**"
+      - "scripts/validate_smp_offline_fixture.py"
+      - "scripts/sovereignty_bundle.py"
+      - "tests/offline_verifier/**"
+      - "docs/offline-smp-verifier-fixture.md"
+      - ".github/workflows/offline-smp-verifier.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-verifier:
+    name: Synthetic offline fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONWARNINGS: error
+    steps:
+      - name: Check out reviewed source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11"
+      - name: Validate the offline fixture
+        env:
+          PYTHONPYCACHEPREFIX: ${{ runner.temp }}/offline-verifier-pycache
+        run: |
+          python -m compileall -q scripts/validate_smp_offline_fixture.py scripts/sovereignty_bundle.py tests/offline_verifier
+          test -z "$(find scripts tests/offline_verifier -type d -name __pycache__ -print -quit)"
+          python -m unittest discover -s tests/offline_verifier -p 'test_*.py' -v
