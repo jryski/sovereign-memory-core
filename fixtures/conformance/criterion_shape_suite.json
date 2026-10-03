@@ -1,0 +1,171 @@
+{
+  "suite_id": "smp-criterion-shape/1",
+  "fixture": {
+    "id": "scope-bound-access",
+    "table_privilege": true,
+    "principals": [
+      {"id": "principal-a", "scopes": ["scope-a"]},
+      {"id": "principal-b", "scopes": ["scope-b"]},
+      {"id": "principal-c", "scopes": ["scope-a"]}
+    ],
+    "records": [
+      {"id": "record-a", "scope": "scope-a", "owner": "principal-a", "visibility": "private"},
+      {"id": "record-b", "scope": "scope-b", "owner": "principal-b", "visibility": "private"},
+      {"id": "record-shared", "scope": "scope-a", "owner": "principal-a", "visibility": "shared"}
+    ],
+    "identity_bindings": [
+      {"principal": "principal-a", "review_field": "reviewed", "resolved": true},
+      {"principal": "principal-b", "review_field": "reviewed", "resolved": true},
+      {"principal": "principal-c", "review_field": "reviewed", "resolved": true}
+    ],
+    "host_identifiers": ["authenticated", "anon"],
+    "host_grants": {"authenticated": 0, "anon": 0}
+  },
+  "criteria": [
+    {
+      "id": "G1",
+      "kind": "grant",
+      "fixture_id": "scope-bound-access",
+      "subject": "principal-a",
+      "object": "record-a",
+      "expected_reason": "owner-disjunct"
+    },
+    {
+      "id": "G2",
+      "kind": "grant",
+      "fixture_id": "scope-bound-access",
+      "subject": "principal-b",
+      "object": "record-b",
+      "expected_reason": "owner-disjunct"
+    },
+    {
+      "id": "G3",
+      "kind": "grant",
+      "fixture_id": "scope-bound-access",
+      "subject": "principal-c",
+      "object": "record-shared",
+      "expected_reason": "shared-disjunct"
+    },
+    {
+      "id": "D1",
+      "kind": "denial",
+      "fixture_id": "scope-bound-access",
+      "pairs_with": "G1",
+      "subject": "principal-b",
+      "object": "record-a",
+      "expected_reason": "scope-denied"
+    },
+    {
+      "id": "D2",
+      "kind": "denial",
+      "fixture_id": "scope-bound-access",
+      "pairs_with": "G3",
+      "isolates": "visibility",
+      "subject": "principal-c",
+      "object": "record-a",
+      "expected_reason": "visibility-disjunct-denied"
+    },
+    {
+      "id": "H1",
+      "kind": "host_filter",
+      "fixture_id": "scope-bound-access",
+      "required_identifiers": ["authenticated"]
+    }
+  ],
+  "demonstrations": [
+    {
+      "id": "demo-g1-privilege",
+      "check_id": "G1",
+      "mutation": {"table_privilege": false},
+      "expected_status": "FAIL",
+      "expected_reason": "request-did-not-reach-policy"
+    },
+    {
+      "id": "demo-g1-identity",
+      "check_id": "G1",
+      "mutation": {"identity_resolved": {"principal-a": false}},
+      "expected_status": "FAIL",
+      "expected_reason": "identity-unresolved"
+    },
+    {
+      "id": "demo-g1-owner",
+      "check_id": "G1",
+      "mutation": {"record_owner": {"record-a": "principal-b"}},
+      "expected_status": "FAIL",
+      "expected_reason": "visibility-disjunct-denied"
+    },
+    {
+      "id": "demo-g2-privilege",
+      "check_id": "G2",
+      "mutation": {"table_privilege": false},
+      "expected_status": "FAIL",
+      "expected_reason": "request-did-not-reach-policy"
+    },
+    {
+      "id": "demo-g3-private",
+      "check_id": "G3",
+      "mutation": {"record_visibility": {"record-shared": "private"}},
+      "expected_status": "FAIL",
+      "expected_reason": "visibility-disjunct-denied"
+    },
+    {
+      "id": "demo-d1-enforced",
+      "check_id": "D1",
+      "mutation": {
+        "hold_scope": {"principal": "principal-b", "scope": "scope-a"},
+        "record_visibility": {"record-a": "shared"}
+      },
+      "expected_status": "FAIL",
+      "expected_reason": "denial-not-enforced"
+    },
+    {
+      "id": "demo-d1-identity",
+      "check_id": "D1",
+      "mutation": {"identity_resolved": {"principal-b": false}},
+      "expected_status": "FAIL",
+      "expected_reason": "wrong-reason:identity-unresolved"
+    },
+    {
+      "id": "demo-d1-privilege",
+      "check_id": "D1",
+      "mutation": {"table_privilege": false},
+      "expected_status": "FAIL",
+      "expected_reason": "wrong-reason:request-did-not-reach-policy"
+    },
+    {
+      "id": "demo-d2-shared",
+      "check_id": "D2",
+      "mutation": {"record_visibility": {"record-a": "shared"}},
+      "expected_status": "FAIL",
+      "expected_reason": "denial-not-enforced"
+    },
+    {
+      "id": "demo-d2-missing-scope",
+      "check_id": "D2",
+      "mutation": {"drop_scope": {"principal": "principal-c", "scope": "scope-a"}},
+      "expected_status": "FAIL",
+      "expected_reason": "denial-precondition-not-met"
+    },
+    {
+      "id": "demo-d2-identity",
+      "check_id": "D2",
+      "mutation": {"identity_resolved": {"principal-c": false}},
+      "expected_status": "FAIL",
+      "expected_reason": "wrong-reason:identity-unresolved"
+    },
+    {
+      "id": "demo-h1-absent",
+      "check_id": "H1",
+      "mutation": {"host_identifiers_remove": ["authenticated"]},
+      "expected_status": "UNSUPPORTED",
+      "expected_reason": "required-identifier-absent"
+    },
+    {
+      "id": "demo-partial-fixture",
+      "kind": "fixture_construction",
+      "mutation": {"omit_review_field": "principal-a"},
+      "expected_status": "ABORT",
+      "expected_reason": "required-review-field-omitted"
+    }
+  ]
+}
