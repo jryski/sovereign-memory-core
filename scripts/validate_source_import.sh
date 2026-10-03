@@ -13,7 +13,6 @@ set -euo pipefail
 #   (`anon`, `authenticated`, `service_role`) if they do not already exist.
 # - If sql/05_candidate_locators.sql exists, the script applies it before validation.
 # - If sql/06_cutover_probe_categories.sql exists, the script applies it before validation.
-# - sql/06_promotion_guards.sql is applied before the promotion-guard tests.
 # - The validation fixtures roll back their own staged data.
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
@@ -58,9 +57,6 @@ if [[ -f "${ROOT_DIR}/sql/06_cutover_probe_categories.sql" ]]; then
   echo "==> Applying richer cutover probe category layer"
   "${PSQL[@]}" -f "${ROOT_DIR}/sql/06_cutover_probe_categories.sql"
 fi
-
-echo "==> Applying review and promotion guards"
-"${PSQL[@]}" -f "${ROOT_DIR}/sql/06_promotion_guards.sql"
 
 echo "==> Running source import validation bundle"
 "${PSQL[@]}" -f "${ROOT_DIR}/sql/validation/source_import_readiness.sql"
