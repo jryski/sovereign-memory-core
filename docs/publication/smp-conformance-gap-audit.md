@@ -8,6 +8,8 @@ This document maps the normative requirements in [`smp-custody-layer.md`](smp-cu
 
 It is intentionally conservative. A requirement is marked **covered** only when the current repository appears to include a direct structural check, validation script, fixture, or negative test for that requirement. Requirements that are architecturally intended but not yet backed by a direct probe are marked **gap** or **partial**.
 
+Bold RFC 2119 keywords in the spec are listed in [`smp-normative-coverage.md`](smp-normative-coverage.md) and checked with `python3 scripts/check_normative_coverage.py`. The check fails when a keyword is unmapped or a mapped audit ID is missing. A passing check does not claim Draft 0.3 conformance.
+
 ## Coverage states
 
 | State | Meaning |
@@ -17,6 +19,7 @@ It is intentionally conservative. A requirement is marked **covered** only when 
 | Gap | Requirement is not currently proven by the repo. |
 | Future profile | Requirement belongs to future adapter/profile/product work, not the current foundation. |
 | Needs decision | Requirement needs scope, wording, or implementation decision before testing. |
+| Documentation | Normative wording is recorded and checked as text. No runtime probe is claimed. |
 
 ## Current tested foundation
 
@@ -42,6 +45,8 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 | T1 | Package MUST declare `smp_version`. | Gap | Add package schema field and validation if not already present. |
 | T2 | Principal or authorized delegate MAY declare authority. | Partial | Current cutover concepts exist, but authorization/delegation model is not fully specified or tested. |
 | T3 | Scope names the subset of memory a cutover covers. | Partial | Cutover machinery exists; explicit scope model and scope-by-scope migration should be checked. |
+| T4 | A store MAY be local, hosted, personal, team-based, or enterprise-operated. | Documentation | Normative permission recorded by the keyword map. No deployment-form matrix is claimed. |
+| T5 | An emitter MAY be deterministic, model-assisted, or model-driven. | Documentation | Normative permission recorded by the keyword map. Emitter output stays untrusted (E1). |
 | I1.1 | Raw source payload preserved before normalization/trust. | Covered | Source payload evidence and hashes are core to `sql/04_source_import.sql` and validation. |
 | I1.2 | Derived record references evidence by locator and hash. | Covered | Candidate locator and quote-hash work covers import/HOLD posture. |
 | I1.3 | Claims without preserved source are not counted as migrated facts. | Partial | HOLD/evidence posture exists; explicit orphaned assertion handling should be tested. |
@@ -58,7 +63,7 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 | I4.1 | Store becomes candidate-authoritative only after required probe suite passes. | Partial | Probe suite and scorecards exist; candidate-authoritative state model should be verified. |
 | I4.2 | Probe suite includes positive, negative, conflict, stale-state, evidence-request categories. | Covered | `sql/06_cutover_probe_categories.sql` introduced these categories and validation coverage. |
 | I4.3 | Critical probes all pass before cutover. | Partial | Critical probe tracking exists; direct cutover-blocking behavior should be tested. |
-| I4.4 | Normative claims are backed by passing probes. | Gap | This audit starts the mapping; not all claims are covered. |
+| I4.4 | Normative claims are backed by passing probes. | Gap | The keyword map records where claims are written. Probe backing for each claim remains open. A passing keyword check does not claim Draft 0.3 conformance. |
 | I5.1 | Corrections append; history is not silently rewritten. | Partial | Supersession doctrine and core audit patterns exist; source-import promoted-record mutation rules need direct tests. |
 | I5.2 | Earlier contradictory record preserved and may be marked stale/superseded/conflicted/historical. | Partial | Conflict/stale probes exist; explicit record preservation under contradiction needs fixture coverage. |
 | I5.3 | Cutover remains reversible until authority declaration recorded. | Gap | Needs explicit cutover-state model and rollback/reversibility test. |
@@ -100,8 +105,8 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
    - Define source-item identity, preservation, hashes, provenance mapping, timestamp mapping, conflict mapping, review-state mapping, unsupported-field preservation, round-trip/export behavior, and probe requirements.
 
 2. **Audit Draft 0.3 SHOULD/MUST coverage automatically**
-   - Add a script or checklist that extracts normative keywords and maps them to this audit.
-   - Prevent future specs from adding silent untracked MUSTs.
+   - `python3 scripts/check_normative_coverage.py` extracts bold RFC 2119 keywords, checks them against [`smp-normative-coverage.md`](smp-normative-coverage.md), and fails when a keyword or mapped audit ID is missing.
+   - The check does not claim Draft 0.3 conformance. CI is documented in that map and is not wired yet.
 
 3. **Generalize consequential-domain enforcement**
    - Move beyond domain-specific guards into a declared consequential-domain model.
