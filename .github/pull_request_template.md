@@ -7,7 +7,7 @@
 ## Validation
 
 - [ ] `git diff --check`
-- [ ] Markdown/link checks if available
+- [ ] `python3 scripts/check_markdown_links.py` if Markdown changed
 - [ ] SQL validation if SQL changed
 - [ ] Python syntax/tests if Python changed
 - [ ] Shell syntax if shell changed

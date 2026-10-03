@@ -106,6 +106,8 @@ Use [.github/pull_request_template.md](../.github/pull_request_template.md) as t
 
 Draft PRs are appropriate for coordination. Ready-for-review means the author believes validation is complete for the stated scope.
 
+When Markdown changes, run `python3 scripts/check_markdown_links.py` from the repository root. It checks links to files and directories inside this repository and reports the source line when a target is missing. It does not crawl external URLs. Contributor instructions are in [CONTRIBUTING.md](../CONTRIBUTING.md).
+
 ## ADR practice
 
 Use [docs/adr/0000-template.md](adr/0000-template.md) for decisions that affect architecture, trust posture, conformance, or contribution rules.
@@ -119,5 +121,4 @@ Documented but intentionally deferred:
 - create actual GitHub labels, milestones, and the `SMP Roadmap` Project board;
 - decide LICENSE and contribution terms;
 - add `scripts/public_safety_check.sh`;
-- add a markdown link-check script or CI job;
 - add an ADR index later if ADR count grows.

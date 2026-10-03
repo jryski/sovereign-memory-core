@@ -1,0 +1,32 @@
+name: Markdown link check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  markdown-links:
+    name: Repo-relative markdown links
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONWARNINGS: error
+    steps:
+      - name: Check out reviewed source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11"
+      - name: Check repo-relative markdown links
+        run: python3 scripts/check_markdown_links.py
+      - name: Test the markdown link checker
+        run: python3 -m unittest discover -s tests/markdown_links -p 'test_*.py' -v
