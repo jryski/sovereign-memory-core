@@ -59,7 +59,7 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 | I4.2 | Probe suite includes positive, negative, conflict, stale-state, evidence-request categories. | Covered | `sql/06_cutover_probe_categories.sql` introduced these categories and validation coverage. |
 | I4.3 | Critical probes all pass before cutover. | Partial | Critical probe tracking exists; direct cutover-blocking behavior should be tested. |
 | I4.4 | Normative claims are backed by passing probes. | Gap | This audit starts the mapping; not all claims are covered. |
-| I5.1 | Corrections append; history is not silently rewritten. | Partial | Supersession doctrine and core audit patterns exist; source-import promoted-record mutation rules need direct tests. |
+| I5.1 | Corrections append; history is not silently rewritten. | Partial | Supersession preserves a prior row when that path is used. ADR-0008 records the promoted-record policy. A disposable check reports a blessed active wiki rewrite as mismatch and a promoted memory with no receipt as unaudited. A silent in-place memory rewrite is still stored and is not content-audited. Not closed. |
 | I5.2 | Earlier contradictory record preserved and may be marked stale/superseded/conflicted/historical. | Partial | Conflict/stale probes exist; explicit record preservation under contradiction needs fixture coverage. |
 | I5.3 | Cutover remains reversible until authority declaration recorded. | Gap | Needs explicit cutover-state model and rollback/reversibility test. |
 | I5.4 | Authority declaration is recorded and evidenced. | Partial | Cutover concepts exist; declaration evidence fields should be audited. |
@@ -83,7 +83,7 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 | CNF1 | System MUST NOT claim conformance merely by storing provenance/memory fields. | Documentation | Enforce by project docs/release policy; no runtime test needed. |
 | CNF2 | Emitter-conformant means packages satisfy I1+I2 only. | Partial | Current Chat-Mine package validates much of I1/I2; `smp_version` and full reconciliation report remain gaps. |
 | CNF3 | Store-conformant enforces I1, I3, I5 on ingest. | Partial | I1 mostly covered; I3/I5 general enforcement gaps remain. |
-| CNF4 | Promoted-record in-place mutation structurally impossible or content-hash audited. | Gap | A prior review identified silent content-update risk in deployment-style wiki pages; repo needs source-import/store audit decision. |
+| CNF4 | Promoted-record in-place mutation structurally impossible or content-hash audited. | Gap | ADR-0008 decides both, scoped, and defers structural immutability and memory receipts. Wiki blessing can show mismatch after an active-page content edit; no-blessing stays its own state; re-blessing overwrites the hash and is not a signature. Not closed. |
 | CNF5 | Cutover-conformant executes full lifecycle and records probe results, review decisions, cutover declaration. | Gap | Full lifecycle beyond dry-run/readiness not complete. |
 | CT1 | Third-party verification can confirm all source items accounted for. | Partial | Fixture/readiness validation covers current source-import package paths; full third-party/offline verification is not complete. |
 | CT2 | Third-party verification can confirm consequential imported facts trace to evidence. | Partial | Evidence tracing exists; consequential-domain enforcement is partial. |
@@ -91,7 +91,7 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 | CT4 | Third-party verification can confirm agent-generated content not promoted as human authority. | Gap | Needs explicit attribution/provenance fixture and negative test. |
 | CT5 | Verification possible offline without source/emitter cooperation. | Partial | Package/evidence/rollback fixtures move in this direction; full offline verifier not complete. |
 | A1 | Agents may propose durable source-of-record changes but not promote without review. | Gap | Policy issue exists; repo docs and/or protected-path proposal posture needed. |
-| A2 | In-place source-of-record changes by an agent are content-hash audited when proposed/authoritative split is unavailable. | Gap | Possible phase-2 trigger; not implemented. |
+| A2 | In-place source-of-record changes by an agent are content-hash audited when proposed/authoritative split is unavailable. | Gap | Memories can represent proposed versus active, but in-place edits of a promoted memory's authority-bearing fields are not content-hash audited. Git history is not claimed as this control. Not closed. |
 
 ## Immediate follow-up issues recommended
 
@@ -117,8 +117,8 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
    - Structurally valid package must not cause authority.
 
 6. **Add promoted-record mutation audit policy**
-   - Decide whether promoted records are append-only, content-hash audited, or both.
-   - Add negative tests for silent post-promotion edit.
+   - Decision recorded in ADR-0008: both, scoped. Full-table append-only is rejected. Enforcement of the guard and memory receipts is deferred.
+   - A disposable silent-edit check exists. It does not close CNF4, A2, or I5.1.
 
 7. **Define offline verifier fixture**
    - Given only package, manifest, evidence hashes, probe definitions/results, and cutover record, verify SMP-complete for a small scope.
