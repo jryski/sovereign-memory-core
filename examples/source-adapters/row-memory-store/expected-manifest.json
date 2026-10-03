@@ -1,0 +1,384 @@
+{
+  "adapter_profile": {
+    "evidence_posture": "SHA-256 covers the raw JSONL line bytes before normalization, with the trailing newline excluded.",
+    "is_default_import_path": false,
+    "lossiness": "Fields absent from the row are absent. source_status is preserved as source vocabulary and is not approval.",
+    "mapping": "Each JSONL row is one source item. The source row id stays a source id. Source status values are not canonical lifecycle.",
+    "profile_id": "example-row-memory-store-v1",
+    "source_identity": "synthetic row-like memory store",
+    "unsupported": [
+      "approval",
+      "deduplication",
+      "conflict resolution",
+      "authoritative cutover"
+    ]
+  },
+  "batch": {
+    "batch_key": "example-row-memory-store-2026-07-08",
+    "export_completed_at": "2026-07-08T16:00:01Z",
+    "export_started_at": "2026-07-08T16:00:00Z",
+    "exported_by": "agent-1",
+    "exported_item_count": 5,
+    "metadata": {
+      "producer": "example-source-adapter-draft",
+      "ready_for_cutover": false
+    },
+    "payload_hash_algorithm": "sha256",
+    "source_item_count": 5,
+    "status": "open",
+    "watermark": {
+      "max_updated_at": "2026-07-08T16:00:00Z",
+      "source_item_count": 5
+    }
+  },
+  "cutover_probe_candidates": [
+    {
+      "expected_behavior": "Do not treat row-2 as current. row-5 is the later source row and is still an unreviewed suggestion. Source status active is not approval.",
+      "expected_source_item_key": "row-2",
+      "probe_category": "stale_state",
+      "probe_key": "example-row-stale-port",
+      "probe_type": "stale-avoidance",
+      "prompt": "Which listener port is current in the row store?",
+      "severity": "critical"
+    },
+    {
+      "expected_behavior": "row-3 is a restricted pointer and a VAULT suggestion that still needs review.",
+      "expected_source_item_key": "row-3",
+      "probe_category": "negative",
+      "probe_key": "example-row-vault-boundary",
+      "probe_type": "sensitive-boundary",
+      "prompt": "Which row must stay out of HOUSE?",
+      "severity": "critical"
+    }
+  ],
+  "draft_format": "source-adapter.manifest-draft.v1",
+  "draft_note": "Synthetic manifest draft. Suggestions are not approved truth. This draft does not mark a batch ready for cutover.",
+  "hash_algorithm": "sha256",
+  "source_items": [
+    {
+      "content_type": "application/json",
+      "manifest_candidates": [
+        {
+          "action": "import",
+          "lifecycle_status": "proposed",
+          "manifest_key": "row-rollback-checklist",
+          "metadata": {
+            "producer_posture": "candidate_only"
+          },
+          "preservation_class": "durable",
+          "review_notes": "Fact-shaped row with source_status active. HOUSE import suggestion for memories. Source status is not approval, and the source row id stays a source id.",
+          "review_state": "unreviewed",
+          "sensitivity": "ordinary",
+          "source_quote": "Example Project rollback checklist lives on wiki page demo-rollback.",
+          "source_quote_hash": "379514f9c053bf068cff5c7802d1134a0d7727dde73ce565fb6494e86258c697",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "Example Project rollback checklist lives on wiki page demo-rollback.",
+          "suggested_summary": "Row says the rollback checklist lives on wiki page demo-rollback.",
+          "target_table": "memories",
+          "target_zone": "HOUSE",
+          "topic_key": "projects/example-project/rollback",
+          "transformation_version": "example-row-memory-store-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "jsonl_line",
+        "file": "sample-input.jsonl",
+        "match_field": "row_id",
+        "match_value": "row-1"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.jsonl#row-1",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "5418c69e6f1dc4c9e68f1a68e9c5680754f24616a88b188fdf86f0320a587a06",
+          "size_bytes": 286
+        }
+      ],
+      "payload_hash": "5418c69e6f1dc4c9e68f1a68e9c5680754f24616a88b188fdf86f0320a587a06",
+      "payload_size_bytes": 286,
+      "raw_payload_location": "sample-input.jsonl#row-1",
+      "source_author": "person-1",
+      "source_container": "example-memory-rows",
+      "source_created_at": "2026-07-08T15:00:00Z",
+      "source_item_key": "row-1",
+      "source_kind": "row",
+      "source_ref": "row-1",
+      "source_updated_at": "2026-07-08T15:00:00Z",
+      "title": "Rollback checklist row"
+    },
+    {
+      "content_type": "application/json",
+      "manifest_candidates": [
+        {
+          "action": "hold",
+          "lifecycle_status": "stale",
+          "manifest_key": "row-port-8080-stale",
+          "metadata": {
+            "producer_posture": "stale_state_quarantine",
+            "quarantine_reason": "stale_state",
+            "superseded_by_source_item_key": "row-5"
+          },
+          "preservation_class": "quarantine",
+          "review_notes": "Stale-state quarantine. source_status is superseded and the row points at row-5. Keep it in HOLD. Do not import superseded source status as current truth.",
+          "review_state": "needs_review",
+          "sensitivity": "ordinary",
+          "source_quote": "Historical status: Example Project listener is port 8080.",
+          "source_quote_hash": "3bc6eceb6265d4d3b610731d6f9a161edb4cbef928f6139105152fafee03e245",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "Historical status: Example Project listener is port 8080.",
+          "suggested_summary": "Superseded row says the listener is port 8080.",
+          "target_zone": "HOLD",
+          "topic_key": "projects/example-project/listener",
+          "transformation_version": "example-row-memory-store-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "jsonl_line",
+        "file": "sample-input.jsonl",
+        "match_field": "row_id",
+        "match_value": "row-2"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.jsonl#row-2",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "1fd4f4293469e3da446cff2978f324195cb2fcd99ed3f8298fd4d727c712b54a",
+          "size_bytes": 303
+        }
+      ],
+      "payload_hash": "1fd4f4293469e3da446cff2978f324195cb2fcd99ed3f8298fd4d727c712b54a",
+      "payload_size_bytes": 303,
+      "raw_payload_location": "sample-input.jsonl#row-2",
+      "source_author": "person-1",
+      "source_container": "example-memory-rows",
+      "source_created_at": "2026-01-15T12:00:00Z",
+      "source_item_key": "row-2",
+      "source_kind": "row",
+      "source_ref": "row-2",
+      "source_updated_at": "2026-01-15T12:00:00Z",
+      "title": "Superseded port 8080 row"
+    },
+    {
+      "content_type": "application/json",
+      "manifest_candidates": [
+        {
+          "action": "import",
+          "custodian": "person-1",
+          "lifecycle_status": "proposed",
+          "manifest_key": "row-restricted-pointer",
+          "metadata": {
+            "producer_posture": "restricted_review"
+          },
+          "preservation_class": "restricted",
+          "review_notes": "Restricted row. VAULT import suggestion. Needs review before normalization. source_status restricted is a signal, not an approved vault write.",
+          "review_state": "needs_review",
+          "sensitivity": "restricted",
+          "source_quote": "Synthetic restricted pointer for vault-subject-demo-1.",
+          "source_quote_hash": "e4b014b7fd88bc2364f594419b3ff480b97e50ae8698c5c0af5791e3ea18266a",
+          "source_quote_hash_algorithm": "sha256",
+          "subject_ref": "vault-subject-demo-1",
+          "suggested_content": "Synthetic restricted pointer for vault-subject-demo-1.",
+          "suggested_summary": "Restricted row pointer for synthetic subject vault-subject-demo-1.",
+          "target_zone": "VAULT",
+          "topic_key": "subjects/vault-subject-demo-1",
+          "transformation_version": "example-row-memory-store-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "jsonl_line",
+        "file": "sample-input.jsonl",
+        "match_field": "row_id",
+        "match_value": "row-3"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.jsonl#row-3",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "c778bcca63a51e3dc8c77ab6716eeda60eae2d6fedf7e505ed956971feb98878",
+          "size_bytes": 302
+        }
+      ],
+      "payload_hash": "c778bcca63a51e3dc8c77ab6716eeda60eae2d6fedf7e505ed956971feb98878",
+      "payload_size_bytes": 302,
+      "raw_payload_location": "sample-input.jsonl#row-3",
+      "source_author": "person-1",
+      "source_container": "example-memory-rows",
+      "source_created_at": "2026-07-08T15:30:00Z",
+      "source_item_key": "row-3",
+      "source_kind": "row",
+      "source_ref": "row-3",
+      "source_updated_at": "2026-07-08T15:30:00Z",
+      "title": "Restricted subject row"
+    },
+    {
+      "content_type": "application/json",
+      "manifest_candidates": [
+        {
+          "action": "evidence",
+          "lifecycle_status": "evidence",
+          "manifest_key": "row-listener-audit",
+          "metadata": {
+            "producer_posture": "process_evidence"
+          },
+          "preservation_class": "process",
+          "review_notes": "Audit row is process evidence. Preserve it as EVIDENCE. It does not become the current listener fact.",
+          "review_state": "unreviewed",
+          "sensitivity": "ordinary",
+          "source_quote": "Process evidence: row-2 was superseded by row-5.",
+          "source_quote_hash": "96e7dada507ae4c3907a19a7888f824e2e0cead4dc69ea098ae85f438eae2405",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "Process evidence: row-2 was superseded by row-5.",
+          "suggested_summary": "Audit row recording that row-2 was superseded by row-5.",
+          "target_zone": "EVIDENCE",
+          "topic_key": "projects/example-project/listener",
+          "transformation_version": "example-row-memory-store-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "jsonl_line",
+        "file": "sample-input.jsonl",
+        "match_field": "row_id",
+        "match_value": "row-4"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.jsonl#row-4",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "3be428f08f4bcb3d9242d4351d441ca4800be90794c139dfe03b080bf3b4d5ec",
+          "size_bytes": 301
+        }
+      ],
+      "payload_hash": "3be428f08f4bcb3d9242d4351d441ca4800be90794c139dfe03b080bf3b4d5ec",
+      "payload_size_bytes": 301,
+      "raw_payload_location": "sample-input.jsonl#row-4",
+      "source_author": "agent-1",
+      "source_container": "example-memory-rows",
+      "source_created_at": "2026-07-08T16:00:00Z",
+      "source_item_key": "row-4",
+      "source_kind": "row",
+      "source_ref": "row-4",
+      "source_updated_at": "2026-07-08T16:00:00Z",
+      "title": "Listener audit row"
+    },
+    {
+      "content_type": "application/json",
+      "manifest_candidates": [
+        {
+          "action": "import",
+          "lifecycle_status": "proposed",
+          "manifest_key": "row-port-9090-correction",
+          "metadata": {
+            "producer_posture": "candidate_only"
+          },
+          "preservation_class": "durable",
+          "review_notes": "Later fact-shaped row. HOUSE import suggestion for memories. source_status active remains unreviewed and does not approve the row.",
+          "review_state": "unreviewed",
+          "sensitivity": "ordinary",
+          "source_quote": "Correction: current Example Project listener is port 9090 on device-demo-1.",
+          "source_quote_hash": "51d9bbd32d9ba0eb9a8949d805e1e14a1f9c003f349effc79d7cf8cdbedcca87",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "Correction: current Example Project listener is port 9090 on device-demo-1.",
+          "suggested_summary": "Later row says the synthetic listener is port 9090 on device-demo-1.",
+          "target_table": "memories",
+          "target_zone": "HOUSE",
+          "topic_key": "projects/example-project/listener",
+          "transformation_version": "example-row-memory-store-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "jsonl_line",
+        "file": "sample-input.jsonl",
+        "match_field": "row_id",
+        "match_value": "row-5"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.jsonl#row-5",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "4e57693ad194a49d7bd203c901b19ca260ec0d95fea75acacca464b18a0e19f8",
+          "size_bytes": 293
+        }
+      ],
+      "payload_hash": "4e57693ad194a49d7bd203c901b19ca260ec0d95fea75acacca464b18a0e19f8",
+      "payload_size_bytes": 293,
+      "raw_payload_location": "sample-input.jsonl#row-5",
+      "source_author": "person-1",
+      "source_container": "example-memory-rows",
+      "source_created_at": "2026-07-08T15:20:00Z",
+      "source_item_key": "row-5",
+      "source_kind": "row",
+      "source_ref": "row-5",
+      "source_updated_at": "2026-07-08T15:20:00Z",
+      "title": "Port 9090 correction row"
+    }
+  ],
+  "source_system": {
+    "adapter_name": "example-row-memory-store",
+    "adapter_version": "example-v1",
+    "description": "Synthetic row-like memory store. This source shape is not the default import path.",
+    "display_name": "Example Row Memory Store",
+    "owner": "shared",
+    "source_key": "example-row-memory-store",
+    "source_type": "memory-store",
+    "visibility": "shared"
+  },
+  "verification": {
+    "candidate_count": 5,
+    "evidence_count": 1,
+    "exclude_count": 0,
+    "exported_item_count": 5,
+    "held_excluded_or_rejected_count": 1,
+    "hold_count": 1,
+    "import_count": 3,
+    "payload_hash_algorithm": "sha256",
+    "raw_input_files": [
+      {
+        "path": "sample-input.jsonl",
+        "sha256": "000cf4a2a13b38b97e80d233c8a91bf1612c9b04e5ca5e08a9ec3a412f4c9dfa",
+        "size_bytes": 1490
+      }
+    ],
+    "rejected_count": 0,
+    "source_item_count": 5
+  }
+}

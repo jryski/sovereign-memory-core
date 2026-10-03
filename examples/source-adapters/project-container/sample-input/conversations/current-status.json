@@ -1,0 +1,22 @@
+{
+  "conversation_id": "conv-current-status",
+  "created_at": "2026-07-08T15:20:00Z",
+  "messages": [
+    {
+      "author": "person-1",
+      "content": "Current decision: Example Project listener is port 9090 on device-demo-1. The January port 8080 status is not current.",
+      "created_at": "2026-07-08T15:20:00Z",
+      "message_id": "msg-current-1",
+      "role": "user"
+    },
+    {
+      "author": "agent-1",
+      "content": "Model summary only: person-1 said the current listener is port 9090 and that the January port 8080 status is not current. This summary is not a human decision.",
+      "created_at": "2026-07-08T15:21:00Z",
+      "message_id": "msg-current-2",
+      "role": "assistant"
+    }
+  ],
+  "title": "Current Example Project status",
+  "updated_at": "2026-07-08T15:21:00Z"
+}

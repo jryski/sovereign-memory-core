@@ -213,11 +213,16 @@ No adapter should bypass review for high-impact or sensitive records.
 
 ## Minimum viable adapters
 
-To prove the core import contract is real, the repo should eventually include examples for at least:
+Checked-in synthetic examples for the shapes below live in
+[`examples/source-adapters/`](../examples/source-adapters/README.md):
 
 1. JSONL conversation export;
-2. Markdown file wiki;
-3. row-like memory store;
-4. SQL table export.
+2. project container with instructions and conversations;
+3. Markdown file wiki;
+4. row-like memory store;
+5. CSV-style SQL table export.
 
-These examples should be small, synthetic, and non-private.
+These examples are small, synthetic, and non-private. They show manifest
+drafts, classification notes, stale-state quarantine, and payload hash/count
+checks. No example is the default import path. None of them is a production
+importer, and none of them marks a batch ready for cutover.

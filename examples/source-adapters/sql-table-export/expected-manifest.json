@@ -1,0 +1,384 @@
+{
+  "adapter_profile": {
+    "evidence_posture": "SHA-256 covers the raw CSV row bytes before normalization, with the trailing newline excluded. The file checksum covers the header and every row.",
+    "is_default_import_path": false,
+    "lossiness": "CSV export drops SQL types, constraints, and indexes. source_status is source vocabulary, not canonical lifecycle.",
+    "mapping": "Each CSV data row is one source item from synthetic table demo_memory_rows. Column names require an explicit mapping. The header is not a source item.",
+    "profile_id": "example-sql-table-export-v1",
+    "source_identity": "synthetic CSV-style export of a SQL table",
+    "unsupported": [
+      "approval",
+      "deduplication",
+      "conflict resolution",
+      "authoritative cutover"
+    ]
+  },
+  "batch": {
+    "batch_key": "example-sql-table-export-2026-07-08",
+    "export_completed_at": "2026-07-08T16:00:01Z",
+    "export_started_at": "2026-07-08T16:00:00Z",
+    "exported_by": "agent-1",
+    "exported_item_count": 5,
+    "metadata": {
+      "producer": "example-source-adapter-draft",
+      "ready_for_cutover": false
+    },
+    "payload_hash_algorithm": "sha256",
+    "source_item_count": 5,
+    "status": "open",
+    "watermark": {
+      "max_updated_at": "2026-07-08T16:00:00Z",
+      "source_item_count": 5
+    }
+  },
+  "cutover_probe_candidates": [
+    {
+      "expected_behavior": "Quarantine sql-row-2 in HOLD. sql-row-3 is a later row and remains unreviewed. Source column source_status is not canonical lifecycle.",
+      "expected_source_item_key": "sql-row-2",
+      "probe_category": "stale_state",
+      "probe_key": "example-sql-stale-port",
+      "probe_type": "stale-avoidance",
+      "prompt": "Is sql-row-2 current listener state?",
+      "severity": "critical"
+    },
+    {
+      "expected_behavior": "sql-row-4 is a VAULT suggestion and still needs review.",
+      "expected_source_item_key": "sql-row-4",
+      "probe_category": "negative",
+      "probe_key": "example-sql-vault-boundary",
+      "probe_type": "sensitive-boundary",
+      "prompt": "Which exported row must stay out of HOUSE?",
+      "severity": "critical"
+    }
+  ],
+  "draft_format": "source-adapter.manifest-draft.v1",
+  "draft_note": "Synthetic manifest draft. Suggestions are not approved truth. This draft does not mark a batch ready for cutover.",
+  "hash_algorithm": "sha256",
+  "source_items": [
+    {
+      "content_type": "text/csv",
+      "manifest_candidates": [
+        {
+          "action": "import",
+          "lifecycle_status": "proposed",
+          "manifest_key": "sql-rollback-checklist",
+          "metadata": {
+            "producer_posture": "candidate_only"
+          },
+          "preservation_class": "durable",
+          "review_notes": "Structured row from demo_memory_rows. HOUSE import suggestion for memories. Column source_status active still needs a reviewed mapping before it can mean anything canonical.",
+          "review_state": "unreviewed",
+          "sensitivity": "ordinary",
+          "source_quote": "Example Project rollback checklist lives on wiki page demo-rollback.",
+          "source_quote_hash": "379514f9c053bf068cff5c7802d1134a0d7727dde73ce565fb6494e86258c697",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "Example Project rollback checklist lives on wiki page demo-rollback.",
+          "suggested_summary": "Table row says the rollback checklist lives on wiki page demo-rollback.",
+          "target_table": "memories",
+          "target_zone": "HOUSE",
+          "topic_key": "projects/example-project/rollback",
+          "transformation_version": "example-sql-table-export-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "csv_row",
+        "file": "sample-input.csv",
+        "match_field": "row_id",
+        "match_value": "sql-row-1"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.csv#sql-row-1",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "5f464010030ed73ad7bb8452e3e1cbdd1ea09be41a4d2dfb7214a8eab7a534ef",
+          "size_bytes": 179
+        }
+      ],
+      "payload_hash": "5f464010030ed73ad7bb8452e3e1cbdd1ea09be41a4d2dfb7214a8eab7a534ef",
+      "payload_size_bytes": 179,
+      "raw_payload_location": "sample-input.csv#sql-row-1",
+      "source_author": "person-1",
+      "source_container": "demo_memory_rows",
+      "source_created_at": "2026-07-08T15:00:00Z",
+      "source_item_key": "sql-row-1",
+      "source_kind": "row",
+      "source_ref": "sql-row-1",
+      "source_updated_at": "2026-07-08T15:00:00Z",
+      "title": "Rollback checklist row"
+    },
+    {
+      "content_type": "text/csv",
+      "manifest_candidates": [
+        {
+          "action": "hold",
+          "lifecycle_status": "stale",
+          "manifest_key": "sql-port-8080-stale",
+          "metadata": {
+            "producer_posture": "stale_state_quarantine",
+            "quarantine_reason": "stale_state",
+            "superseded_by_source_item_key": "sql-row-3"
+          },
+          "preservation_class": "quarantine",
+          "review_notes": "Stale-state quarantine. source_status superseded on a historical port claim. Keep the row in HOLD. sql-row-3 is the later suggestion and is still unreviewed.",
+          "review_state": "needs_review",
+          "sensitivity": "ordinary",
+          "source_quote": "Historical status: Example Project listener is port 8080.",
+          "source_quote_hash": "3bc6eceb6265d4d3b610731d6f9a161edb4cbef928f6139105152fafee03e245",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "Historical status: Example Project listener is port 8080.",
+          "suggested_summary": "Superseded table row says the listener is port 8080.",
+          "target_zone": "HOLD",
+          "topic_key": "projects/example-project/listener",
+          "transformation_version": "example-sql-table-export-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "csv_row",
+        "file": "sample-input.csv",
+        "match_field": "row_id",
+        "match_value": "sql-row-2"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.csv#sql-row-2",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "c732f67a74641659824e72901011e32cd88ce51f5e5d101221a119cf06fd1bae",
+          "size_bytes": 172
+        }
+      ],
+      "payload_hash": "c732f67a74641659824e72901011e32cd88ce51f5e5d101221a119cf06fd1bae",
+      "payload_size_bytes": 172,
+      "raw_payload_location": "sample-input.csv#sql-row-2",
+      "source_author": "person-1",
+      "source_container": "demo_memory_rows",
+      "source_created_at": "2026-01-15T12:00:00Z",
+      "source_item_key": "sql-row-2",
+      "source_kind": "row",
+      "source_ref": "sql-row-2",
+      "source_updated_at": "2026-01-15T12:00:00Z",
+      "title": "Superseded port 8080 row"
+    },
+    {
+      "content_type": "text/csv",
+      "manifest_candidates": [
+        {
+          "action": "import",
+          "lifecycle_status": "proposed",
+          "manifest_key": "sql-port-9090-correction",
+          "metadata": {
+            "producer_posture": "candidate_only"
+          },
+          "preservation_class": "durable",
+          "review_notes": "Later structured row. HOUSE import suggestion for memories. Unreviewed. Table column order is not authority.",
+          "review_state": "unreviewed",
+          "sensitivity": "ordinary",
+          "source_quote": "Correction: current Example Project listener is port 9090 on device-demo-1.",
+          "source_quote_hash": "51d9bbd32d9ba0eb9a8949d805e1e14a1f9c003f349effc79d7cf8cdbedcca87",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "Correction: current Example Project listener is port 9090 on device-demo-1.",
+          "suggested_summary": "Later table row says the synthetic listener is port 9090 on device-demo-1.",
+          "target_table": "memories",
+          "target_zone": "HOUSE",
+          "topic_key": "projects/example-project/listener",
+          "transformation_version": "example-sql-table-export-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "csv_row",
+        "file": "sample-input.csv",
+        "match_field": "row_id",
+        "match_value": "sql-row-3"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.csv#sql-row-3",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "00c3e397b9ed92aea816fd19e6665931cbc1a8c208d1b81983f52e31e9a8cc4e",
+          "size_bytes": 186
+        }
+      ],
+      "payload_hash": "00c3e397b9ed92aea816fd19e6665931cbc1a8c208d1b81983f52e31e9a8cc4e",
+      "payload_size_bytes": 186,
+      "raw_payload_location": "sample-input.csv#sql-row-3",
+      "source_author": "person-1",
+      "source_container": "demo_memory_rows",
+      "source_created_at": "2026-07-08T15:20:00Z",
+      "source_item_key": "sql-row-3",
+      "source_kind": "row",
+      "source_ref": "sql-row-3",
+      "source_updated_at": "2026-07-08T15:20:00Z",
+      "title": "Port 9090 correction row"
+    },
+    {
+      "content_type": "text/csv",
+      "manifest_candidates": [
+        {
+          "action": "import",
+          "custodian": "person-1",
+          "lifecycle_status": "proposed",
+          "manifest_key": "sql-restricted-pointer",
+          "metadata": {
+            "producer_posture": "restricted_review"
+          },
+          "preservation_class": "restricted",
+          "review_notes": "Restricted structured row. VAULT import suggestion. Needs review before normalization. A CSV column does not authorize a HOUSE write.",
+          "review_state": "needs_review",
+          "sensitivity": "restricted",
+          "source_quote": "Synthetic restricted pointer for vault-subject-demo-1.",
+          "source_quote_hash": "e4b014b7fd88bc2364f594419b3ff480b97e50ae8698c5c0af5791e3ea18266a",
+          "source_quote_hash_algorithm": "sha256",
+          "subject_ref": "vault-subject-demo-1",
+          "suggested_content": "Synthetic restricted pointer for vault-subject-demo-1.",
+          "suggested_summary": "Restricted table row for synthetic subject vault-subject-demo-1.",
+          "target_zone": "VAULT",
+          "topic_key": "subjects/vault-subject-demo-1",
+          "transformation_version": "example-sql-table-export-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "csv_row",
+        "file": "sample-input.csv",
+        "match_field": "row_id",
+        "match_value": "sql-row-4"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.csv#sql-row-4",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "dfd9b27b634546e12e2f7c2dad906c05a86966efa7a2974d9b4dcd5ca89fdb31",
+          "size_bytes": 195
+        }
+      ],
+      "payload_hash": "dfd9b27b634546e12e2f7c2dad906c05a86966efa7a2974d9b4dcd5ca89fdb31",
+      "payload_size_bytes": 195,
+      "raw_payload_location": "sample-input.csv#sql-row-4",
+      "source_author": "person-1",
+      "source_container": "demo_memory_rows",
+      "source_created_at": "2026-07-08T15:30:00Z",
+      "source_item_key": "sql-row-4",
+      "source_kind": "row",
+      "source_ref": "sql-row-4",
+      "source_updated_at": "2026-07-08T15:30:00Z",
+      "title": "Restricted subject row"
+    },
+    {
+      "content_type": "text/csv",
+      "manifest_candidates": [
+        {
+          "action": "evidence",
+          "lifecycle_status": "evidence",
+          "manifest_key": "sql-listener-audit",
+          "metadata": {
+            "producer_posture": "process_evidence"
+          },
+          "preservation_class": "process",
+          "review_notes": "Audit row is process evidence. Preserve it as EVIDENCE. It does not become the current listener fact.",
+          "review_state": "unreviewed",
+          "sensitivity": "ordinary",
+          "source_quote": "Process evidence: sql-row-2 was superseded by sql-row-3.",
+          "source_quote_hash": "3577b19cbcdb8d30bbeda09e2ef5ff6b067741a75f4f3d4acdb763fdbf773142",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "Process evidence: sql-row-2 was superseded by sql-row-3.",
+          "suggested_summary": "Audit row recording that sql-row-2 was superseded by sql-row-3.",
+          "target_zone": "EVIDENCE",
+          "topic_key": "projects/example-project/listener",
+          "transformation_version": "example-sql-table-export-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "csv_row",
+        "file": "sample-input.csv",
+        "match_field": "row_id",
+        "match_value": "sql-row-5"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.csv#sql-row-5",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "11a70484fe15081e21c8d2a1bd932146c419e77e476a8be9ce8da94a0ce0b561",
+          "size_bytes": 202
+        }
+      ],
+      "payload_hash": "11a70484fe15081e21c8d2a1bd932146c419e77e476a8be9ce8da94a0ce0b561",
+      "payload_size_bytes": 202,
+      "raw_payload_location": "sample-input.csv#sql-row-5",
+      "source_author": "agent-1",
+      "source_container": "demo_memory_rows",
+      "source_created_at": "2026-07-08T16:00:00Z",
+      "source_item_key": "sql-row-5",
+      "source_kind": "row",
+      "source_ref": "sql-row-5",
+      "source_updated_at": "2026-07-08T16:00:00Z",
+      "title": "Listener audit row"
+    }
+  ],
+  "source_system": {
+    "adapter_name": "example-sql-table-export",
+    "adapter_version": "example-v1",
+    "description": "Synthetic CSV-style export of table demo_memory_rows. This source shape is not the default import path.",
+    "display_name": "Example SQL Table Export",
+    "owner": "shared",
+    "source_key": "example-sql-table-export",
+    "source_type": "sql",
+    "visibility": "shared"
+  },
+  "verification": {
+    "candidate_count": 5,
+    "evidence_count": 1,
+    "exclude_count": 0,
+    "exported_item_count": 5,
+    "held_excluded_or_rejected_count": 1,
+    "hold_count": 1,
+    "import_count": 3,
+    "payload_hash_algorithm": "sha256",
+    "raw_input_files": [
+      {
+        "path": "sample-input.csv",
+        "sha256": "a7ef7d41279daa9d9c21ae6be8e54700e654f385a732696670b0ef404654d167",
+        "size_bytes": 1016
+      }
+    ],
+    "rejected_count": 0,
+    "source_item_count": 5
+  }
+}
