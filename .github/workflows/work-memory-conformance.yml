@@ -363,6 +363,7 @@ jobs:
       - name: Apply SECURITY DEFINER hardening, evaluability, and topology scope
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/fixtures/upgrade_sentinel_evaluable.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/12_topology_scope.sql
       - name: Verify durable control-table repair preserved registry data
