@@ -8,6 +8,17 @@ This document defines source adapter expectations for common sources such as AI 
 
 Adapters translate source-specific exports into the generic source-import contract described in `docs/07-source-import-cutover.md`.
 
+## Profile declaration
+
+The matrix below is a set of expectations. It is not an adapter profile, and
+none of its rows is a completed adapter.
+
+A profile for one source family is a filled copy of
+[`templates/adapter-profile.md`](templates/adapter-profile.md). The copy keeps
+the lossiness declaration and the round-trip limitations. Filling the form
+declares mapping, preservation, and loss. It does not prove probes, round-trip,
+mining quality, or production readiness.
+
 ## Adapter rule
 
 An adapter is not allowed to decide truth.
