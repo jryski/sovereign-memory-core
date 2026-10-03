@@ -279,6 +279,18 @@ A migrated memory system is only successful if real recall works.
 
 A probe should represent a query or expectation the new system must satisfy.
 
+### Probe categories
+
+SQL defines five categories. Prompt wording can vary. Readiness uses the category.
+
+- `positive` — expected recall is present.
+- `negative` — the answer does not invent or over-answer.
+- `conflict` — tensions stay visible.
+- `stale_state` — a superseded fact does not outrank the current fact.
+- `evidence_request` — supporting evidence is returned or cited.
+
+Critical probes use all-pass readiness. `cutover_scorecard.pass_pct` can stay high while `critical_all_pass` is false. Cutover readiness follows `critical_all_pass`. Recorded runs are history, not canonical memory.
+
 ### Probe types
 
 - exact-known fact;

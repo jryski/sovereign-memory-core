@@ -43,7 +43,8 @@ from (
   values
     ('source_freeze_batch',            to_regprocedure('public.source_freeze_batch(uuid,text,jsonb,text)') is not null, 'Run sql/04_source_import.sql'),
     ('source_manifest_payload_drift',  to_regprocedure('public.source_manifest_payload_drift(uuid)') is not null,       'Run sql/04_source_import.sql'),
-    ('source_mark_batch_ready',        to_regprocedure('public.source_mark_batch_ready(uuid,text)') is not null,        'Run sql/04_source_import.sql')
+    ('source_mark_batch_ready',        to_regprocedure('public.source_mark_batch_ready(uuid,text)') is not null,        'Run sql/04_source_import.sql'),
+    ('cutover_probe_outcome_matched',  to_regprocedure('public.cutover_probe_outcome_matched(text,text,text,boolean,text,text)') is not null, 'Run sql/06_cutover_probe_categories.sql')
 ) as v(function_name, ok, remediation)
 cross join lateral (select case when ok then 'pass' else 'fail' end as state) s;
 
@@ -124,7 +125,12 @@ select 'grant_posture',
 from pg_proc p
 join pg_namespace n on n.oid=p.pronamespace and n.nspname='public'
 cross join lateral aclexplode(coalesce(p.proacl, acldefault('f',p.proowner))) acl
-where p.proname in ('source_freeze_batch','source_manifest_payload_drift','source_mark_batch_ready')
+where p.proname in (
+  'source_freeze_batch',
+  'source_manifest_payload_drift',
+  'source_mark_batch_ready',
+  'cutover_probe_outcome_matched'
+)
   and acl.privilege_type='EXECUTE'
   and acl.grantee::regrole::text in ('anon','authenticated','-');
 
@@ -134,7 +140,8 @@ order by check_group, object_name;
 
 -- ---- smoke test --------------------------------------------------------------
 -- This section proves the contract can stage, manifest, review, freeze, score,
--- block premature readiness, enforce locators and richer probes, then pass
+-- block premature readiness, enforce locators and richer probes, cover each
+-- probe outcome, fail readiness when any critical probe misses, then pass
 -- readiness after blockers are resolved. It rolls back all fixture rows.
 
 begin;
@@ -272,23 +279,38 @@ with agent as (
   cross join (values
     ('fixture-positive-alpha', 'project-state', 'positive', 'critical', 'What did project alpha decide?', 'boring durable schema', null, 'Return the known project decision.', false),
     ('fixture-negative-unknown', 'unknown-avoidance', 'negative', 'critical', 'What is the launch date for missing project omega?', 'unknown', 'January 1', 'Say unknown or insufficient evidence; do not invent a date.', false),
-    ('fixture-conflict-status', 'conflict', 'conflict', 'critical', 'Is the maybe-stale status confirmed?', 'needs review', null, 'Surface the unresolved status instead of flattening it into confirmed truth.', false),
-    ('fixture-stale-state', 'stale-avoidance', 'stale_state', 'critical', 'What should happen to stale project state?', 'hold', null, 'Avoid promoting stale or uncertain state as current.', false),
-    ('fixture-evidence-request', 'evidence', 'evidence_request', 'critical', 'Show evidence for the project alpha decision.', 'evidence', null, 'Return the answer with supporting evidence.', true)
+    ('fixture-conflict-status', 'conflict', 'conflict', 'critical', 'Is the maybe-stale status confirmed?', 'needs review', 'confirmed current', 'Surface the unresolved status instead of flattening it into confirmed truth.', false),
+    ('fixture-stale-state', 'stale-avoidance', 'stale_state', 'critical', 'What should happen to stale project state?', 'hold', 'probably current', 'Current disposition stays hold; the superseded note must not outrank it.', false),
+    ('fixture-evidence-request', 'evidence', 'evidence_request', 'critical', 'Show evidence for the project alpha decision.', 'fixture source locator', null, 'Return or cite supporting evidence.', true)
   ) as p(probe_key, probe_type, probe_category, severity, prompt, expect_substring, avoid_substring, expected_behavior, expected_evidence_required)
   returning id, probe_category
 ), runs as (
-  insert into cutover_runs(probe_id, runner_agent, matched, observed_answer, notes)
-  select probes.id, batch.created_by, true,
-         case probes.probe_category
-           when 'positive' then 'Use the boring durable schema.'
-           when 'negative' then 'Unknown: insufficient evidence.'
-           when 'conflict' then 'This status needs review and should not be treated as confirmed.'
-           when 'stale_state' then 'Hold stale or uncertain state until reviewed.'
-           when 'evidence_request' then 'Evidence: fixture source locator supports the decision.'
-         end,
-         'validation fixture'
-  from probes cross join batch
+  insert into cutover_runs(probe_id, runner_agent, matched, observed_answer, evidence_ref, notes)
+  select
+    cp.id,
+    batch.created_by,
+    cutover_probe_outcome_matched(
+      cp.probe_category,
+      cp.expect_substring,
+      cp.avoid_substring,
+      cp.expected_evidence_required,
+      obs.observed_answer,
+      obs.evidence_ref
+    ),
+    obs.observed_answer,
+    obs.evidence_ref,
+    'validation fixture'
+  from probes
+  join cutover_probes cp on cp.id = probes.id
+  cross join batch
+  join (values
+    ('positive', 'Use the boring durable schema.', null::text),
+    ('negative', 'Unknown: insufficient evidence.', null::text),
+    ('conflict', 'This status needs review and should not be treated as confirmed.', null::text),
+    ('stale_state', 'Hold stale or uncertain state until reviewed.', null::text),
+    ('evidence_request', 'Evidence: fixture source locator supports the decision.', 'fixture://item-house.json')
+  ) as obs(probe_category, observed_answer, evidence_ref)
+    on obs.probe_category = cp.probe_category
   returning id
 )
 select count(*) as fixture_rows_created
@@ -395,6 +417,290 @@ select 'smoke_test',
 from cutover_scorecard cs
 join source_import_batches b on b.id=cs.batch_id
 where b.batch_key='fixture-batch-001';
+
+-- Category outcomes are generic string/evidence contracts. They do not call a
+-- retrieval engine. Each category has a passing observation and a failing one.
+insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+select 'smoke_test',
+       v.object_name,
+       case when cutover_probe_outcome_matched(
+              v.probe_category,
+              v.expect_substring,
+              v.avoid_substring,
+              v.expected_evidence_required,
+              v.observed_answer,
+              v.evidence_ref
+            ) = v.expected_match then 'pass' else 'fail' end,
+       'required',
+       true,
+       v.remediation
+from (values
+  ('outcome_positive_recall', 'positive', 'boring durable schema', null::text, false,
+    'Use the boring durable schema.', null::text, true,
+    'Positive probes match when the expected recall is present.'),
+  ('outcome_positive_missing_recall', 'positive', 'boring durable schema', null::text, false,
+    'No project decision was found.', null::text, false,
+    'Positive probes miss when the expected recall is absent.'),
+  ('outcome_positive_unnamed_recall', 'positive', null::text, null::text, false,
+    'Use the boring durable schema.', null::text, false,
+    'Positive probes fail closed when no expected recall is named.'),
+  ('outcome_negative_refuses', 'negative', 'unknown', 'January 1', false,
+    'Unknown: insufficient evidence.', null::text, true,
+    'Negative probes match when the answer refuses and does not invent the forbidden fact.'),
+  ('outcome_negative_invents', 'negative', 'unknown', 'January 1', false,
+    'The launch date is January 1.', null::text, false,
+    'Negative probes miss when the answer invents the forbidden fact.'),
+  ('outcome_negative_over_answers', 'negative', 'unknown', 'January 1', false,
+    'Unknown, but the launch date is January 1.', null::text, false,
+    'Negative probes miss when a refusal still includes the forbidden over-answer.'),
+  ('outcome_conflict_visible', 'conflict', 'needs review', 'confirmed current', false,
+    'This status needs review and both accounts stay visible.', null::text, true,
+    'Conflict probes match when the tension stays visible.'),
+  ('outcome_conflict_flattened', 'conflict', 'needs review', 'confirmed current', false,
+    'The status is confirmed current.', null::text, false,
+    'Conflict probes miss when the tension is flattened.'),
+  ('outcome_stale_current_fact', 'stale_state', 'hold', 'probably current', false,
+    'Hold stale or uncertain state until reviewed.', null::text, true,
+    'Stale-state probes match when the current fact is present and the superseded fact is absent.'),
+  ('outcome_stale_superseded_outranks', 'stale_state', 'hold', 'probably current', false,
+    'The stale note is probably current.', null::text, false,
+    'Stale-state probes miss when the superseded fact is returned in place of the current fact.'),
+  ('outcome_stale_superseded_still_present', 'stale_state', 'hold', 'probably current', false,
+    'Hold the item, but it is probably current.', null::text, false,
+    'Stale-state probes miss when the superseded fact remains beside the current fact.'),
+  ('outcome_stale_unnamed_superseded', 'stale_state', 'hold', null::text, false,
+    'Hold stale or uncertain state until reviewed.', null::text, false,
+    'Stale-state probes fail closed when the superseded fact is not named.'),
+  ('outcome_evidence_cited', 'evidence_request', 'fixture source locator', null::text, true,
+    'Evidence: fixture source locator supports the decision.', null::text, true,
+    'Evidence-request probes match when the answer cites supporting evidence.'),
+  ('outcome_evidence_returned', 'evidence_request', 'fixture source locator', null::text, true,
+    'See the attached support.', 'fixture://item-house.json', true,
+    'Evidence-request probes match when supporting evidence is returned by reference.'),
+  ('outcome_evidence_missing', 'evidence_request', 'fixture source locator', null::text, true,
+    'The decision stands without a citation.', null::text, false,
+    'Evidence-request probes miss when no evidence is returned or cited.'),
+  ('outcome_evidence_not_required_fails_closed', 'evidence_request', 'fixture source locator', null::text, false,
+    'Evidence: fixture source locator supports the decision.', 'fixture://item-house.json', false,
+    'Evidence-request probes fail closed unless evidence is required.')
+) as v(
+  object_name,
+  probe_category,
+  expect_substring,
+  avoid_substring,
+  expected_evidence_required,
+  observed_answer,
+  evidence_ref,
+  expected_match,
+  remediation
+);
+
+-- One critical miss at a time. The other four stay passing, so pass_pct stays
+-- at 80. Readiness must still fail, and the miss remains in run history.
+do $$
+declare
+  v_batch_id uuid;
+  v_agent text;
+  v_probe_id uuid;
+  v_category text;
+  v_expect text;
+  v_avoid text;
+  v_evidence_required boolean;
+  v_observed text;
+  v_evidence_ref text;
+  v_matched boolean;
+  v_pass_pct numeric;
+  v_critical_all_pass boolean;
+  v_critical_misses bigint;
+  v_probes_passed bigint;
+  v_ready_state text;
+  v_blocker_count bigint;
+  v_failed_history bigint;
+  v_memories_before bigint;
+  v_wiki_before bigint;
+  v_step integer := 0;
+begin
+  select count(*) into v_memories_before from memories;
+  select count(*) into v_wiki_before from wiki_pages;
+
+  select b.id, b.created_by
+    into v_batch_id, v_agent
+  from source_import_batches b
+  where b.batch_key = 'fixture-batch-001';
+
+  for v_category, v_observed, v_evidence_ref in
+    select category, observed_answer, evidence_ref
+    from (values
+      ('positive', 'No recalled project decision.', null::text),
+      ('negative', 'The launch date is January 1.', null::text),
+      ('conflict', 'The status is confirmed current.', null::text),
+      ('stale_state', 'The stale note is probably current.', null::text),
+      ('evidence_request', 'The decision stands without a citation.', null::text)
+    ) as misses(category, observed_answer, evidence_ref)
+  loop
+    v_step := v_step + 1;
+
+    select cp.id, cp.expect_substring, cp.avoid_substring, cp.expected_evidence_required
+      into v_probe_id, v_expect, v_avoid, v_evidence_required
+    from cutover_probes cp
+    where cp.batch_id = v_batch_id
+      and cp.probe_category = v_category
+      and cp.active
+      and cp.severity = 'critical';
+
+    v_matched := cutover_probe_outcome_matched(
+      v_category, v_expect, v_avoid, v_evidence_required, v_observed, v_evidence_ref
+    );
+
+    insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+    values (
+      'smoke_test',
+      'outcome_recorded_miss_' || v_category,
+      case when v_matched then 'fail' else 'pass' end,
+      'required',
+      true,
+      'The recorded ' || v_category || ' miss must fail that category outcome.'
+    );
+
+    insert into cutover_runs(probe_id, run_at, runner_agent, matched, observed_answer, evidence_ref, notes)
+    values (
+      v_probe_id,
+      now() + (v_step * interval '1 minute'),
+      v_agent,
+      v_matched,
+      v_observed,
+      v_evidence_ref,
+      'synthetic critical miss'
+    );
+
+    select cs.pass_pct, cs.critical_all_pass, cs.critical_misses, cs.probes_passed
+      into v_pass_pct, v_critical_all_pass, v_critical_misses, v_probes_passed
+    from cutover_scorecard cs
+    where cs.batch_id = v_batch_id;
+
+    select sr.state
+      into v_ready_state
+    from source_readiness sr
+    where sr.batch_id = v_batch_id
+      and sr.check_key = 'critical_cutover_probes_all_pass';
+
+    select count(*)
+      into v_blocker_count
+    from source_readiness sr
+    where sr.batch_id = v_batch_id
+      and sr.severity = 'blocker'
+      and sr.state = 'fail';
+
+    insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+    values (
+      'smoke_test',
+      'critical_miss_visible_' || v_category,
+      case
+        when v_probes_passed = 4
+         and v_critical_misses = 1
+         and v_critical_all_pass = false
+         and v_pass_pct = 80
+         and v_ready_state = 'fail'
+         and v_blocker_count = 1
+        then 'pass' else 'fail'
+      end,
+      'required',
+      true,
+      'One critical ' || v_category || ' miss must fail readiness while pass_pct stays 80.'
+    );
+
+    begin
+      perform source_mark_batch_ready(v_batch_id, v_agent);
+      insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+      values (
+        'smoke_test',
+        'critical_miss_blocks_ready_' || v_category,
+        'fail',
+        'required',
+        true,
+        'source_mark_batch_ready must reject a batch with a critical probe miss.'
+      );
+    exception
+      when others then
+        insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+        values (
+          'smoke_test',
+          'critical_miss_blocks_ready_' || v_category,
+          case when sqlerrm like 'source_mark_batch_ready:%blocker%' then 'pass' else 'fail' end,
+          'required',
+          true,
+          'source_mark_batch_ready must reject a batch with a critical probe miss.'
+        );
+    end;
+
+    insert into cutover_runs(probe_id, run_at, runner_agent, matched, observed_answer, evidence_ref, notes)
+    select
+      cr.probe_id,
+      now() + (v_step * interval '1 minute') + interval '30 seconds',
+      cr.runner_agent,
+      cutover_probe_outcome_matched(
+        cp.probe_category,
+        cp.expect_substring,
+        cp.avoid_substring,
+        cp.expected_evidence_required,
+        cr.observed_answer,
+        cr.evidence_ref
+      ),
+      cr.observed_answer,
+      cr.evidence_ref,
+      'later passing run; earlier miss remains history'
+    from cutover_runs cr
+    join cutover_probes cp on cp.id = cr.probe_id
+    where cr.probe_id = v_probe_id
+      and cr.notes = 'validation fixture'
+    order by cr.run_at asc
+    limit 1;
+  end loop;
+
+  select cs.pass_pct, cs.critical_all_pass, cs.critical_misses, cs.probes_passed
+    into v_pass_pct, v_critical_all_pass, v_critical_misses, v_probes_passed
+  from cutover_scorecard cs
+  where cs.batch_id = v_batch_id;
+
+  select count(*)
+    into v_failed_history
+  from cutover_runs cr
+  join cutover_probes cp on cp.id = cr.probe_id
+  where cp.batch_id = v_batch_id
+    and cr.matched = false
+    and cr.notes = 'synthetic critical miss';
+
+  insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+  values (
+    'smoke_test',
+    'critical_miss_history_retained',
+    case
+      when v_failed_history = 5
+       and v_probes_passed = 5
+       and v_critical_misses = 0
+       and v_critical_all_pass
+       and v_pass_pct = 100
+      then 'pass' else 'fail'
+    end,
+    'required',
+    true,
+    'Critical misses remain run history. The latest passing runs restore all-pass readiness.'
+  );
+
+  insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
+  values (
+    'smoke_test',
+    'probe_results_are_run_history',
+    case
+      when (select count(*) from memories) = v_memories_before
+       and (select count(*) from wiki_pages) = v_wiki_before
+      then 'pass' else 'fail'
+    end,
+    'required',
+    true,
+    'Probe outcome checks must not write canonical memories or wiki pages.'
+  );
+end $$;
 
 insert into source_import_fixture_results(check_group, object_name, state, severity, fatal, remediation)
 select 'smoke_test',

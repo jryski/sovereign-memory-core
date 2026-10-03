@@ -10,6 +10,11 @@
 --   Retrieval success alone is not proof of readiness. Cutover probes must also
 --   verify refusal/unknown behavior, conflict surfacing, stale-state avoidance,
 --   and evidence-request behavior.
+--
+--   cutover_probe_outcome_matched is a generic observation predicate. It does
+--   not call a retrieval engine and it does not write canonical memory. Recorded
+--   cutover_runs are run history. Readiness follows critical_all_pass; pass_pct
+--   is descriptive and cannot clear a critical miss.
 -- ============================================================================
 
 alter table cutover_probes
@@ -39,8 +44,61 @@ end $$;
 create index if not exists idx_cutover_probes_category
   on cutover_probes(batch_id, probe_category, severity, active);
 
+-- Generic outcome predicate. Callers record the boolean on cutover_runs.
+-- The function does not insert memories, wiki pages, or other canonical rows.
+create or replace function cutover_probe_outcome_matched(
+  p_probe_category text,
+  p_expect_substring text,
+  p_avoid_substring text,
+  p_expected_evidence_required boolean,
+  p_observed_answer text,
+  p_evidence_ref text
+) returns boolean
+language sql
+immutable
+set search_path to public
+as $$
+  with markers as (
+    select
+      nullif(lower(trim(coalesce(p_expect_substring, ''))), '') as expect_marker,
+      nullif(lower(trim(coalesce(p_avoid_substring, ''))), '') as avoid_marker,
+      lower(coalesce(p_observed_answer, '')) as observed,
+      nullif(trim(coalesce(p_evidence_ref, '')), '') as evidence_ref
+  )
+  select case p_probe_category
+    when 'positive' then
+      expect_marker is not null
+      and strpos(observed, expect_marker) > 0
+      and (avoid_marker is null or strpos(observed, avoid_marker) = 0)
+    when 'negative' then
+      avoid_marker is not null
+      and strpos(observed, avoid_marker) = 0
+      and (expect_marker is null or strpos(observed, expect_marker) > 0)
+    when 'conflict' then
+      expect_marker is not null
+      and strpos(observed, expect_marker) > 0
+      and (avoid_marker is null or strpos(observed, avoid_marker) = 0)
+    when 'stale_state' then
+      expect_marker is not null
+      and avoid_marker is not null
+      and strpos(observed, expect_marker) > 0
+      and strpos(observed, avoid_marker) = 0
+    when 'evidence_request' then
+      coalesce(p_expected_evidence_required, false)
+      and (
+        evidence_ref is not null
+        or (expect_marker is not null and strpos(observed, expect_marker) > 0)
+      )
+    else false
+  end
+  from markers;
+$$;
+
+revoke all on function cutover_probe_outcome_matched(text,text,text,boolean,text,text) from public;
+
 -- Recreate scorecard so critical readiness is not hidden behind aggregate pass
--- percentage. A single active critical miss remains visible as a blocker signal.
+-- percentage. pass_pct stays visible as history. critical_all_pass is the
+-- readiness signal: one active critical miss remains a blocker.
 drop view if exists cutover_scorecard;
 
 create view cutover_scorecard with (security_invoker=true) as
@@ -181,11 +239,13 @@ begin
   if exists (select 1 from pg_roles where rolname='anon') then
     revoke all on cutover_scorecard from anon;
     revoke all on source_readiness from anon;
+    revoke all on function cutover_probe_outcome_matched(text,text,text,boolean,text,text) from anon;
   end if;
 
   if exists (select 1 from pg_roles where rolname='authenticated') then
     revoke all on cutover_scorecard from authenticated;
     revoke all on source_readiness from authenticated;
+    revoke all on function cutover_probe_outcome_matched(text,text,text,boolean,text,text) from authenticated;
   end if;
 end $$;
 
