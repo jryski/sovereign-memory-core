@@ -124,7 +124,8 @@ DATABASE_URL="postgres://postgres:postgres@localhost:5432/postgres" \
 
 The helper creates local compatibility shims (`extensions`, `anon`, `authenticated`,
 `service_role`), applies `01_core.sql`, applies `04_source_import.sql`, applies optional
-follow-on SQL layers if present, and runs the rollback validation bundle. Use it for local
+follow-on SQL layers if present, and runs the rollback validation bundle, including
+`sql/validation/promotion_guard_negative.sql`. Use it for local
 review only; production/Supabase deployments should still apply DDL through migrations.
 
 - DONE, object/perimeter checks:

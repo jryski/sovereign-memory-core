@@ -8,6 +8,7 @@ on:
       - "sql/05_candidate_locators.sql"
       - "sql/06_cutover_probe_categories.sql"
       - "sql/validation/source_import_readiness.sql"
+      - "sql/validation/promotion_guard_negative.sql"
       - "sql/validation/load_chat_mine_package.sql"
       - "scripts/validate_source_import.sh"
       - "scripts/export_chat_mine_package.py"
