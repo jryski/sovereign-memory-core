@@ -185,7 +185,6 @@ sql/03_provenance_guards.sql           optional
 sql/04_source_import.sql               optional
 sql/05_candidate_locators.sql          optional
 sql/06_cutover_probe_categories.sql    optional
-sql/06_promotion_guards.sql            optional
 sql/07_work_lessons.sql
 sql/08_attention_events.sql
 sql/09_perimeter_refresh.sql
@@ -206,9 +205,7 @@ Three ordering rules that will bite you otherwise:
 `sql/validation/` is not in the ordered list. It holds
 `source_import_readiness.sql`, `promotion_guard_negative.sql`, and
 `load_chat_mine_package.sql`. Those are validation helpers. Applying `01`
-through `11` does not run them. `06_promotion_guards.sql` stays with the
-optional source-import layers, before `07`. `11` remains the last numbered
-migration.
+through `11` does not run them.
 
 `09` closes schema creation, table grants, function execution, default
 privileges, RLS and FORCE RLS, ownership, and trigger-only boundaries. `10`
