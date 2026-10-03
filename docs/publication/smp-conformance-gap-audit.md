@@ -57,7 +57,7 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 | I3.5 | Unsourced or agent-authored consequential facts rejected at write time. | Partial | Existing provenance guards cover financial-style facts; general legal/medical/identity domain enforcement is not complete. |
 | I4.1 | Store becomes candidate-authoritative only after required probe suite passes. | Partial | Probe suite and scorecards exist; candidate-authoritative state model should be verified. |
 | I4.2 | Probe suite includes positive, negative, conflict, stale-state, evidence-request categories. | Covered | `sql/06_cutover_probe_categories.sql` introduced these categories and validation coverage. |
-| I4.3 | Critical probes all pass before cutover. | Partial | Critical probe tracking exists; direct cutover-blocking behavior should be tested. |
+| I4.3 | Critical probes all pass before cutover. | Covered | Synthetic validation fails readiness when any critical probe misses, including when the aggregate pass percentage stays at 80. |
 | I4.4 | Normative claims are backed by passing probes. | Gap | This audit starts the mapping; not all claims are covered. |
 | I5.1 | Corrections append; history is not silently rewritten. | Partial | Supersession doctrine and core audit patterns exist; source-import promoted-record mutation rules need direct tests. |
 | I5.2 | Earlier contradictory record preserved and may be marked stale/superseded/conflicted/historical. | Partial | Conflict/stale probes exist; explicit record preservation under contradiction needs fixture coverage. |
