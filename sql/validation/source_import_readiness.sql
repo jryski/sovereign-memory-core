@@ -283,17 +283,17 @@ with agent as (
     ('fixture-stale-state', 'stale-avoidance', 'stale_state', 'critical', 'What should happen to stale project state?', 'hold', 'probably current', 'Current disposition stays hold; the superseded note must not outrank it.', false),
     ('fixture-evidence-request', 'evidence', 'evidence_request', 'critical', 'Show evidence for the project alpha decision.', 'fixture source locator', null, 'Return or cite supporting evidence.', true)
   ) as p(probe_key, probe_type, probe_category, severity, prompt, expect_substring, avoid_substring, expected_behavior, expected_evidence_required)
-  returning id, probe_category
+  returning id, probe_category, expect_substring, avoid_substring, expected_evidence_required
 ), runs as (
   insert into cutover_runs(probe_id, runner_agent, matched, observed_answer, evidence_ref, notes)
   select
-    cp.id,
+    probes.id,
     batch.created_by,
     cutover_probe_outcome_matched(
-      cp.probe_category,
-      cp.expect_substring,
-      cp.avoid_substring,
-      cp.expected_evidence_required,
+      probes.probe_category,
+      probes.expect_substring,
+      probes.avoid_substring,
+      probes.expected_evidence_required,
       obs.observed_answer,
       obs.evidence_ref
     ),
@@ -301,7 +301,6 @@ with agent as (
     obs.evidence_ref,
     'validation fixture'
   from probes
-  join cutover_probes cp on cp.id = probes.id
   cross join batch
   join (values
     ('positive', 'Use the boring durable schema.', null::text),
@@ -310,7 +309,7 @@ with agent as (
     ('stale_state', 'Hold stale or uncertain state until reviewed.', null::text),
     ('evidence_request', 'Evidence: fixture source locator supports the decision.', 'fixture://item-house.json')
   ) as obs(probe_category, observed_answer, evidence_ref)
-    on obs.probe_category = cp.probe_category
+    on obs.probe_category = probes.probe_category
   returning id
 )
 select count(*) as fixture_rows_created
