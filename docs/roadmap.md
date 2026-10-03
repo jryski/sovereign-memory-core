@@ -22,7 +22,7 @@ Public posture is **alpha**, the same posture as the README. Tag `v0.3-alpha` na
 
 The phase names later in this file (`v0.1-alpha - Custody Foundation`, `v0.3-alpha - Review Workflow`, and the rest) are older product-milestone vocabulary. They are a different statement from the `v0.3-alpha` git tag. Where a milestone name and STATUS disagree, STATUS and the README win.
 
-Custody rails that are in the repository can be reviewed from the migrations and CI. The local operator path, and the review-workflow milestone below, remain forward targets. Live and production export, clean restore of private data, and independent live acceptance are blocked on #92.
+Custody rails that are in the repository can be reviewed from the migrations and CI. The local operator path, and the review-workflow milestone below, remain forward targets. That forward operator path is specified to include a portable backup, a clean restore into an empty compatible target, and a scoped custody receipt that states what was or was not proven. Those steps are not shipped. Live and production export, clean restore of private data, and independent live acceptance are blocked on #92.
 
 ## What is done
 
@@ -42,7 +42,8 @@ Custody rails that are in the repository can be reviewed from the migrations and
 
 - Finish project organization, ADRs, and contribution paths.
 - Document durable-write policy for protected memory scopes.
-- Build the local operator flow: `smc doctor`, local Docker install, schema installer, validation runner, and safe database URL checks.
+- Build the local operator flow: `smc doctor`, local Docker install, schema installer, validation runner, safe database URL checks, clean restore verification, and custody receipt generation.
+- Reuse one versioned canonical-view and probe suite across installer verification, offline conformance, and Steward Pack validation.
 - Add review workflow for accept, hold, reject, and evidence display.
 - Define adapter profiles without making Chat-Mine quality claims.
 
@@ -50,7 +51,7 @@ Custody rails that are in the repository can be reviewed from the migrations and
 
 | Track | Purpose | Current posture |
 |---|---|---|
-| Alpha build | Make the custody layer installable, verifiable, reviewable, and recoverable by an operator. | Active near-term work. |
+| Alpha build | Make the custody layer installable, verifiable, reviewable, recoverable, and independently restorable by an operator. | Active near-term work. |
 | Publication | Explain SMP custody concepts, conformance gaps, and adoption path without overclaiming implementation completeness. | Drafting and review. |
 | Research | Improve Chat-Mine and other emitters through evaluation, not claims. | Explicitly separate from alpha build. |
 
@@ -84,7 +85,16 @@ Includes:
 - schema installer
 - validation runner
 - safe database URL checks
+- portable backup creation with SHA-256 manifest
+- clean restore into an empty compatible PostgreSQL target
+- canonical governed-state comparison
+- structural invariant and restored-instance conformance probes
+- three honest completion states: installed, backup created, custody verified
+- canonical JSON custody receipt with declared scope and exclusions
+- re-runnable `smc verify-exit`
 - operator documentation
+
+The custody gate is default-on but skippable on constrained hosts. A skip must record a degraded state and reason; it may never be reported as `custody verified`. The contract is [`11-installer-roadmap.md`](11-installer-roadmap.md) and [`12-custody-receipt.md`](12-custody-receipt.md).
 
 ### v0.3-alpha - Review Workflow
 
@@ -95,6 +105,7 @@ Includes:
 - evidence display
 - candidate status transitions
 - basic review UI or CLI review
+- structurally separate candidate and authoritative retrieval paths
 
 ### v0.4-alpha - Adapter Profiles
 
@@ -112,6 +123,7 @@ Includes:
 Includes:
 
 - conformance fixture
+- offline custody receipt verifier fixture
 - public docs
 - license/IP checklist
 - history/privacy caveat
@@ -132,8 +144,8 @@ Includes:
 | Release | Target outcome |
 |---|---|
 | `v0.1-alpha` | Custody foundation can be reviewed and validated from the repo. |
-| `v0.2-alpha` | A local operator can install and validate the foundation without manually interpreting every SQL file. |
-| `v0.3-alpha` | Candidate review and promotion are visible, testable, and bounded. |
+| `v0.2-alpha` | A local operator can install, validate, back up, clean-restore, and produce an auditable custody receipt without manually interpreting every SQL file. |
+| `v0.3-alpha` | Candidate review and promotion are visible, testable, bounded, and structurally separate from authoritative retrieval. |
 | `v0.4-alpha` | External sources can declare profile, lossiness, and evidence posture. |
-| `v0.5-alpha` | The repo can support a public release candidate with clear conformance gaps. |
+| `v0.5-alpha` | The repo can support a public release candidate with clear conformance gaps and an offline verifier fixture. |
 | `v1.0` | SMP custody-layer reference behavior is stable enough for adoption testing. |

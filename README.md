@@ -161,7 +161,11 @@ The two claims are not the same and this README does not conflate them.
   package/restore is the rehearsal named above. Live and production export,
   clean restore of private data, and independent live acceptance stay open on
   #92. There is still no one-command installer or deployment profiles beyond
-  the reference ones. Checksums, where a release record has them, show
+  the reference ones. The intended installer and custody-verification gate
+  are specified in
+  [`docs/11-installer-roadmap.md`](docs/11-installer-roadmap.md) and
+  [`docs/12-custody-receipt.md`](docs/12-custody-receipt.md).
+  Checksums, where a release record has them, show
   integrity. Signed authorship is still absent.
 
 ## Not in this repository
@@ -232,6 +236,8 @@ before applying to anything you care about.
 - [`STATUS.md`](STATUS.md) — repository posture, open program pointers, and the recovery hold
 - [`PROGRAM-ROLE.md`](PROGRAM-ROLE.md) — one-way protocol, core, and deployment boundaries
 - [`docs/roadmap.md`](docs/roadmap.md) — older milestone vocabulary, read with STATUS
+- [`docs/11-installer-roadmap.md`](docs/11-installer-roadmap.md) — future local/cloud installer and custody verification gate
+- [`docs/12-custody-receipt.md`](docs/12-custody-receipt.md) — clean restore, layered verification, and custody receipt contract
 - [`docs/positioning.md`](docs/positioning.md) — custody versus retrieval, Eywa crosswalk
 - [`docs/perimeter.md`](docs/perimeter.md) — permission profiles and policy inputs
 - [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md) — evaluated, not-clean, and unsupported perimeter states
