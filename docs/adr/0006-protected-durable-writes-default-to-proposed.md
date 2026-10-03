@@ -24,4 +24,4 @@ This reflects the durable-write policy ruling recorded in issue #34.
 ## Related
 
 - Issue #34
-- Planned durable-write policy documentation
+- [Agent durable-write policy](../agent-durable-write-policy.md)
