@@ -1,6 +1,6 @@
 -- ============================================================================
 -- SOVEREIGN MEMORY :: TOPOLOGY / SEARCH-SCOPE CORRECTNESS V1
--- Issue #72. Target: PostgreSQL 15+. Run after 10_security_definer_hardening.sql.
+-- Issue #72. Target: PostgreSQL 15+. Run after 11_perimeter_evaluability.sql.
 --
 -- Topology rows are non-secret deployment-configuration evidence. They are not
 -- routing authority and contain no endpoints or credentials. The public seams
@@ -11,8 +11,9 @@
 DO $$
 BEGIN
   IF to_regprocedure('public.session_boot(text)') IS NULL
-     OR to_regclass('public.perimeter_authority_function_registry') IS NULL THEN
-    RAISE EXCEPTION 'topology/scope migration requires migrations 01 and 07 through 10';
+     OR to_regclass('public.perimeter_authority_function_registry') IS NULL
+     OR to_regprocedure('public.perimeter_report()') IS NULL THEN
+    RAISE EXCEPTION 'topology/scope migration requires migrations 01 and 07 through 11';
   END IF;
 END $$;
 
@@ -206,7 +207,9 @@ DECLARE
   v_seen text[]:=ARRAY[]::text[];
   v_local_id text;
   v_topology_state text;
+  v_registered integer;
   v_visible_enabled integer;
+  v_not_visible integer;
   v_local_hits integer:=0;
   v_remote_hits integer:=0;
   v_queried integer:=0;
@@ -325,19 +328,26 @@ BEGIN
     ));
   END LOOP;
 
-  SELECT count(*)::integer INTO v_visible_enabled
-  FROM public.known_memory_stores s
-  WHERE s.advertised AND s.enabled AND s.visibility='shared';
+  -- Denominator is every registered store. The viewer-queryable subset is
+  -- advertised, enabled, and shared. Excluded rows stay out of the sanitized
+  -- store list; only their count is reported.
+  SELECT count(*)::integer,
+         count(*) FILTER (
+           WHERE s.advertised AND s.enabled AND s.visibility='shared'
+         )::integer
+  INTO v_registered,v_visible_enabled
+  FROM public.known_memory_stores s;
+  v_not_visible:=v_registered-v_visible_enabled;
 
   SELECT coalesce(jsonb_agg(value ORDER BY value->>'store_id'),'[]'::jsonb)
   INTO v_attempt_rows FROM jsonb_array_elements(v_attempt_rows);
 
   v_classification:=CASE
-    WHEN v_topology_state<>'configured' OR v_local_id IS NULL OR v_visible_enabled>32 THEN 'unknown_topology'
+    WHEN v_topology_state<>'configured' OR v_local_id IS NULL OR v_registered>32 THEN 'unknown_topology'
     WHEN v_local_hits>0 THEN 'local_hit'
     WHEN v_remote_hits>0 THEN 'remote_hit'
     WHEN v_unreachable>0 THEN 'unreachable_peer'
-    WHEN v_queried<v_visible_enabled THEN 'partial_miss'
+    WHEN v_queried<v_registered OR v_not_visible>0 THEN 'partial_miss'
     ELSE 'complete_miss'
   END;
 
@@ -348,16 +358,19 @@ BEGIN
     'authority','client-reported-coverage-not-search-authority',
     'viewer',p_viewer,
     'classification',v_classification,
-    'coverage_complete',(v_topology_state='configured' AND v_visible_enabled<=32
+    'coverage_complete',(v_topology_state='configured' AND v_registered<=32
                          AND v_local_id IS NOT NULL
-                         AND v_queried=v_visible_enabled AND v_unreachable=0),
+                         AND v_not_visible=0
+                         AND v_queried=v_registered AND v_unreachable=0),
     'global_absence_supported',(v_classification='complete_miss'
                                 AND v_topology_state='configured'
                                 AND v_local_id IS NOT NULL
-                                AND v_visible_enabled<=32
-                                AND v_queried=v_visible_enabled
+                                AND v_registered<=32
+                                AND v_not_visible=0
+                                AND v_queried=v_registered
                                 AND v_unreachable=0),
     'visible_advertised_stores',v_visible_enabled,
+    'stores_not_visible_to_viewer',v_not_visible,
     'queried_stores',v_queried,
     'unreachable_stores',v_unreachable,
     'advertised_unqueried_stores',greatest(v_visible_enabled-v_queried-v_unreachable,0),

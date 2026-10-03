@@ -7,8 +7,9 @@ negative. This is a correctness/availability contract; topology rows are
 
 ## Installation and public seams
 
-Apply `sql/11_topology_scope.sql` after migration `10`. It is safe to reapply and
-adds:
+Apply `sql/12_topology_scope.sql` after `sql/11_perimeter_evaluability.sql`.
+Slot 12 is the next free migration after perimeter evaluability; slot 11 remains
+that evaluability boundary. Topology/search-scope is safe to reapply and adds:
 
 - `public.topology_profile_boot(viewer text)`;
 - topology output under `public.session_boot(viewer text)`;
@@ -59,25 +60,41 @@ The receipt labels its source `client-reported` and its authority
 claims from entering the receipt, but it does **not** prove that a client really
 queried a peer. The server does not connect to peers and stores no routes.
 
+The coverage denominator is **every registered store**, not only the
+advertised, enabled, shared subset a viewer can query. Stores outside that
+subset — private, unadvertised, or disabled — are excluded from viewer-queryable
+coverage. Their identifiers stay out of `visible_known_stores` and out of the
+receipt. The receipt reports only the count `stores_not_visible_to_viewer`.
+`visible_advertised_stores` remains the viewer-queryable count.
+`advertised_unqueried_stores` remains the gap inside that queryable set.
+
+`coverage_complete` and `global_absence_supported` are true only when that
+excluded count is zero. A hidden registered peer therefore keeps
+`global_absence_supported` false after every visible store was queried
+successfully. Identity suppression stays a privacy property; it is not evidence
+that the withheld store does not exist.
+
 Classification precedence after validation is:
 
 1. `unknown_topology` when the profile singleton is absent, topology is
    `unknown`/`not_configured`, the canonical enabled advertised local-store row is
-   absent, or visible advertised coverage exceeds the bounded contract;
+   absent, or registered coverage exceeds the bounded contract;
 2. `local_hit`;
 3. `remote_hit`;
 4. `unreachable_peer`;
-5. `partial_miss` when any enabled advertised visible store is unqueried; and
-6. `complete_miss` only when every enabled advertised visible store was reported
-   queried with zero hits.
+5. `partial_miss` when any registered store was not reported queried, including
+   a store excluded from the viewer-queryable set; and
+6. `complete_miss` only when every registered store was reported queried with
+   zero hits, which requires zero excluded stores.
 
 Therefore a local miss while an advertised peer remains unqueried is always
 `partial_miss`, never a complete or global “nothing found.”
 The explicit `global_absence_supported` receipt field is true only for
-`complete_miss` with a configured canonical local store, bounded visible topology,
-all visible stores queried, and no unreachable store. It is false for every other
-classification. `coverage_complete` is likewise false when local identity is
-missing, even if the client submits an empty attempts array.
+`complete_miss` with a configured canonical local store, bounded registered
+topology, zero stores excluded from the viewer, every registered store queried,
+and no unreachable store. It is false for every other classification.
+`coverage_complete` uses the same zero-excluded requirement and is false when
+local identity is missing, even if the client submits an empty attempts array.
 
 Validation error precedence is stable: object/version envelope, 32-attempt bound, object
 and exact keys, JSON scalar types, status, duplicate store ID, visible store

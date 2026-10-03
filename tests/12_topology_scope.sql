@@ -49,6 +49,10 @@ begin
   end if;
 end $$;
 
+-- Remove the hidden peer before positive coverage claims. The regression below
+-- reinserts it and proves a visible-only miss is not a global absence.
+delete from public.known_memory_stores where store_id='private-peer';
+
 -- Deterministic classification through the public, client-reported receipt seam.
 do $$
 declare v jsonb;
@@ -73,7 +77,8 @@ begin
 
   v:=public.search_coverage_receipt('example-user','{"schema_version":"1","attempts":[{"store_id":"local-store","scope":"default","status":"queried","hit_count":0},{"store_id":"peer-store","scope":"default","status":"queried","hit_count":0}]}');
   if v->>'classification'<>'complete_miss' or (v->>'coverage_complete')::boolean is not true
-     or (v->>'global_absence_supported')::boolean is not true then
+     or (v->>'global_absence_supported')::boolean is not true
+     or (v->>'stores_not_visible_to_viewer')::integer<>0 then
     raise exception 'complete miss classification failed: %',v;
   end if;
 
@@ -88,6 +93,59 @@ begin
     raise exception 'unknown topology classification failed: %',v;
   end if;
   update public.store_topology_profile set topology_state='configured' where singleton;
+end $$;
+
+-- A hidden registered peer keeps global absence unsupported after every visible
+-- store was queried. Private, unadvertised, and disabled rows are excluded from
+-- the viewer-queryable set and counted without exposing withheld identifiers.
+do $$
+declare v jsonb;v_boot jsonb;
+begin
+  insert into public.known_memory_stores(
+    store_id,store_profile,relationship,search_scope,owner,visibility)
+  values('private-peer','reference','peer','private-scope','example-partner','private');
+  v:=public.search_coverage_receipt('example-user',
+    '{"schema_version":"1","attempts":[{"store_id":"local-store","scope":"default","status":"queried","hit_count":0},{"store_id":"peer-store","scope":"default","status":"queried","hit_count":0}]}'::jsonb);
+  v_boot:=public.topology_profile_boot('example-user');
+  if v->>'classification'<>'partial_miss'
+     or (v->>'coverage_complete')::boolean is not false
+     or (v->>'global_absence_supported')::boolean is not false
+     or (v->>'stores_not_visible_to_viewer')::integer<>1
+     or (v->>'visible_advertised_stores')::integer<>2
+     or (v->>'queried_stores')::integer<>2
+     or (v->>'advertised_unqueried_stores')::integer<>0
+     or v::text like '%private-peer%'
+     or v_boot::text like '%private-peer%'
+     or v_boot::text like '%private-scope%'
+     or jsonb_array_length(v_boot->'visible_known_stores')<>2 then
+    raise exception 'hidden registered peer was treated as absent: receipt %, boot %',v,v_boot;
+  end if;
+
+  insert into public.known_memory_stores(
+    store_id,store_profile,relationship,search_scope,owner,visibility,advertised)
+  values('quiet-peer','reference','peer','default','shared','shared',false);
+  v:=public.search_coverage_receipt('example-user',
+    '{"schema_version":"1","attempts":[{"store_id":"local-store","scope":"default","status":"queried","hit_count":0},{"store_id":"peer-store","scope":"default","status":"queried","hit_count":0}]}'::jsonb);
+  v_boot:=public.topology_profile_boot('example-user');
+  if (v->>'coverage_complete')::boolean is not false
+     or (v->>'global_absence_supported')::boolean is not false
+     or (v->>'stores_not_visible_to_viewer')::integer<>2
+     or v::text like '%quiet-peer%'
+     or v_boot::text like '%quiet-peer%' then
+    raise exception 'unadvertised registered peer was treated as absent: receipt %, boot %',v,v_boot;
+  end if;
+
+  update public.known_memory_stores set enabled=false where store_id='peer-store';
+  v:=public.search_coverage_receipt('example-user',
+    '{"schema_version":"1","attempts":[{"store_id":"local-store","scope":"default","status":"queried","hit_count":0}]}'::jsonb);
+  if (v->>'coverage_complete')::boolean is not false
+     or (v->>'global_absence_supported')::boolean is not false
+     or (v->>'stores_not_visible_to_viewer')::integer<>3
+     or (v->>'queried_stores')::integer<>1 then
+    raise exception 'disabled registered peer was treated as absent: %',v;
+  end if;
+  update public.known_memory_stores set enabled=true where store_id='peer-store';
+  delete from public.known_memory_stores where store_id='quiet-peer';
 end $$;
 
 -- A configured profile without its canonical local store is unknown topology,

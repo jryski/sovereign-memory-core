@@ -21,6 +21,8 @@ declare
     'public.correct_work_lesson_evidence(uuid,text,text,text,text,text,text,text)',
     'public.current_doc_hash(text)',
     'public.hot_touch(text,uuid,text,text)',
+    'public.perimeter_assert_violations_v1()',
+    'public.perimeter_report()',
     'public.promote_memory(uuid,text,text)',
     'public.propose_lesson_supersession(uuid,text,text,text,text,text,text,text,text)',
     'public.propose_work_lesson(text,text,text,text,text,text,text,text,text)',
@@ -94,9 +96,10 @@ begin
       perform public.assert_perimeter_closed();
     exception when others then
       if sqlstate='P0001'
+         and sqlerrm like 'PERIMETER FAIL: report found %'
          and sqlerrm like (case when v_case='untrusted'
-           then 'PERIMETER FAIL: registered authority-function search-path schema is missing or not explicitly protected:%'
-           else 'PERIMETER FAIL: unsafe or missing function search_path:%'
+           then '%PERIMETER FAIL: registered authority-function search-path schema is missing or not explicitly protected:%'
+           else '%PERIMETER FAIL: unsafe or missing function search_path:%'
          end)
          and sqlerrm like '%public.current_doc_hash%' then
         execute 'alter function public.current_doc_hash(text) set search_path=pg_catalog,pg_temp';
@@ -127,7 +130,7 @@ begin
   begin
     perform public.assert_perimeter_closed();
   exception when others then
-    if sqlstate='P0001' and sqlerrm like '%unexpected effective ACL grantees:%'
+    if sqlstate='P0001' and sqlerrm like 'PERIMETER FAIL: report found %'
        and sqlerrm like '%service_role%' and sqlerrm like '%CREATE%' then return; end if;
     raise exception 'checker temp-shadow attempt failed without real drift evidence: %',sqlerrm;
   end;

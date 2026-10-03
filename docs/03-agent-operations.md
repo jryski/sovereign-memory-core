@@ -83,11 +83,14 @@ topology/profile evidence, hot topics, deadlines, channel inbox, integrity, and
 health. The viewer argument is not authentication under a shared runtime
 credential. Orient before answering. Skip only for a trivial one-liner.
 
-Treat topology and search scope fail closed. Report a negative as complete for
-the advertised snapshot only when `search_coverage_receipt()` returns
-`complete_miss` with `coverage_complete=true`. A local miss with an advertised
-store whose coverage is `not_queried`, `unreachable`, `unknown`, or
-`not_applicable` is not “nothing found everywhere”; state the missing scope.
+Treat topology and search scope fail closed. Report a negative as globally
+complete only when `search_coverage_receipt()` returns `complete_miss` with
+`coverage_complete=true` and `global_absence_supported=true`. Both flags require
+zero registered stores excluded from the viewer. A hidden, unadvertised, or
+disabled registered store keeps global absence unsupported after every visible
+store was queried. A local miss with an advertised store whose coverage is
+`not_queried`, `unreachable`, `unknown`, or `not_applicable` is a partial miss;
+state the missing scope.
 Client-reported attempts are coverage evidence, never proof or authority. If
 topology or contract attestation is unknown/mismatched, preserve local read-only
 recovery, warn about the limitation, and do not perform topology-dependent writes
