@@ -1,0 +1,6 @@
+row_id,created_at,updated_at,author,source_status,sensitivity,topic_key,body
+sql-row-1,2026-07-08T15:00:00Z,2026-07-08T15:00:00Z,person-1,active,ordinary,projects/example-project/rollback,Example Project rollback checklist lives on wiki page demo-rollback.
+sql-row-2,2026-01-15T12:00:00Z,2026-01-15T12:00:00Z,person-1,superseded,ordinary,projects/example-project/listener,Historical status: Example Project listener is port 8080.
+sql-row-3,2026-07-08T15:20:00Z,2026-07-08T15:20:00Z,person-1,active,ordinary,projects/example-project/listener,Correction: current Example Project listener is port 9090 on device-demo-1.
+sql-row-4,2026-07-08T15:30:00Z,2026-07-08T15:30:00Z,person-1,restricted,restricted,subjects/vault-subject-demo-1,Synthetic restricted pointer for vault-subject-demo-1. Not a real identity record.
+sql-row-5,2026-07-08T16:00:00Z,2026-07-08T16:00:00Z,agent-1,audit,ordinary,projects/example-project/listener,Process evidence: sql-row-2 was superseded by sql-row-3. This audit row is not current truth.
