@@ -1,0 +1,5 @@
+# SYNTHETIC FIXTURE. Unmistakably fake. Not a real conversation.
+# expected-rule: coordination-transcript
+# min-findings: 1
+From: not-real.person@invalid.test
+Subject: synthetic sequence note

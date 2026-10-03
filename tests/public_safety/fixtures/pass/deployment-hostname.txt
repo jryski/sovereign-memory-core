@@ -1,0 +1,5 @@
+# SYNTHETIC NEAR-MISS. This file must not produce a public-safety finding.
+# covers-rule: deployment-hostname
+example.local
+excluded.internal_execute_roles
+Use example.local as the placeholder. Do not publish other dot-local names or dot-internal names.

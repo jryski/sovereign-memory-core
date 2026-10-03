@@ -1,0 +1,9 @@
+# SYNTHETIC NEAR-MISS. This file must not produce a public-safety finding.
+# covers-rule: operational-receipt
+custody_receipt: REDACTED
+routing_record: example-record
+exact_private_count: REDACTED
+stable_watermark: <watermark>
+conversation_count: 1
+package_checksum: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+Do not publish custody receipts, exact private counts, stable watermarks, or routing records.

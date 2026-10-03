@@ -1,0 +1,5 @@
+# SYNTHETIC FIXTURE. Unmistakably fake. Not a live database.
+# expected-rule: live-schema-inventory
+# min-findings: 1
+Schema | Name | Result data type | Argument data types | Type
+public | not_a_real_function | void | | func
