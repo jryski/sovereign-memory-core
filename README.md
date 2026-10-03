@@ -185,6 +185,7 @@ sql/03_provenance_guards.sql           optional
 sql/04_source_import.sql               optional
 sql/05_candidate_locators.sql          optional
 sql/06_cutover_probe_categories.sql    optional
+sql/12_consequential_domains.sql       optional
 sql/07_work_lessons.sql
 sql/08_attention_events.sql
 sql/09_perimeter_refresh.sql
@@ -201,6 +202,12 @@ Three ordering rules that will bite you otherwise:
 - `11` is the perimeter-evaluability/report boundary and must remain **last**.
   It is itself re-runnable. If an operator deliberately reapplies `10`, reapply
   `11` immediately afterward before treating the perimeter as evaluated.
+
+`sql/12_consequential_domains.sql` is optional. Apply it after `01` and before
+`09` when those later migrations are used. It declares consequential domains
+and rejects unsourced or agent-authored rows in a declared domain. It does not
+replace `11`, and reapplying it does not rewrite the perimeter report.
+`tests/12_consequential_domains.sql` is the local rollback check.
 
 `sql/validation/` is not in the ordered list. It holds
 `source_import_readiness.sql` and `load_chat_mine_package.sql`. Those are

@@ -109,6 +109,37 @@ values ('Ballpark is around $5k','shared','system',0.5,'{"financial_unverified":
 ```
 Then perimeter: `select assert_perimeter_closed();`
 
+## Step 8b (optional): Declared consequential domains
+Apply `12_consequential_domains.sql` after `01_core.sql` and before
+`09_perimeter_refresh.sql`. It does not replace `11_perimeter_evaluability.sql`.
+The monetary values, workstreams, and citations below are synthetic.
+- DONE: the baseline domains exist, an unsourced declared row fails, an
+  agent-authored declared row fails, and a human proposal still promotes.
+
+```sql
+select domain from consequential_domains
+where domain in ('financial','legal','medical','identity')
+order by domain;
+-- expect four rows: financial, identity, legal, medical
+
+insert into consequential_domain_bindings(relation_name, workstream, domain)
+values ('memories','example-medical','medical');
+
+-- unsourced declared fact MUST FAIL with 'unsourced consequential fact':
+insert into memories(content,workstream,owner,visibility,source_agent,source_kind,metadata)
+values ('Synthetic medical claim with no measured quantity.','example-medical','example-user','private','example-user-claude','human','{}');
+
+-- agent-authored declared fact MUST FAIL with 'agent-authored consequential fact':
+insert into memories(content,workstream,owner,visibility,source_agent,source_kind,status,metadata)
+values ('Synthetic medical claim.','example-medical','example-user','private','example-user-claude','agent','proposed',
+        '{"basis":"source_document","source_citation":"synthetic-record-001"}');
+```
+
+The rollback suite is `tests/12_consequential_domains.sql`. It also promotes one
+human-authored medical proposal and one ordinary agent proposal through
+`promote_memory`. Run it on a disposable database after `01`, `03`, `08`, and
+`12`. No live database is required.
+
 ## Step 9: Source import and authoritative cutover foundation
 Apply `04_source_import.sql` as migration `source_import_v1`.
 
