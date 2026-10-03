@@ -98,6 +98,17 @@ at all.
   principal, action, table, id, and column keys only. Keys-only is deliberate: an audit
   trail must not become an unguarded second copy of health and finance payloads.
 
+## NULL is not a closed check
+
+A comparison, `bool_and`, `NOT`, or `CHECK` can come back unknown. Unknown is
+not false. `IF NOT` does not run when the predicate is `NULL`, `bool_and` can
+report success while skipping `NULL` assertions, and a `CHECK` passes when its
+expression is `NULL`. A security predicate has to return true or false for
+every input, including `NULL`, and it must not be declared `STRICT`. A `CHECK`
+that states an invariant is only as strong as `NOT NULL` on the columns it
+reads. The disposable local matrix and the five verification-gate requirements
+are in [`three-valued-logic.md`](three-valued-logic.md).
+
 ## What to tell your threat model
 
 This design assumes: the humans are trusted; the assistants are semi-trusted (helpful
