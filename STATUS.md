@@ -32,7 +32,7 @@ Status date: 2026-09-25
 |---|---:|---:|---|
 | Core schema concept | 9/10 | 10/10 | Strong baseline for memory, wiki, attention index, provenance, supersession, and operating-doc integrity. |
 | Repo/deployment alignment | 7/10 | 10/10 | The generic source-import/cutover foundation is repo-owned; deployment drift and operational evidence still need periodic verification. |
-| Source import/cutover readiness | 8/10 | 10/10 | Foundation, candidate provenance, richer probes, fatal validation, and the first internal producer slice exist; real adapters and operational dry runs remain. |
+| Source import/cutover readiness | 8/10 | 10/10 | Foundation, candidate provenance, richer probes, fatal validation, the first internal producer slice, and a scope-bound authority contract exist; real adapters, operational dry runs, and live acceptance remain. |
 | Security posture | 8/10 | 10/10 | Security model is honest; next step is least-privilege access hardening beyond broad credential operation. |
 | Survivability | 7/10 | 10/10 | Backup/restore guidance and an evidence template exist. The v0.3-alpha known-limitations record proves synthetic package/restore for that rehearsal profile. Live and production export, clean restore of private data, and independent live acceptance remain open and blocked on #92, with #58 and #52 still open. |
 | Personal memory UX/readability | 6/10 | 10/10 | Core has strong data model; browser UI belongs in a separate repo. |
@@ -53,12 +53,19 @@ Checked against `main` on 2026-09-25. Ordered migrations in `sql/`:
 - `sql/09_perimeter_refresh.sql`
 - `sql/10_security_definer_hardening.sql`
 - `sql/11_perimeter_evaluability.sql`
+- `sql/12_scope_bound_authority.sql`
 
 `sql/11_perimeter_evaluability.sql` is the in-repo C1 report seam. Its presence
 is a migration, not live acceptance.
 
+`sql/12_scope_bound_authority.sql` is an optional cutover contract. It can be
+applied any time after `sql/06_cutover_probe_categories.sql`. It is exercised
+by a local rollback fixture. It is not live acceptance and it is not part of
+the v0.3-alpha C2 migration set.
+
 `sql/validation/` is not part of that ordered apply list. It holds
-`source_import_readiness.sql` and `load_chat_mine_package.sql`.
+`source_import_readiness.sql`, `scope_bound_authority.sql`, and
+`load_chat_mine_package.sql`.
 
 Also in the repository:
 
