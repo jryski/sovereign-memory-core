@@ -21,7 +21,7 @@ Principal-bound planning access is maintained in:
 
 ## Authority rules
 
-1. Jesse's accepted decisions define program intent.
+1. The project lead's accepted decisions define program intent.
 2. Protocol and versioned shared contracts define semantics within their stated scope.
 3. Each component repository defines and proves its own implementation.
 4. Deployment stores define accepted operational state for that deployment.

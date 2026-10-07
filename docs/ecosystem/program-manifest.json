@@ -4,7 +4,7 @@
   "title": "Sovereign AI OS",
   "snapshot_date": "2026-08-29",
   "canonical_context": "https://github.com/jryski/sovereign-memory-core/blob/main/docs/ecosystem/SOVEREIGN_AI_OS.md",
-  "authority_note": "This manifest is an informative, diffable snapshot of Jesse's accepted program direction. Component repositories remain authoritative for their own implementation and evidence. Private deployment state must not be inferred from this public file.",
+  "authority_note": "This manifest is an informative, diffable snapshot of the project lead's accepted program direction. Component repositories remain authoritative for their own implementation and evidence. Private deployment state must not be inferred from this public file.",
   "components": [
     {
       "id": "sovereign-memory-protocol",
@@ -401,7 +401,7 @@
         "planning-data-plane-profile"
       ],
       "data_classification": "mixed",
-      "planning_relationship": "This component is the planning relationship. Its public contracts are generic; the live cross-repository build board is privately deployed in Jesse's Vault and real household/business boards belong in their deployment stores.",
+      "planning_relationship": "This component is the planning relationship. Its public contracts are generic; the live cross-repository build board is privately deployed in the maintainers' Vault and real household/business boards belong in their deployment stores.",
       "evidence_locators": [
         "https://github.com/jryski/Household-OS/blob/main/docs/PLANNING_WORK_PLANE.md",
         "https://github.com/jryski/sovereign-memory-core/blob/main/docs/ecosystem/BUSINESS_PLANNING_WORK_PLANE.md",

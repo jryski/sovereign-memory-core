@@ -1,7 +1,7 @@
 # Sovereign AI OS: program context
 
 > **Document class:** informative ecosystem context, not a normative Sovereign Memory Core specification  
-> **Program authority:** Jesse's accepted program direction  
+> **Program authority:** the project lead's accepted program direction  
 > **Snapshot date:** 2026-08-29
 
 ## North star
@@ -199,7 +199,7 @@ Additional repositories may implement importers, UIs, skills, domain overlays, o
 
 ## Source-of-truth hierarchy
 
-1. Jesse's accepted program decisions define program intent.
+1. The project lead's accepted program decisions define program intent.
 2. Protocol and versioned contracts define shared semantics within their stated scope.
 3. Each repository defines and proves its own implementation.
 4. Deployment stores define accepted operational state for that deployment.
