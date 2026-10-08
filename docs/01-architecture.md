@@ -79,6 +79,40 @@ The behavior contract for the assistants is itself a wiki page
 **warns and asks the human to confirm or re-bless**; it never locks anyone out. This
 catches both corruption and prompt-injection-driven rewrites of the contract.
 
+## Declared consequential domains (optional)
+
+`sql/12_consequential_domains.sql` is how a deployment declares consequential
+domains on Tier 1. The baseline rows are financial, legal, medical, and
+identity. A schema owner may insert further domains. A workstream on `memories`
+or `wiki_pages` is bound to one domain in `consequential_domain_bindings`. A
+row may also set `consequential_domain`. If the binding and the row disagree,
+the write is rejected.
+
+A classified row keeps the Tier 1 provenance already used by the financial
+figure guard: `basis` is one of `human_direct`, `decision_record`,
+`imported_artifact`, or `source_document`, and `source_citation` is specific.
+Those fields live in `memories.metadata` or `wiki_pages.frontmatter`.
+`source_kind='agent'` is rejected at write time for a classified row, including
+`status='proposed'`. The guard does not treat "still proposed" as the allowed
+agent state. That test would also reject `promote_memory`, which is the human
+review path from `proposed` to `active`.
+
+`promote_memory(id, note, actor)` still promotes a human-authored or
+manual classified proposal, and it still promotes an agent proposal that is
+not in a declared domain. It does not change `source_kind`, so it cannot turn
+an agent-authored consequential row into a human fact. Primary Users review
+through that existing function.
+
+The layer does not read prose and decide that a sentence is medical, legal,
+financial, or about identity. Undeclared rows stay on the previous rules. The
+financial figure guard in `sql/03_provenance_guards.sql` still applies to
+money-shaped content. `financial_unverified` does not admit a row once a
+domain is declared.
+
+`supersede_memory` and `supersede_wiki` stamp the successor
+`source_kind='agent'`. They cannot write a consequential successor. A human
+correction is a new human-authored row linked with `supersedes`.
+
 ## Tier 2: the private vault (optional)
 
 Separate locked schemas (`identity_private`, `health_private`, `finance_private`,
