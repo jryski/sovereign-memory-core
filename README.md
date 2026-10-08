@@ -240,6 +240,7 @@ before applying to anything you care about.
 - [`docs/work-memory.md`](docs/work-memory.md)
 - [`docs/attention-layer.md`](docs/attention-layer.md)
 - [`docs/upgrades/work-memory-v2.md`](docs/upgrades/work-memory-v2.md)
+- [`docs/adr/0008-promoted-record-mutation-audit.md`](docs/adr/0008-promoted-record-mutation-audit.md) — promoted-record edit policy; CNF4, A2, and I5.1 remain open
 
 ## License
 
