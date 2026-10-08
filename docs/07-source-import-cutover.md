@@ -328,6 +328,13 @@ Only after gates pass:
 4. log cutover date, batch, evidence, and rollback window;
 5. create a post-cutover review task.
 
+The repository contract for that log is a scope-bound declaration. It names
+the principal, the scope, the batch, an evidence reference, and a review note.
+It does not authorize any other scope. Rollback before the declaration stays
+available; after it, reversal is itself recorded. See
+[12 · Scope-bound authority](12-scope-bound-authority.md). This does not accept
+a live cutover.
+
 ## Phase 10: Rollback and fallback
 
 Rollback is not a failure if it is planned.
