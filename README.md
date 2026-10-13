@@ -109,7 +109,7 @@ remains in this tree.
 | Deciding whether custody matters for your system | [`docs/positioning.md`](docs/positioning.md) |
 | Building a memory engine, want a custody substrate | [`docs/positioning.md`](docs/positioning.md), then `sql/` |
 | Running it yourself | [Installing](#installing), then [`docs/perimeter.md`](docs/perimeter.md) |
-| Reviewing security | [`docs/security-definer-inventory.md`](docs/security-definer-inventory.md) |
+| Reviewing security | [`docs/security-definer-inventory.md`](docs/security-definer-inventory.md), [`docs/three-valued-logic.md`](docs/three-valued-logic.md) |
 | Looking for a chat UI, or a RAG product | This is not it |
 
 ## What works
