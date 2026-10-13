@@ -151,13 +151,23 @@ jobs:
             end if;
           end $$;
           SQL
-      - name: Hardened runtime and temp-shadow conformance
+      - name: Hardened runtime conformance before evaluability
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/07_work_lessons.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/08_attention_events.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/09_perimeter_acl.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/09_perimeter_acl_review.sql
+      - name: Apply perimeter evaluability and topology scope
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/12_topology_scope.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/12_topology_scope.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'select public.assert_perimeter_closed()'
+      - name: Post-install inventory and topology conformance
+        run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/10_security_definer_temp_shadow.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/12_topology_scope.sql
       - name: Concurrent identical replay
         if: matrix.pg == '16'
         run: |
@@ -173,6 +183,8 @@ jobs:
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
           psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
+          psql "$CONCURRENCY_URL" -v ON_ERROR_STOP=1 -f sql/12_topology_scope.sql
           DATABASE_URL="$CONCURRENCY_URL" bash tests/08_attention_concurrency.sh
 
   portable-profile:
@@ -218,6 +230,10 @@ jobs:
           done
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/12_topology_scope.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/12_topology_scope.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           do $$ begin
             if (select profile from public.perimeter_acl_policy where singleton)<>'portable' then
@@ -344,8 +360,12 @@ jobs:
           SQL
       - name: Apply v4 perimeter upgrade
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
-      - name: Apply SECURITY DEFINER temp-shadow hardening
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+      - name: Apply SECURITY DEFINER hardening, evaluability, and topology scope
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/fixtures/upgrade_sentinel_evaluable.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/12_topology_scope.sql
       - name: Verify durable control-table repair preserved registry data
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
@@ -417,7 +437,10 @@ jobs:
           end $$;
           select public.assert_perimeter_closed();
           SQL
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/12_topology_scope.sql
       - name: Reapply upgraded package
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/12_topology_scope.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'select public.assert_perimeter_closed()'

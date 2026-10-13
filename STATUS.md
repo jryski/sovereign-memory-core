@@ -53,9 +53,11 @@ Checked against `main` on 2026-09-25. Ordered migrations in `sql/`:
 - `sql/09_perimeter_refresh.sql`
 - `sql/10_security_definer_hardening.sql`
 - `sql/11_perimeter_evaluability.sql`
+- `sql/12_topology_scope.sql`
 
 `sql/11_perimeter_evaluability.sql` is the in-repo C1 report seam. Its presence
-is a migration, not live acceptance.
+is a migration, not live acceptance. `sql/12_topology_scope.sql` is the
+topology and search-scope contract and follows that seam.
 
 `sql/validation/` is not part of that ordered apply list. It holds
 `source_import_readiness.sql` and `load_chat_mine_package.sql`.
