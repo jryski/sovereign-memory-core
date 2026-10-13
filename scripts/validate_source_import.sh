@@ -13,7 +13,8 @@ set -euo pipefail
 #   (`anon`, `authenticated`, `service_role`) if they do not already exist.
 # - If sql/05_candidate_locators.sql exists, the script applies it before validation.
 # - If sql/06_cutover_probe_categories.sql exists, the script applies it before validation.
-# - The validation fixture rolls back its own staged data.
+# - If sql/12_scope_bound_authority.sql exists, the script applies it and runs its fixture.
+# - The validation fixtures roll back their own staged data.
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
   echo "DATABASE_URL is required" >&2
@@ -58,7 +59,17 @@ if [[ -f "${ROOT_DIR}/sql/06_cutover_probe_categories.sql" ]]; then
   "${PSQL[@]}" -f "${ROOT_DIR}/sql/06_cutover_probe_categories.sql"
 fi
 
+if [[ -f "${ROOT_DIR}/sql/12_scope_bound_authority.sql" ]]; then
+  echo "==> Applying scope-bound authority contract"
+  "${PSQL[@]}" -f "${ROOT_DIR}/sql/12_scope_bound_authority.sql"
+fi
+
 echo "==> Running source import validation bundle"
 "${PSQL[@]}" -f "${ROOT_DIR}/sql/validation/source_import_readiness.sql"
+
+if [[ -f "${ROOT_DIR}/sql/validation/scope_bound_authority.sql" ]]; then
+  echo "==> Running scope-bound authority validation"
+  "${PSQL[@]}" -f "${ROOT_DIR}/sql/validation/scope_bound_authority.sql"
+fi
 
 echo "==> Done"

@@ -246,6 +246,30 @@ Run the validation helper again after this migration. Expected behavior adds:
 - fixture scorecard shows five passing critical probes;
 - readiness includes category coverage and critical all-pass gates.
 
+## Step 9C: Scope-bound authority
+Apply `12_scope_bound_authority.sql` as migration `scope_bound_authority_v1` after
+Step 9B. It does not require Steps 7–11 and it adds no `SECURITY DEFINER` routines.
+
+The contract stores the cutover scope on the batch, registers scopes without a
+global kind, binds probe results to that scope, and records an authority
+declaration that names the principal and the scope. Current truth and probe
+observations take a scope argument. A null scope returns no rows. See
+`docs/12-scope-bound-authority.md`.
+
+- DONE, scope objects:
+```sql
+select 'scope_registry', count(*)::text from information_schema.tables
+  where table_schema='public' and table_name='scope_registry'
+union all select 'cutover_scope', count(*)::text from information_schema.columns
+  where table_schema='public' and table_name='source_import_batches' and column_name='cutover_scope'
+union all select 'declaration', count(*)::text from information_schema.tables
+  where table_schema='public' and table_name='scope_authority_declarations';
+```
+Expect: each count is 1.
+
+Run the validation helper again after this migration. The scope fixture covers
+two synthetic scopes, rejects a global kind, and rolls back its own rows.
+
 ## Step 10: Source-control your migrations (not optional)
 Hosted `supabase_migrations.schema_migrations` is NOT source control; if the project
 dies, your schema dies with it. Set up per docs/05 section 1: export every migration to
@@ -272,6 +296,7 @@ run the exit-test checks.
 | 9 | Source import/cutover foundation | validation bundle passes |
 | 9A | Candidate locator/quote-hash hardening | locator readiness gate passes |
 | 9B | Richer cutover probe hardening | category coverage + critical all-pass gates |
+| 9C | Scope-bound authority | two-scope fixture; no global kind; declaration names principal and scope |
 | 10-11 | Survivability | repo checksum + restore rehearsal |
 
 Stop building after step 11. Use it before adding higher-level automation.

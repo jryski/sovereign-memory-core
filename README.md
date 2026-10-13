@@ -185,6 +185,7 @@ sql/03_provenance_guards.sql           optional
 sql/04_source_import.sql               optional
 sql/05_candidate_locators.sql          optional
 sql/06_cutover_probe_categories.sql    optional
+sql/12_scope_bound_authority.sql       optional, any time after 06
 sql/07_work_lessons.sql
 sql/08_attention_events.sql
 sql/09_perimeter_refresh.sql
@@ -198,13 +199,17 @@ Three ordering rules that will bite you otherwise:
   reapply them, do it **before** `10`.
 - `10` is the SECURITY DEFINER hardening boundary. Do not reapply `07` through
   `09` after crossing it.
-- `11` is the perimeter-evaluability/report boundary and must remain **last**.
-  It is itself re-runnable. If an operator deliberately reapplies `10`, reapply
-  `11` immediately afterward before treating the perimeter as evaluated.
+- `11` is the perimeter-evaluability/report boundary for the `01` / `07`–`11`
+  sequence. It is re-runnable. If an operator deliberately reapplies `10`,
+  reapply `11` immediately afterward before treating the perimeter as evaluated.
+- `12` is the optional scope-bound cutover contract. Apply it any time after
+  `06`. It adds no `SECURITY DEFINER` routines and does not move the
+  evaluability boundary. It is not part of the v0.3-alpha C2 migration set.
 
 `sql/validation/` is not in the ordered list. It holds
-`source_import_readiness.sql` and `load_chat_mine_package.sql`. Those are
-validation helpers. Applying `01` through `11` does not run them.
+`source_import_readiness.sql`, `scope_bound_authority.sql`, and
+`load_chat_mine_package.sql`. Those are validation helpers. Applying `01`
+through `12` does not run them.
 
 `09` closes schema creation, table grants, function execution, default
 privileges, RLS and FORCE RLS, ownership, and trigger-only boundaries. `10`
@@ -238,6 +243,7 @@ before applying to anything you care about.
 - [`docs/templates/restore-rehearsal.md`](docs/templates/restore-rehearsal.md) — provider-exit evidence record
 - [`docs/security-definer-inventory.md`](docs/security-definer-inventory.md)
 - [`docs/work-memory.md`](docs/work-memory.md)
+- [`docs/12-scope-bound-authority.md`](docs/12-scope-bound-authority.md) — scope-bound cutover declarations
 - [`docs/attention-layer.md`](docs/attention-layer.md)
 - [`docs/upgrades/work-memory-v2.md`](docs/upgrades/work-memory-v2.md)
 
