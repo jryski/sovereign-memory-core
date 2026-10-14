@@ -14,9 +14,10 @@ what to transfer and what the receiving project must establish independently.
 The initial package is merged in Core at
 `ae88f6bd8bf45badf486f82b384f380a37aced3a`. That workflow contains an invalid
 `cancelled()` expression in a step environment variable. Its jobs cannot start.
-The correction and full-workflow semantic validation are proposed in
+The correction, full-workflow semantic validation and unprivileged regression
+CI are proposed in
 [PR #123](https://github.com/jryski/sovereign-memory-core/pull/123), at candidate
-source head `b5036673615b71de0bbd365f3fba4998f5d3a2b1`. This guide does not
+source head `d7ef1edab7e69e56e45333b164521d3eb253c659`. This guide does not
 certify that draft or claim an operational gate. Select the final independently
 reviewed repair commit before adoption; record that exact commit in the
 receiving project's receipt.
@@ -39,12 +40,12 @@ repair is approved.
 
 | Transfer | Paths | Receiving-project responsibility |
 | --- | --- | --- |
-| Workflow | `.github/workflows/leak-gate.yml` | Review its event handling, trusted source and status permissions under the receiving repository's Actions policy. |
+| Workflows | `.github/workflows/leak-gate.yml`, `.github/workflows/leak-ci.yml` | Review its event handling, trusted source and status permissions under the receiving repository's Actions policy. |
 | Credential and artifact controls | `.gitleaks.toml`, `scripts/leak/classify_literals.py`, `scripts/leak/gate.py` | Preserve the detection and fail-closed boundary. |
 | Scanner installation | `scripts/leak/scanner-pin.json`, `scripts/leak/install_gitleaks.py` | Retain the reviewed release, digest, archive size and executable validation. |
 | Semantic validation from the repair | `scripts/leak/actionlint-pin.json`, `scripts/leak/install_actionlint.py`, `tests/leak/test_actions_semantics.py` | Validate the complete workflow, including legal expression contexts. |
 | Policy and exceptions | `.leak-policy.json`, `.leak-allowlist` | Set the actual repository privacy classification. Independently review each narrow exception. Public repositories have no private-literal path exemptions. |
-| Synthetic qualification | `tests/leak/test_gate.py`, `tests/leak/test_gate.sh`, `tests/leak/test_install_gitleaks.py`, `tests/leak/test_workflow.py`, `tests/leak/fixtures/README.md` | Run on the exact receiving revision, with both verified native tools available. |
+| Synthetic qualification | `tests/leak/test_gate.py`, `tests/leak/test_gate.sh`, `tests/leak/test_install_gitleaks.py`, `tests/leak/test_workflow.py`, `tests/leak/test_ci_workflow.py`, `tests/leak/fixtures/README.md` | Run on the exact receiving revision, with both verified native tools available. |
 | Operator documentation | `docs/security/LEAK-01.md` | Link it from the receiving repository's README and security documentation. |
 
 The protected `LEAK_PRIVATE_PATTERNS` Actions secret is a separate input. Its
@@ -82,21 +83,7 @@ export LEAK_ACTIONLINT="$leak_tools_dir/actionlint"
 test -x "$LEAK_TEST_GITLEAKS"
 test -x "$LEAK_ACTIONLINT"
 python3 --version
-"$LEAK_ACTIONLINT" -no-color -shellcheck= -pyflakes= \
-  .github/workflows/leak-gate.yml
-python3 - <<'PYTEST'
-import sys
-import unittest
-
-suite = unittest.defaultTestLoader.discover("tests/leak", pattern="test_*.py")
-result = unittest.TextTestRunner(verbosity=2).run(suite)
-if result.skipped:
-    print("Qualification failed: skipped tests are not accepted.", file=sys.stderr)
-if result.testsRun == 0:
-    print("Qualification failed: no tests executed.", file=sys.stderr)
-raise SystemExit(0 if result.wasSuccessful() and not result.skipped
-                 and result.testsRun > 0 else 1)
-PYTEST
+bash tests/leak/test_gate.sh
 ```
 
 Both installers download their pinned official release archives and verify
@@ -112,13 +99,15 @@ Actions syntax and expression contexts. It does not prove that GitHub permits
 the action, that the token can publish statuses or that real patterns are
 complete. Those need receiving-repository acceptance.
 
-For ongoing regression protection, the receiving repository also needs an
-unprivileged pull-request check that runs full-workflow semantic validation and
-the complete synthetic suite, without private patterns or deployment secrets.
-The draft revision above adds a local semantic test but does not wire that
-suite into Core's GitHub CI. Existing green database checks do not establish
-workflow validation. The `test_gate.sh` wrapper currently runs only
-`test_gate.py`; use the complete discovery command above for qualification.
+The candidate includes an unprivileged pull-request check that runs
+full-workflow semantic validation and the complete synthetic suite without
+private patterns or deployment secrets. Its `test_gate.sh` wrapper checks both
+workflows and fails for missing tools, failed or skipped tests, or empty test
+discovery. Core's [candidate regression run](https://github.com/jryski/sovereign-memory-core/actions/runs/38511294040)
+executed 78 tests with zero failures, errors or skips. This establishes that
+candidate's regression execution, not merge, an operational repository scan or
+required-status enforcement. The receiving repository must qualify its own
+source, Actions policy and protected inputs independently.
 
 ## Result contract
 
