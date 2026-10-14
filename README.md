@@ -110,6 +110,7 @@ remains in this tree.
 | Building a memory engine, want a custody substrate | [`docs/positioning.md`](docs/positioning.md), then `sql/` |
 | Running it yourself | [Installing](#installing), then [`docs/perimeter.md`](docs/perimeter.md) |
 | Reviewing security | [`docs/security-definer-inventory.md`](docs/security-definer-inventory.md) |
+| Adding repository leak protection to another project | [LEAK-01 adoption guide](docs/security/LEAK-01-adoption.md), then [operator guide](docs/security/LEAK-01.md) |
 | Looking for a chat UI, or a RAG product | This is not it |
 
 ## What works
@@ -237,6 +238,7 @@ before applying to anything you care about.
 - [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md) — evaluated, not-clean, and unsupported perimeter states
 - [`docs/templates/restore-rehearsal.md`](docs/templates/restore-rehearsal.md) — provider-exit evidence record
 - [`docs/security-definer-inventory.md`](docs/security-definer-inventory.md)
+- [LEAK-01 adoption guide](docs/security/LEAK-01-adoption.md) — shared files, deployment inputs, verification and activation evidence
 - [`docs/work-memory.md`](docs/work-memory.md)
 - [`docs/attention-layer.md`](docs/attention-layer.md)
 - [`docs/upgrades/work-memory-v2.md`](docs/upgrades/work-memory-v2.md)
