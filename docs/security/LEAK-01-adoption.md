@@ -23,8 +23,10 @@ receiving project's receipt.
 
 The supplied workflow supports GitHub.com repositories whose default branch is
 `main`, using `ubuntu-24.04` runners. Its installers support Linux x86_64.
-Use Git and Python 3.12 for the local qualification commands below. GitHub
-Enterprise, another default branch or another architecture requires an explicit
+The workflow uses the runner's system `python3` on `ubuntu-24.04`; the reported
+local qualification used Python 3.13.5. Record and qualify the Python version
+used in the receiving environment.
+GitHub Enterprise, another default branch or another architecture requires an explicit
 adapter change and its own review and acceptance. The current workflow refuses
 unsupported event revisions.
 
@@ -77,9 +79,24 @@ python3 scripts/leak/install_actionlint.py \
 
 export LEAK_TEST_GITLEAKS="$leak_tools_dir/gitleaks"
 export LEAK_ACTIONLINT="$leak_tools_dir/actionlint"
+test -x "$LEAK_TEST_GITLEAKS"
+test -x "$LEAK_ACTIONLINT"
+python3 --version
 "$LEAK_ACTIONLINT" -no-color -shellcheck= -pyflakes= \
   .github/workflows/leak-gate.yml
-python3 -m unittest discover -s tests/leak -p 'test_*.py' -v
+python3 - <<'PYTEST'
+import sys
+import unittest
+
+suite = unittest.defaultTestLoader.discover("tests/leak", pattern="test_*.py")
+result = unittest.TextTestRunner(verbosity=2).run(suite)
+if result.skipped:
+    print("Qualification failed: skipped tests are not accepted.", file=sys.stderr)
+if result.testsRun == 0:
+    print("Qualification failed: no tests executed.", file=sys.stderr)
+raise SystemExit(0 if result.wasSuccessful() and not result.skipped
+                 and result.testsRun > 0 else 1)
+PYTEST
 ```
 
 Both installers download their pinned official release archives and verify
@@ -88,8 +105,9 @@ installer's `--archive` option with the corresponding retained archive. The
 same digest, size and executable checks apply.
 
 Retain the tool versions, exact source commit, exit codes, executed test count
-and skipped test count. A run without `LEAK_TEST_GITLEAKS` skips native scanner
-cases; it is not equivalent qualification. The semantic validator checks
+and skipped test count. The command fails if either tool is nonexecutable, no
+tests run, any test fails or any test is skipped. A run without
+`LEAK_TEST_GITLEAKS` skips native scanner cases; it is not equivalent qualification. The semantic validator checks
 Actions syntax and expression contexts. It does not prove that GitHub permits
 the action, that the token can publish statuses or that real patterns are
 complete. Those need receiving-repository acceptance.
