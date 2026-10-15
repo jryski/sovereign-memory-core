@@ -135,6 +135,56 @@ in five jobs across PostgreSQL 15 and 16 on every pull request. See
 deployment has them depends on which migrations that deployment has applied.
 The two claims are not the same and this README does not conflate them.
 
+## Source-import and cutover
+
+Source-import and cutover controls are repo-owned SQL. They are not pending
+reconciliation from a live deployment.
+
+| Layer | What it is | SQL |
+|---|---|---|
+| Source import and cutover foundation | Source registry, import batches, raw evidence, manifest review, readiness checks, and cutover scorecards | `sql/04_source_import.sql` |
+| Candidate locators and quote hashes | Candidate-level source locators, support quotes, and quote hashes when one source item yields many candidates | `sql/05_candidate_locators.sql` |
+| Richer cutover probes | Positive, negative, conflict, stale-state, and evidence-request probe categories | `sql/06_cutover_probe_categories.sql` |
+
+[`docs/10-chat-mine-source-import-exporter.md`](docs/10-chat-mine-source-import-exporter.md)
+is the first internal Chat-Mine producer slice. It aligns one producer with
+that contract. Chat-Mine export is internal producer alignment, not a public
+interchange protocol.
+
+Current status of this path:
+
+- **Merged core foundation.** Generic source staging, manifest review, candidate
+  provenance, readiness checks, and cutover probes are the SQL in the table,
+  plus `sql/validation/source_import_readiness.sql`.
+- **Internal producer slice.** The Chat-Mine exporter and its fixture
+  validation are in this repository. That slice does not prove mining quality
+  on real conversations.
+- **Future work.** Review UI, Hermes orchestration, adapters for real source
+  exports, and operational dry runs remain future work.
+
+## Verified baseline
+
+[Work-memory conformance](.github/workflows/work-memory-conformance.yml) is the
+baseline under [What works](#what-works): lifecycle, history, authority
+perimeter, and upgrade safety on PostgreSQL 15 and 16.
+
+[Source-import validation](.github/workflows/source-import-validation.yml)
+checks the merged foundation on a disposable database when those paths change,
+and the same scripts can be run locally:
+
+- source-import and cutover objects, security-definer search paths, grant
+  posture, and fixture rollback;
+- fatal validation failure behavior: a fatal failing check raises an exception,
+  so the run does not exit successfully;
+- candidate locators and quote hashes;
+- all five richer cutover probe categories;
+- Chat-Mine exporter validation: deterministic package output against the
+  checked-in fixture, and, when `DATABASE_URL` is set, a rollback-only load
+  into the merged schema.
+
+That Chat-Mine check is internal producer alignment, not a public interchange
+protocol. Repository validation is not independent live acceptance.
+
 ## What's not done
 
 - No live deployment has completed independent acceptance.
@@ -154,6 +204,9 @@ The two claims are not the same and this README does not conflate them.
   identity-backed proof. It is a known limitation, not an oversight.
 - The attention and work-memory layer is an early reference implementation, not
   a ranking policy anyone should adopt.
+- Review UI, Hermes orchestration, adapters for real source exports, and
+  operational dry runs are future work. They sit outside the merged
+  source-import foundation and outside the internal Chat-Mine producer slice.
 - Tag `v0.3-alpha` (commit `c96b9da749b2d95661973485b2a026897329c8cd`) is a
   reviewed coordinate. Its limitations record is
   [`release/v0.3-alpha-known-limitations.md`](release/v0.3-alpha-known-limitations.md).
@@ -202,6 +255,11 @@ Three ordering rules that will bite you otherwise:
   It is itself re-runnable. If an operator deliberately reapplies `10`, reapply
   `11` immediately afterward before treating the perimeter as evaluated.
 
+Files marked optional are layers to apply when that capability is needed.
+`sql/04_source_import.sql`, `sql/05_candidate_locators.sql`, and
+`sql/06_cutover_probe_categories.sql` are part of the merged foundation in
+this repository.
+
 `sql/validation/` is not in the ordered list. It holds
 `source_import_readiness.sql` and `load_chat_mine_package.sql`. Those are
 validation helpers. Applying `01` through `11` does not run them.
@@ -237,6 +295,8 @@ before applying to anything you care about.
 - [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md) — evaluated, not-clean, and unsupported perimeter states
 - [`docs/templates/restore-rehearsal.md`](docs/templates/restore-rehearsal.md) — provider-exit evidence record
 - [`docs/security-definer-inventory.md`](docs/security-definer-inventory.md)
+- [`docs/07-source-import-cutover.md`](docs/07-source-import-cutover.md) — source import and authoritative cutover
+- [`docs/10-chat-mine-source-import-exporter.md`](docs/10-chat-mine-source-import-exporter.md) — first internal Chat-Mine producer slice
 - [`docs/work-memory.md`](docs/work-memory.md)
 - [`docs/attention-layer.md`](docs/attention-layer.md)
 - [`docs/upgrades/work-memory-v2.md`](docs/upgrades/work-memory-v2.md)
