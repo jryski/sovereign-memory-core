@@ -1,0 +1,4 @@
+# SYNTHETIC FIXTURE. Unmistakably fake. Not a real database.
+# expected-rule: deployment-connection-string
+# min-findings: 1
+postgresql://notreal_user:notarealvalue001@db-01.internal:5432/notreal

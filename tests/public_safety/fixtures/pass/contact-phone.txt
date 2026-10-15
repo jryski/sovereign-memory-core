@@ -1,0 +1,7 @@
+# SYNTHETIC NEAR-MISS. This file must not produce a public-safety finding.
+# covers-rule: contact-phone
++1-212-555-0100
+(415) 555-0199
+555-0100
+2026-07-08
+port 55432

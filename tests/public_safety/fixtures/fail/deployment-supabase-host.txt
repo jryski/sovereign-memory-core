@@ -1,0 +1,7 @@
+# SYNTHETIC FIXTURE. Unmistakably fake. Not a hosted project.
+# expected-rule: deployment-supabase-host
+# min-findings: 4
+https://abcdefghijklmnopqrst.supabase.co
+db.abcdefghijklmnopqrst.supabase.co
+synthetic-region.pooler.supabase.com
+project_ref: abcdefghijklmnopqrst

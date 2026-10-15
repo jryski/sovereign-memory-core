@@ -1,0 +1,4 @@
+# SYNTHETIC FIXTURE. Unmistakably fake. Not a real host.
+# expected-rule: deployment-ip
+# min-findings: 1
+host: 10.14.2.8

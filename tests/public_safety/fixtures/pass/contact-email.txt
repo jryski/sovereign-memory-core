@@ -1,0 +1,5 @@
+# SYNTHETIC NEAR-MISS. This file must not produce a public-safety finding.
+# covers-rule: contact-email
+Signed-off-by: Your Name <you@example.com>
+release-test@example.invalid
+operator@mail.example.org

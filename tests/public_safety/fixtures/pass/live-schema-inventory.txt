@@ -1,0 +1,4 @@
+# SYNTHETIC NEAR-MISS. This file must not produce a public-safety finding.
+# covers-rule: live-schema-inventory
+Do not paste a live schema inventory, an RPC inventory, an access-control finding, a denial path, or attack-relevant configuration from a real deployment.
+Reviewed reference doctrine in this repository is not a live dump.

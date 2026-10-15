@@ -1,0 +1,6 @@
+# SYNTHETIC NEAR-MISS. This file must not produce a public-safety finding.
+# covers-rule: deployment-connection-string
+postgres://postgres:postgres@localhost:5432/postgres
+postgresql://postgres:postgres@127.0.0.1:55432/postgres
+postgresql://postgres:x@localhost:55432/postgres
+postgresql://postgres:postgres@[::1]:5432/postgres
