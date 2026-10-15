@@ -42,6 +42,17 @@ Behavioral lessons are governed because accepting one changes how agents act.
 Ordinary memories remain constrained by lifecycle status and provenance; their
 presence, wording, or retrieval rank does not give them behavioral authority.
 
+Declared consequential domains, when `sql/12_consequential_domains.sql` is
+installed, are a schema-owner list. The baseline is financial, legal, medical,
+and identity. A bound workstream, or a row that names `consequential_domain`,
+must carry a specific citation and a closed provenance basis. Agent-authored
+rows in those domains are rejected at write time. `remember()` is an agent
+write, so it cannot store a declared consequential fact. Do not relabel
+`source_kind` to get around that rejection. Primary Users promote a
+human-authored proposal with `promote_memory`. That function does not change
+`source_kind`. Prose is not classified by itself: a fact stays ordinary until
+a domain is declared for it.
+
 ---
 
 ## A. The operating contract (paste into `_system/ai-instructions`)
@@ -133,6 +144,17 @@ financial_unverified=true with confidence<=0.60. The database enforces this;
 if your write is rejected, fix the provenance, do not rephrase the number to
 dodge the pattern match.
 
+## 8.1 Declared consequential domains
+If consequential domain tables are installed, financial, legal, medical, and
+identity are the baseline. A schema owner binds a workstream, and a row may
+name consequential_domain. Those rows need basis plus a specific
+source_citation. source_kind=agent is rejected, including proposed rows.
+remember() cannot write them. Do not relabel source_kind. A human-authored
+proposal is promoted with promote_memory, which does not change source_kind.
+supersede_memory and supersede_wiki cannot write a consequential successor
+because they stamp the new row as agent-authored. A human correction is a new
+human-authored row. Unclassified prose is not auto-detected.
+
 ## 9. Store proactively, hand off
 After meaningful decisions, learnings, corrections, or completions, store without being
 asked. End a meaningful session with a 'handoff'-tagged memory summarizing state and
@@ -176,6 +198,9 @@ assistant: VIEWER='<person>', SOURCE_AGENT='<person>-claude'.
    'mismatch', warn me and ask me to confirm; do NOT lock me out.
 3. Store via remember(); correct via supersede_memory(); never delete.
    Stamp source_agent='<person>-claude'. Check the hot index before minting topic_keys.
+   remember() is agent-authored. Declared consequential domains reject it.
+   Do not relabel source_kind. Human consequential facts use a human or manual
+   source_kind, a specific citation, and promote_memory when they start proposed.
 4. Any BULK status change requires a dry-run SELECT shown to me first.
 5. Access is service-role-only; 42501 means wrong role, not missing data.
 6. After significant decisions/learnings/completions, store without being asked.
@@ -203,6 +228,8 @@ Then read the operating contract at wiki_pages path '_system/ai-instructions'
 (status='active'), verify it, and apply it only within existing human/system/custody
 authority: remember() to store, supersede to correct,
 never delete, stamp your source_agent, warn me on integrity mismatch.
+remember() is agent-authored and cannot write a declared consequential domain.
+Do not relabel source_kind.
 ```
 
 **The OpenAI tool-safety wrinkle (learned in production):** ChatGPT's tool-safety layer
