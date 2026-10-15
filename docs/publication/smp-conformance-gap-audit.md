@@ -77,9 +77,9 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 | H3 | Quote hash proves custody, not correctness. | Informative/doctrine | No test required beyond docs clarity. |
 | E1 | Store treats emitter output as proposed input. | Partial | Source manifest/review posture exists; direct store-level guard is future review workflow. |
 | E2 | Structurally valid package alone MUST NOT promote candidate. | Partial | Loader dry-run never marks authoritative; broader store-level truth-promotion guards remain future review workflow work. |
-| C1 | Adapter profile maps source item identity, raw preservation, hashes, candidates, provenance, timestamps, conflicts, review states, unsupported fields, round-trip/export, probes. | Future profile | Create adapter profile template. |
-| C2 | Adapter profile declares lossiness. | Future profile | Add required section to adapter profile template. |
-| C3 | Non-round-tripped fields must be declared, not silently dropped. | Future profile | Needs round-trip fixture/profile tests. |
+| C1 | Adapter profile maps source item identity, raw preservation, hashes, candidates, provenance, timestamps, conflicts, review states, unsupported fields, round-trip/export, probes. | Future profile | Blank template: [`docs/templates/adapter-profile.md`](../templates/adapter-profile.md). Filled profiles and probes that exercise them remain future. |
+| C2 | Adapter profile declares lossiness. | Future profile | The template requires a lossiness section. No source family has a filled declaration yet. |
+| C3 | Non-round-tripped fields must be declared, not silently dropped. | Future profile | The template requires explicit round-trip limitations. Round-trip fixtures and profile tests are still absent. |
 | CNF1 | System MUST NOT claim conformance merely by storing provenance/memory fields. | Documentation | Enforce by project docs/release policy; no runtime test needed. |
 | CNF2 | Emitter-conformant means packages satisfy I1+I2 only. | Partial | Current Chat-Mine package validates much of I1/I2; `smp_version` and full reconciliation report remain gaps. |
 | CNF3 | Store-conformant enforces I1, I3, I5 on ingest. | Partial | I1 mostly covered; I3/I5 general enforcement gaps remain. |
@@ -95,9 +95,9 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 
 ## Immediate follow-up issues recommended
 
-1. **Create adapter profile template**
-   - Add required lossiness declaration.
-   - Define source-item identity, preservation, hashes, provenance mapping, timestamp mapping, conflict mapping, review-state mapping, unsupported-field preservation, round-trip/export behavior, and probe requirements.
+1. **Adapter profile template**
+   - The blank form is [`docs/templates/adapter-profile.md`](../templates/adapter-profile.md). It requires lossiness, source-item identity, preservation, hashes, provenance mapping, timestamp mapping, conflict representation, review-state mapping, unsupported-field preservation, round-trip/export behavior, and probes.
+   - Remaining work: a filled profile for one source family, plus round-trip fixtures that fail when a non-round-tripped field is dropped silently (C3). The blank template is not adapter completion.
 
 2. **Audit Draft 0.3 SHOULD/MUST coverage automatically**
    - Add a script or checklist that extracts normative keywords and maps them to this audit.

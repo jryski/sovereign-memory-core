@@ -236,6 +236,7 @@ before applying to anything you care about.
 - [`docs/perimeter.md`](docs/perimeter.md) — permission profiles and policy inputs
 - [`docs/perimeter-evaluability.md`](docs/perimeter-evaluability.md) — evaluated, not-clean, and unsupported perimeter states
 - [`docs/templates/restore-rehearsal.md`](docs/templates/restore-rehearsal.md) — provider-exit evidence record
+- [`docs/templates/adapter-profile.md`](docs/templates/adapter-profile.md) — blank adapter profile declaration; not a completed adapter
 - [`docs/security-definer-inventory.md`](docs/security-definer-inventory.md)
 - [`docs/work-memory.md`](docs/work-memory.md)
 - [`docs/attention-layer.md`](docs/attention-layer.md)

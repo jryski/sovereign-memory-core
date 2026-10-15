@@ -21,4 +21,5 @@ SMP should support adapter profiles over competing with every memory protocol or
 ## Related
 
 - [docs/09-source-adapters.md](../09-source-adapters.md)
+- [docs/templates/adapter-profile.md](../templates/adapter-profile.md)
 - [ADR-0001](0001-smp-is-a-custody-layer-not-a-memory-format.md)
