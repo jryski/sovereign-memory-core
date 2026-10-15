@@ -1,0 +1,384 @@
+{
+  "adapter_profile": {
+    "evidence_posture": "SHA-256 covers the raw JSONL line bytes before normalization, with the trailing newline excluded.",
+    "is_default_import_path": false,
+    "lossiness": "A line-oriented export omits attachments and container fields that are not on the line.",
+    "mapping": "Each JSONL line is one source item. Candidates suggest an action and zone. They do not approve truth.",
+    "profile_id": "example-chat-export-jsonl-v1",
+    "source_identity": "synthetic jsonl conversation export",
+    "unsupported": [
+      "approval",
+      "deduplication",
+      "conflict resolution",
+      "authoritative cutover"
+    ]
+  },
+  "batch": {
+    "batch_key": "example-chat-export-jsonl-2026-07-08",
+    "export_completed_at": "2026-07-08T16:00:01Z",
+    "export_started_at": "2026-07-08T16:00:00Z",
+    "exported_by": "agent-1",
+    "exported_item_count": 5,
+    "metadata": {
+      "producer": "example-source-adapter-draft",
+      "ready_for_cutover": false
+    },
+    "payload_hash_algorithm": "sha256",
+    "source_item_count": 5,
+    "status": "open",
+    "watermark": {
+      "max_updated_at": "2026-07-08T15:30:00Z",
+      "source_item_count": 5
+    }
+  },
+  "cutover_probe_candidates": [
+    {
+      "expected_behavior": "Do not return chat-record-3 as current truth. chat-record-4 is a later correction and remains an unreviewed import suggestion.",
+      "expected_source_item_key": "chat-record-3",
+      "probe_category": "stale_state",
+      "probe_key": "example-chat-stale-port",
+      "probe_type": "stale-avoidance",
+      "prompt": "Is port 8080 the current Example Project listener?",
+      "severity": "critical"
+    },
+    {
+      "expected_behavior": "Keep the vault-subject-demo-1 pointer out of HOUSE. The suggestion is VAULT and still needs review.",
+      "expected_source_item_key": "chat-record-5",
+      "probe_category": "negative",
+      "probe_key": "example-chat-vault-boundary",
+      "probe_type": "sensitive-boundary",
+      "prompt": "What restricted record must not appear in HOUSE?",
+      "severity": "critical"
+    }
+  ],
+  "draft_format": "source-adapter.manifest-draft.v1",
+  "draft_note": "Synthetic manifest draft. Suggestions are not approved truth. This draft does not mark a batch ready for cutover.",
+  "hash_algorithm": "sha256",
+  "source_items": [
+    {
+      "content_type": "application/json",
+      "manifest_candidates": [
+        {
+          "action": "import",
+          "lifecycle_status": "proposed",
+          "manifest_key": "chat-rollback-checklist",
+          "metadata": {
+            "producer_posture": "candidate_only"
+          },
+          "preservation_class": "durable",
+          "review_notes": "User-stated durable operating fact. HOUSE import suggestion for memories. Review state stays unreviewed, so this is not approved truth.",
+          "review_state": "unreviewed",
+          "sensitivity": "ordinary",
+          "source_quote": "Example Project keeps the current rollback checklist on the operations wiki page demo-rollback.",
+          "source_quote_hash": "f1bdf3b6582a1de4eaecacb8c7487296c6e3bed2b5e620c7fea5a7bbf927c7b4",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "Example Project keeps the current rollback checklist on the operations wiki page demo-rollback.",
+          "suggested_summary": "User statement places the Example Project rollback checklist on wiki page demo-rollback.",
+          "target_table": "memories",
+          "target_zone": "HOUSE",
+          "topic_key": "projects/example-project/rollback",
+          "transformation_version": "example-chat-export-jsonl-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "jsonl_line",
+        "file": "sample-input.jsonl",
+        "match_field": "record_id",
+        "match_value": "chat-record-1"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.jsonl#chat-record-1",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "e6adc6cf53c5f6ab9891419884a655a6ac51225a407ae47a4b6534f2d064eb60",
+          "size_bytes": 275
+        }
+      ],
+      "payload_hash": "e6adc6cf53c5f6ab9891419884a655a6ac51225a407ae47a4b6534f2d064eb60",
+      "payload_size_bytes": 275,
+      "raw_payload_location": "sample-input.jsonl#chat-record-1",
+      "source_author": "person-1",
+      "source_container": "conv-demo-1",
+      "source_created_at": "2026-07-08T15:00:00Z",
+      "source_item_key": "chat-record-1",
+      "source_kind": "message",
+      "source_ref": "chat-record-1",
+      "source_updated_at": "2026-07-08T15:00:00Z",
+      "title": "Rollback checklist mention"
+    },
+    {
+      "content_type": "application/json",
+      "manifest_candidates": [
+        {
+          "action": "evidence",
+          "lifecycle_status": "evidence",
+          "manifest_key": "chat-rollback-model-summary",
+          "metadata": {
+            "producer_posture": "process_evidence"
+          },
+          "preservation_class": "process",
+          "review_notes": "Assistant summary is process evidence. Preserve the raw line. An evidence suggestion is not a human decision.",
+          "review_state": "unreviewed",
+          "sensitivity": "ordinary",
+          "source_quote": "This summary is not a human decision.",
+          "source_quote_hash": "32bdf7009da4aa34ec0cdd69b6feb7b95fe9aafe504c6caf41ef950c6073177b",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "This summary is not a human decision.",
+          "suggested_summary": "Assistant restatement of the rollback checklist request.",
+          "target_zone": "EVIDENCE",
+          "topic_key": "projects/example-project/rollback",
+          "transformation_version": "example-chat-export-jsonl-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "jsonl_line",
+        "file": "sample-input.jsonl",
+        "match_field": "record_id",
+        "match_value": "chat-record-2"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.jsonl#chat-record-2",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "e10fb9695ea48cb24584a0ef7d6ecb5caa88becba7221b9562e1ca009acd8056",
+          "size_bytes": 346
+        }
+      ],
+      "payload_hash": "e10fb9695ea48cb24584a0ef7d6ecb5caa88becba7221b9562e1ca009acd8056",
+      "payload_size_bytes": 346,
+      "raw_payload_location": "sample-input.jsonl#chat-record-2",
+      "source_author": "agent-1",
+      "source_container": "conv-demo-1",
+      "source_created_at": "2026-07-08T15:01:00Z",
+      "source_item_key": "chat-record-2",
+      "source_kind": "message",
+      "source_ref": "chat-record-2",
+      "source_updated_at": "2026-07-08T15:01:00Z",
+      "title": "Model summary of the rollback checklist"
+    },
+    {
+      "content_type": "application/json",
+      "manifest_candidates": [
+        {
+          "action": "hold",
+          "lifecycle_status": "stale",
+          "manifest_key": "chat-port-8080-stale",
+          "metadata": {
+            "producer_posture": "stale_state_quarantine",
+            "quarantine_reason": "stale_state",
+            "superseded_by_source_item_key": "chat-record-4"
+          },
+          "preservation_class": "quarantine",
+          "review_notes": "Stale-state quarantine. Historical current-state claim that the listener is port 8080. Keep it in HOLD. A later line suggests port 9090 and is still unreviewed.",
+          "review_state": "needs_review",
+          "sensitivity": "ordinary",
+          "source_quote": "Historical status: Example Project listener is port 8080.",
+          "source_quote_hash": "3bc6eceb6265d4d3b610731d6f9a161edb4cbef928f6139105152fafee03e245",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "Historical status: Example Project listener is port 8080.",
+          "suggested_summary": "January note says the Example Project listener is port 8080.",
+          "target_zone": "HOLD",
+          "topic_key": "projects/example-project/listener",
+          "transformation_version": "example-chat-export-jsonl-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "jsonl_line",
+        "file": "sample-input.jsonl",
+        "match_field": "record_id",
+        "match_value": "chat-record-3"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.jsonl#chat-record-3",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "ebdb63679dfd020edbfef57b3492b36b78584bb966acbef1948020d9951517aa",
+          "size_bytes": 260
+        }
+      ],
+      "payload_hash": "ebdb63679dfd020edbfef57b3492b36b78584bb966acbef1948020d9951517aa",
+      "payload_size_bytes": 260,
+      "raw_payload_location": "sample-input.jsonl#chat-record-3",
+      "source_author": "person-1",
+      "source_container": "conv-demo-1",
+      "source_created_at": "2026-01-15T12:00:00Z",
+      "source_item_key": "chat-record-3",
+      "source_kind": "message",
+      "source_ref": "chat-record-3",
+      "source_updated_at": "2026-01-15T12:00:00Z",
+      "title": "Outdated port 8080 status"
+    },
+    {
+      "content_type": "application/json",
+      "manifest_candidates": [
+        {
+          "action": "import",
+          "lifecycle_status": "proposed",
+          "manifest_key": "chat-port-9090-correction",
+          "metadata": {
+            "producer_posture": "candidate_only"
+          },
+          "preservation_class": "durable",
+          "review_notes": "Later user correction. HOUSE import suggestion for memories. Unreviewed, so a later timestamp does not make it active truth.",
+          "review_state": "unreviewed",
+          "sensitivity": "ordinary",
+          "source_quote": "The current synthetic listener is port 9090 on device-demo-1.",
+          "source_quote_hash": "56d22d75c7e6c5f50050624c1b12f2faaf805dd4a7cb54703c351f023efa28fd",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "The current synthetic listener is port 9090 on device-demo-1.",
+          "suggested_summary": "Later user correction says the synthetic listener is port 9090 on device-demo-1.",
+          "target_table": "memories",
+          "target_zone": "HOUSE",
+          "topic_key": "projects/example-project/listener",
+          "transformation_version": "example-chat-export-jsonl-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "jsonl_line",
+        "file": "sample-input.jsonl",
+        "match_field": "record_id",
+        "match_value": "chat-record-4"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.jsonl#chat-record-4",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "324b4999a93ba6a60b8ff22cfadeddd54ccfc540c63cd42d90c450f73b8a85c7",
+          "size_bytes": 336
+        }
+      ],
+      "payload_hash": "324b4999a93ba6a60b8ff22cfadeddd54ccfc540c63cd42d90c450f73b8a85c7",
+      "payload_size_bytes": 336,
+      "raw_payload_location": "sample-input.jsonl#chat-record-4",
+      "source_author": "person-1",
+      "source_container": "conv-demo-1",
+      "source_created_at": "2026-07-08T15:20:00Z",
+      "source_item_key": "chat-record-4",
+      "source_kind": "message",
+      "source_ref": "chat-record-4",
+      "source_updated_at": "2026-07-08T15:20:00Z",
+      "title": "Port 9090 correction"
+    },
+    {
+      "content_type": "application/json",
+      "manifest_candidates": [
+        {
+          "action": "import",
+          "custodian": "person-1",
+          "lifecycle_status": "proposed",
+          "manifest_key": "chat-restricted-pointer",
+          "metadata": {
+            "producer_posture": "restricted_review"
+          },
+          "preservation_class": "restricted",
+          "review_notes": "Restricted subject pointer. VAULT import suggestion. Needs review before normalization. Shared HOUSE memory is the wrong zone.",
+          "review_state": "needs_review",
+          "sensitivity": "restricted",
+          "source_quote": "Keep it out of shared HOUSE memory.",
+          "source_quote_hash": "e431f0d7c8313d1a7e7890d33ecac78270f9891f2360233dcb63d5a1ad239b06",
+          "source_quote_hash_algorithm": "sha256",
+          "subject_ref": "vault-subject-demo-1",
+          "suggested_content": "Keep it out of shared HOUSE memory.",
+          "suggested_summary": "Restricted pointer for synthetic subject vault-subject-demo-1.",
+          "target_zone": "VAULT",
+          "topic_key": "subjects/vault-subject-demo-1",
+          "transformation_version": "example-chat-export-jsonl-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "source_field"
+      },
+      "payload": {
+        "basis": "jsonl_line",
+        "file": "sample-input.jsonl",
+        "match_field": "record_id",
+        "match_value": "chat-record-5"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input.jsonl#chat-record-5",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "d6583f9d1da802c65a44ef2a49ec1647ab21e657b528935040e79c58d5900584",
+          "size_bytes": 319
+        }
+      ],
+      "payload_hash": "d6583f9d1da802c65a44ef2a49ec1647ab21e657b528935040e79c58d5900584",
+      "payload_size_bytes": 319,
+      "raw_payload_location": "sample-input.jsonl#chat-record-5",
+      "source_author": "person-1",
+      "source_container": "conv-demo-1",
+      "source_created_at": "2026-07-08T15:30:00Z",
+      "source_item_key": "chat-record-5",
+      "source_kind": "message",
+      "source_ref": "chat-record-5",
+      "source_updated_at": "2026-07-08T15:30:00Z",
+      "title": "Restricted subject pointer"
+    }
+  ],
+  "source_system": {
+    "adapter_name": "example-chat-export-jsonl",
+    "adapter_version": "example-v1",
+    "description": "Synthetic JSONL conversation export. This source shape is not the default import path.",
+    "display_name": "Example JSONL Conversation Export",
+    "owner": "shared",
+    "source_key": "example-chat-export-jsonl",
+    "source_type": "ai-export",
+    "visibility": "shared"
+  },
+  "verification": {
+    "candidate_count": 5,
+    "evidence_count": 1,
+    "exclude_count": 0,
+    "exported_item_count": 5,
+    "held_excluded_or_rejected_count": 1,
+    "hold_count": 1,
+    "import_count": 3,
+    "payload_hash_algorithm": "sha256",
+    "raw_input_files": [
+      {
+        "path": "sample-input.jsonl",
+        "sha256": "e8a5730fc9e2fa8c9fee6e59d043c5686e309c0e56c959b8c4f8963e4b3ff17b",
+        "size_bytes": 1541
+      }
+    ],
+    "rejected_count": 0,
+    "source_item_count": 5
+  }
+}
