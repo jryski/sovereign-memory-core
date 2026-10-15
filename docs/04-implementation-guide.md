@@ -211,6 +211,16 @@ Probe categories:
 | `stale_state` | Proves superseded or uncertain state does not outrank current reviewed state. |
 | `evidence_request` | Proves the system can return or cite supporting evidence on demand. |
 
+`cutover_probe_outcome_matched` applies those categories to one recorded observation. It is generic: it does not call a vector database, model, or UI, and it does not write memories or wiki pages. A match is run history on `cutover_runs`, not canonical truth.
+
+| Category | Recorded observation matches when |
+|---|---|
+| `positive` | The expected-recall marker is present. |
+| `negative` | The forbidden invention is absent. A refusal marker named by the probe is present. |
+| `conflict` | The tension marker is present. A flattened claim named by the probe is absent. |
+| `stale_state` | The current-fact marker is present and the superseded-fact marker is absent. |
+| `evidence_request` | Evidence is required, and it is returned on `evidence_ref` or cited in the answer. |
+
 Additional fields:
 
 | Field | Purpose |
@@ -223,8 +233,9 @@ Readiness effect:
 
 - a batch must define active probes across all five categories before cutover;
 - every active critical probe must have a latest passing run;
-- `cutover_scorecard` exposes category counts, `critical_not_run`, and
-  `critical_all_pass` so misses cannot hide behind aggregate pass percentage.
+- `cutover_scorecard` exposes category counts, `critical_not_run`, `pass_pct`, and
+  `critical_all_pass`. `pass_pct` is descriptive. Readiness uses `critical_all_pass`,
+  so one critical miss stays a blocker when the aggregate percentage remains high.
 
 - DONE, probe category checks:
 ```sql
@@ -244,6 +255,9 @@ Run the validation helper again after this migration. Expected behavior adds:
 - richer probe columns pass;
 - fixture defines all five categories;
 - fixture scorecard shows five passing critical probes;
+- each category has a passing observation and a failing observation;
+- one critical miss at a time leaves `pass_pct` at 80 and fails readiness;
+- the miss remains in `cutover_runs` after a later passing run;
 - readiness includes category coverage and critical all-pass gates.
 
 ## Step 10: Source-control your migrations (not optional)
