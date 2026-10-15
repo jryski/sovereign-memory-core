@@ -13,7 +13,7 @@ set -euo pipefail
 #   (`anon`, `authenticated`, `service_role`) if they do not already exist.
 # - If sql/05_candidate_locators.sql exists, the script applies it before validation.
 # - If sql/06_cutover_probe_categories.sql exists, the script applies it before validation.
-# - The validation fixture rolls back its own staged data.
+# - The validation fixtures roll back their own staged data.
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
   echo "DATABASE_URL is required" >&2
@@ -60,5 +60,8 @@ fi
 
 echo "==> Running source import validation bundle"
 "${PSQL[@]}" -f "${ROOT_DIR}/sql/validation/source_import_readiness.sql"
+
+echo "==> Running review and promotion guard tests"
+"${PSQL[@]}" -f "${ROOT_DIR}/sql/validation/promotion_guard_negative.sql"
 
 echo "==> Done"
