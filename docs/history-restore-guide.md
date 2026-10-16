@@ -1,5 +1,7 @@
 # History and restore guide (v0.3-alpha, synthetic)
 
+**Classification: synthetic-only. This is not live recovery.**
+
 This is the authoritative public procedure for reproducing the Core history and
 restore evidence. It runs the provider-exit rehearsal from the exact alpha
 source on two new, disposable PostgreSQL 16 clusters. It then validates the
@@ -12,9 +14,9 @@ history and perimeter state.
 
 **What this is not:** it does not export or restore private data, rebuild a
 hosted provider's control plane, prove signed actor attribution, or recreate the
-2026-08-15 release archive byte for byte. See [Limits](#limits).
+2026-08-15 release archive byte for byte. It is not live recovery. See [Limits](#limits).
 
-## Pin
+## Pin and checksums
 
 | Item | Value |
 | --- | --- |
@@ -39,7 +41,7 @@ Later `main` commits are outside the reviewed coordinate. Do not substitute
   `synthetic-local-only`, and it exists only inside the disposable clusters,
   which publish no host ports.
 
-## Exact steps
+## Exact commands
 
 Run these from an empty working directory. The recipe is kept outside the
 checkout so that the source tree stays pristine.
@@ -86,7 +88,7 @@ the same value.
 7. In a `finally` block that runs on success or failure, removes the created
    containers with their volumes, then the network, then the image.
 
-## Expected results
+## Expected outcomes
 
 ### Allowed (must succeed)
 
@@ -118,8 +120,15 @@ and timestamps. The validator checks each run's archive against that run's own
 checksum. The reference receipt below is the value from one run, not an
 expected constant.
 
+## Failure controls
+
 Any failure stops the recipe (`$ErrorActionPreference = 'Stop'` plus explicit
-exit-code checks). Treat a missing final `PASS` line as a failed run.
+exit-code checks). Treat a missing final `PASS` line as a failed run. The
+`finally` block still removes the containers, volumes, network and image created
+for that run id. Do not continue past a thrown error, a non-zero rehearsal or
+validator exit, or a missing `PASS` line. Do not point the recipe at a live
+database; it refuses any checkout other than the pinned alpha commit, and it
+creates only new disposable clusters.
 
 ## Cleanup
 

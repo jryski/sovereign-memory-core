@@ -13,8 +13,8 @@ Do not put secrets, credentials, private memory exports, private chat logs, API 
 Report a vulnerability through this repository's own private vulnerability reporting form:
 <https://github.com/jryski/sovereign-memory-core/security/advisories/new>
 
-If the form is unavailable, email <jryski@gmail.com> instead. Include the affected commit, the
-trust boundary involved and a minimal reproduction with synthetic data.
+If the form is unavailable, contact Primary Users through a private channel. Include the affected commit, the
+trust boundary involved and a minimal reproduction with synthetic data. Do not post the report publicly.
 
 Each program component has its own private form. Report issues in another component there; the
 [program map](https://github.com/WireSpeedComputing/sovereign-ai-os) lists every component.
