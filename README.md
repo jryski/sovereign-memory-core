@@ -12,6 +12,24 @@
 > Current program pointers, including the open recovery hold, are in
 > [`STATUS.md`](STATUS.md).
 
+## Orientation: purpose, place and first test
+
+A short map for people and AI assistants arriving here first. Each row links
+the source that supports it.
+
+| Question | Answer |
+| --- | --- |
+| What is this? | The PostgreSQL reference implementation for custody: evidence, history, an authority perimeter and export/restore ([what this is](#what-this-is)). It is not a consumer application or a retrieval engine. |
+| Where does it fit? | The durable evidence and history foundation in the [Sovereign AI OS program map](https://github.com/WireSpeedComputing/sovereign-ai-os) ([component routes](https://github.com/WireSpeedComputing/sovereign-ai-os/blob/main/ROUTES.md), [program role](PROGRAM-ROLE.md)). It implements protocol semantics; deployments consume it ([the three layers](#the-three-layers)). It does not require User MCP, Household OS or Sovereign Vault. No install order across components is implied. |
+| What is supported today? | Alpha. Tag `v0.3-alpha` (`c96b9da749b2d95661973485b2a026897329c8cd`) is the reviewed coordinate; later `main` commits are outside it. Provider-exit restore is declared for PostgreSQL 15 and 16 only ([known limitations](release/v0.3-alpha-known-limitations.md), [release](https://github.com/jryski/sovereign-memory-core/releases/tag/v0.3-alpha)). |
+| First test | The [history and restore guide](docs/history-restore-guide.md) gives the exact setup, the pinned recipe and its checksum, expected allowed and denied results, the receipt fields and owned-resource cleanup for `v0.3-alpha`. It uses PowerShell 7, Git and Docker with Linux containers; a pass prints `PASS: synthetic C2 rehearsal and bundle validation.` A database-free check is `python -m unittest discover -s tests/export_restore -p 'test_*.py' -v` ([export-restore-validation.yml](.github/workflows/export-restore-validation.yml)). There is no one-command installer ([installing](#installing)). |
+| Evidence | [Workflow runs](https://github.com/jryski/sovereign-memory-core/actions) on PostgreSQL 15 and 16; the [v0.3-alpha release](https://github.com/jryski/sovereign-memory-core/releases/tag/v0.3-alpha) publishes `CHECKSUMS.sha256` with its receipts. |
+| Source status | Merged source: `main`, of which only the `v0.3-alpha` coordinate was reviewed for restore. Tested review branches: open draft pull requests, each for its stated exact head only. Operating observations: the synthetic receipt in the [guide](docs/history-restore-guide.md#reference-receipt). Future direction: [roadmap](docs/roadmap.md). |
+| Limitations | No live deployment has independent acceptance; restore evidence is synthetic; attribution is assertion-grade; checksums are not signatures ([what's not done](#whats-not-done)). |
+| Contribute | [CONTRIBUTING.md](CONTRIBUTING.md), [SUPPORT.md](SUPPORT.md), DCO sign-off ([DCO.md](DCO.md)). |
+| License and security | Apache-2.0 ([LICENSE](LICENSE), [NOTICE](NOTICE)). Report vulnerabilities through this repository's own private form, with an email fallback ([SECURITY.md](SECURITY.md)). |
+| Related components | [Sovereign Memory Protocol](https://github.com/jryski/sovereign-memory-protocol) (intended long-term home of normative text), [Supabase User MCP](https://github.com/jryski/Supabase_user_MCP), [Household OS](https://github.com/jryski/Household-OS), and [Sovereign Vault](https://github.com/WireSpeedComputing/Sovereign-Vault), an independent business platform that records Core as design lineage ([LINEAGE.md](https://github.com/WireSpeedComputing/Sovereign-Vault/blob/main/LINEAGE.md)). |
+
 ## The problem, concretely
 
 We examined multi-year ChatGPT and Claude exports from real accounts.
