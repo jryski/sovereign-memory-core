@@ -105,6 +105,12 @@ memory_hot_staging for an existing (owner, topic_key).
 ## 4. Correct by superseding, never delete
     select supersede_memory(<old_id>, 'corrected fact', '<your source_agent>');
 Hard deletes are blocked. If you were wrong, the correction becomes part of history.
+A proposed row is a candidate: revising it in place is review, not a correction.
+An active row is a promoted record. Do not rewrite its content, source, or
+provenance in place; supersede it so the earlier bytes stay in the chain.
+Marking a deadline done or touching the hot list does not rewrite the promoted
+fact. This store has no content-hash receipt for memories. No receipt means
+unaudited, not verified. A wiki bless hash is not a signature.
 
 ## 5. Deadlines
 Store with p_due_date (due_status becomes 'pending'). When handled:
