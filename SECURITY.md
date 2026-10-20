@@ -10,7 +10,14 @@ Relevant doc:
 
 Do not put secrets, credentials, private memory exports, private chat logs, API keys, or deployment details in public issues or pull requests.
 
-If you need to report a sensitive issue, use a private channel with the repository owner or maintainer instead of posting the sensitive material publicly.
+Report a vulnerability through this repository's own private vulnerability reporting form:
+<https://github.com/jryski/sovereign-memory-core/security/advisories/new>
+
+If the form is unavailable, contact Primary Users through a private channel. Include the affected commit, the
+trust boundary involved and a minimal reproduction with synthetic data. Do not post the report publicly.
+
+Each program component has its own private form. Report issues in another component there; the
+[program map](https://github.com/WireSpeedComputing/sovereign-ai-os) lists every component.
 
 ## Live systems
 
