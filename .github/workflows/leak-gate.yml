@@ -165,7 +165,6 @@ jobs:
     env:
       GIT_TERMINAL_PROMPT: "0"
       GIT_CONFIG_NOSYSTEM: "1"
-      GIT_CONFIG_GLOBAL: /dev/null
       GIT_LFS_SKIP_SMUDGE: "1"
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
@@ -192,6 +191,7 @@ jobs:
       - name: Check policy completeness and repository classification
         shell: bash
         env:
+          GIT_CONFIG_GLOBAL: /dev/null
           EXPECTED_PRIVATE: ${{ needs.prepare.outputs.private_repo }}
         run: |
           python3 - <<'PY'
@@ -215,6 +215,8 @@ jobs:
 
       - name: Install checksum-verified scanner from trusted pin
         shell: bash
+        env:
+          GIT_CONFIG_GLOBAL: /dev/null
         run: |
           python3 "$GITHUB_WORKSPACE/trusted-policy/scripts/leak/install_gitleaks.py" \
             --pin "$GITHUB_WORKSPACE/trusted-policy/scripts/leak/scanner-pin.json" \
@@ -224,6 +226,7 @@ jobs:
         id: data
         shell: bash
         env:
+          GIT_CONFIG_GLOBAL: /dev/null
           READ_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ needs.prepare.outputs.repository }}
           BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
@@ -291,6 +294,7 @@ jobs:
         # No dependency installation, PR scripts, hooks, submodules or target checkout.
         shell: bash
         env:
+          GIT_CONFIG_GLOBAL: /dev/null
           LEAK_PRIVATE_PATTERNS: ${{ secrets.LEAK_PRIVATE_PATTERNS }}
           TARGET_REPO: ${{ steps.data.outputs.repo }}
           BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
@@ -317,13 +321,16 @@ jobs:
       statuses: write
     steps:
       - name: Publish exact-head clear or failed result
+        # Status functions are illegal in step env. Canceled runs skip this
+        # step and keep the blocking pending status.
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           STATUS_TOKEN: ${{ github.token }}
           STATUS_REPOSITORY: ${{ needs.prepare.outputs.repository }}
           STATUS_HEAD: ${{ needs.prepare.outputs.head_sha }}
           STATUS_PHASE: final
-          RUN_CANCELLED: ${{ cancelled() }}
+          RUN_CANCELLED: "false"
           SCAN_RESULT: ${{ needs.leak-gate.result }}
           SCAN_OUTCOME: ${{ needs.leak-gate.outputs.scan_outcome }}
         run: |

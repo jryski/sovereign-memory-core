@@ -1,0 +1,248 @@
+{
+  "schema_version": "leak-history-triage/v1",
+  "reviewed_at_utc": "2026-10-20T12:54:41Z",
+  "repository": "jryski/sovereign-memory-core",
+  "review_scope": "Independent redacted Core history triage, repair qualification, and public ruleset readback. No secret values or private pattern content included.",
+  "scan": {
+    "run_id": 39425202351,
+    "url": "https://github.com/jryski/sovereign-memory-core/actions/runs/39425202351",
+    "job_id": 118635952843,
+    "head": "c8fad4252b5d3efeb1c51d487b03cb6a1f92f244",
+    "mode": "history",
+    "status": "findings",
+    "exit_code": 1,
+    "commits_scanned": 289,
+    "metadata_objects_scanned": 422,
+    "paths_scanned": 296,
+    "unique_blobs_scanned": 659,
+    "findings": 75,
+    "private_literal_findings": 0
+  },
+  "finding_groups": [
+    {
+      "path": "fixtures/chat_mine/expected_source_import_package.json",
+      "path_sha256": "18a3d2127a690fd6ff8e31d010e10953eba983a01f23f249dff5c2f2bfb017f8",
+      "historical_blob": "0016cc4d7e87d6beeb4fb4134807977feba494fe",
+      "finding_count": 40,
+      "field_names": [
+        "expected_source_item_key",
+        "source_item_key"
+      ],
+      "rule": "generic-api-key",
+      "classification": "synthetic_conversation_identifier",
+      "path_hash_mapping_verified": true,
+      "main_path_present": true,
+      "historical_fixture_bytes_equal_current_main": false,
+      "historical_reported_line_shapes_equal_current_main": 0,
+      "current_main_scrub_commit": "1855435",
+      "historic_commit_count": 8,
+      "containing_branch_count": 60,
+      "containing_tags": [
+        "v0.3-alpha"
+      ],
+      "proof": {
+        "source_and_probe_keys_equal_synthetic_conversation_id": true,
+        "single_distinct_conversation_identifier": true,
+        "identifier_character_count": 16,
+        "synthetic_marker_present_in_document": true,
+        "authentication_material_established": false
+      }
+    },
+    {
+      "path": "fixtures/chat_mine/sample_chat_export.json",
+      "path_sha256": "af0ec3c2bf317bbaa8195069aaab39e59bbfc9259c9c68f85d08795183e6504c",
+      "historical_blob": "ab68b6bf2b4694b7a04b75c8b033a8f59f59dc69",
+      "finding_count": 32,
+      "field_names": [
+        "expected_source_item_key"
+      ],
+      "rule": "generic-api-key",
+      "classification": "synthetic_conversation_identifier",
+      "path_hash_mapping_verified": true,
+      "main_path_present": true,
+      "historical_fixture_bytes_equal_current_main": false,
+      "historical_reported_line_shapes_equal_current_main": 0,
+      "current_main_scrub_commit": "1855435",
+      "historic_commit_count": 8,
+      "containing_branch_count": 60,
+      "containing_tags": [
+        "v0.3-alpha"
+      ],
+      "proof": {
+        "source_and_probe_keys_equal_synthetic_conversation_id": true,
+        "single_distinct_conversation_identifier": true,
+        "identifier_character_count": 16,
+        "synthetic_marker_present_in_document": true,
+        "authentication_material_established": false
+      }
+    },
+    {
+      "path": "tests/public_safety/fixtures/fail/secret-private-key.txt",
+      "path_sha256": "6f55240af052a46ec363d6d8ee737a1362510d2837a07a7d38e8b6a61995d0d9",
+      "historical_blob": "175028cced480eb00bb0b13784eee637723b44eb",
+      "main_path_present": false,
+      "current_branch_tip_contains_fixture": true,
+      "source_branch": "cursor/public-safety-gates-309c",
+      "source_pr": 100,
+      "source_head": "099c6c0e115aa0247deda9d7f367a1ca9b490016",
+      "classification": "synthetic_negative_test_fixture",
+      "proof": {
+        "synthetic_and_not_real_labels_present": true,
+        "openssl_pkey_parse_and_check_succeeds": false
+      },
+      "containing_branch_count": 1,
+      "containing_tag_count": 0,
+      "rule": "private-key",
+      "finding_count": 2,
+      "path_hash_mapping_verified": true
+    },
+    {
+      "path": "tests/public_safety/fixtures/fail/secret-jwt.txt",
+      "path_sha256": "79f99195532821a4d853fe17dc52775cb8e7e529f801b5ea891fa178839e273f",
+      "historical_blob": "dfdab7e01d5a6d58ad0208d3448208eeeb7e7f22",
+      "main_path_present": false,
+      "current_branch_tip_contains_fixture": true,
+      "source_branch": "cursor/public-safety-gates-309c",
+      "source_pr": 100,
+      "source_head": "099c6c0e115aa0247deda9d7f367a1ca9b490016",
+      "classification": "synthetic_negative_test_fixture",
+      "proof": {
+        "synthetic_label_present": true,
+        "decoded_payload_is_fixture_labelled": true,
+        "signature_segment_character_count": 12
+      },
+      "containing_branch_count": 1,
+      "containing_tag_count": 0,
+      "rule": "jwt",
+      "finding_count": 1,
+      "path_hash_mapping_verified": true
+    }
+  ],
+  "assessment": {
+    "actual_credential_or_configured_private_identifier_exposure_established": false,
+    "raw_scan_remains_findings": true,
+    "interpretation": "Reported findings are synthetic test identifiers or labelled negative-test credential shapes. This triage does not turn the scanner result into clear or certify all private data absent.",
+    "historical_bytes_remain_reachable": true,
+    "policy_changed": false,
+    "suppressions_added": false,
+    "history_rewritten": false
+  },
+  "repair_qualification": {
+    "pull_request": 126,
+    "url": "https://github.com/jryski/sovereign-memory-core/pull/126",
+    "reviewed_head": "f571725e446de8e0af5c0a8ff1b0a27bc7ab2da6",
+    "workflow_git_blob": "be29260b0a0fbe0d5a4c5807efdc7dbb2a4fb243",
+    "current_main_at_review": "c8fad4252b5d3efeb1c51d487b03cb6a1f92f244",
+    "change": "Scope GIT_CONFIG_GLOBAL=/dev/null to four post-checkout trusted shell steps; no scanner/policy/privilege change.",
+    "tests": {
+      "command": "bash tests/leak/test_gate.sh",
+      "actionlint_version": "1.7.12",
+      "gitleaks_version": "8.30.1",
+      "pinned_archives_size_and_sha256_verified": true,
+      "tests_run": 81,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "both_leak_workflows_actionlint_pass": true,
+      "materialized_source_files_verified_against_upstream_git_blob_ids": 19
+    }
+  },
+  "public_rulesets_independently_read_back": [
+    {
+      "repository": "jryski/sovereign-memory-core",
+      "ruleset_id": 24057304,
+      "enforcement": "active",
+      "default_branch_included": true,
+      "strict_required_status_checks": true,
+      "leak_status_required": true,
+      "leak_publisher_integration_id": 15368,
+      "required_checks": [
+        {
+          "context": "C1 fresh, reapply, upgrade (PostgreSQL 15)",
+          "integration_id": 15368
+        },
+        {
+          "context": "C1 fresh, reapply, upgrade (PostgreSQL 16)",
+          "integration_id": 15368
+        },
+        {
+          "context": "LEAK-01",
+          "integration_id": 15368
+        }
+      ]
+    },
+    {
+      "repository": "jryski/Household-OS",
+      "ruleset_id": 24057309,
+      "enforcement": "active",
+      "default_branch_included": true,
+      "strict_required_status_checks": true,
+      "leak_status_required": true,
+      "leak_publisher_integration_id": 15368,
+      "required_checks": [
+        {
+          "context": "LEAK-01",
+          "integration_id": 15368
+        }
+      ]
+    },
+    {
+      "repository": "jryski/Supabase_user_MCP",
+      "ruleset_id": 24057302,
+      "enforcement": "active",
+      "default_branch_included": true,
+      "strict_required_status_checks": true,
+      "leak_status_required": true,
+      "leak_publisher_integration_id": 15368,
+      "required_checks": [
+        {
+          "context": "Build and test",
+          "integration_id": 15368
+        },
+        {
+          "context": "M2 principal-bound read acceptance",
+          "integration_id": 15368
+        },
+        {
+          "context": "LEAK-01",
+          "integration_id": 15368
+        }
+      ]
+    }
+  ],
+  "enforcement_limits": [
+    "Integration 15368 identifies GitHub Actions; it does not itself pin one trusted workflow source. Independent review of the actual trusted scan remains necessary.",
+    "Private repository rules are unavailable under its current GitHub plan; independent human exact-head review is the stated fallback.",
+    "The configured private-identifier policy is bounded. This receipt does not certify a complete PII inventory or coverage of logs, releases, external data, unreachable Git objects, or uncommitted files."
+  ],
+  "recommended_next_actions": [
+    "Retain the original findings result and attach this redacted classification.",
+    "For future PR #100 work, generate credential-shaped negative fixtures in disposable test directories instead of committing static credential-shaped text.",
+    "Do not delete refs, rewrite main, move release tags, or weaken policy to manufacture a green history result. Any later history rewrite requires explicit owner authorization and a preservation/consumer plan."
+  ],
+  "activation": {
+    "source_repair_pr": 126,
+    "source_repair_merged": true,
+    "source_repair_merge_commit": "c8fad4252b5d3efeb1c51d487b03cb6a1f92f244",
+    "configured_private_identifier_policy": "v1",
+    "policy_contents_published": false,
+    "policy_scope": "Bounded configured policy; not a complete PII inventory.",
+    "policy_validation_source": "Operator-reported private source/control validation; contents deliberately not copied into this receipt.",
+    "operator_reported_controls": {
+      "strict_canonical_base64": true,
+      "regex_validation_pass": true,
+      "intended_controls_blocked": true,
+      "benign_controls_clear": true,
+      "private_source_acl_valid": true,
+      "secret_metadata_confirmed": true
+    },
+    "independently_observed_trusted_push_run": {
+      "id": 39424737284,
+      "url": "https://github.com/jryski/sovereign-memory-core/actions/runs/39424737284",
+      "event": "push",
+      "head": "c8fad4252b5d3efeb1c51d487b03cb6a1f92f244",
+      "conclusion": "success"
+    },
+    "claim": "Trusted scanning is operating with configured policy. History remains findings with the classifications below."
+  }
+}
