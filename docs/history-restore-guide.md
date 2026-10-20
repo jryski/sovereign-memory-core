@@ -46,6 +46,13 @@ Later `main` commits are outside the reviewed coordinate. Do not substitute
 Run these from an empty working directory. The recipe is kept outside the
 checkout so that the source tree stays pristine.
 
+Before this guide is merged, the `main` raw URL in the commands below returns
+404. Until then, copy `docs/history-restore/core-restore.ps1` from the reviewed
+checkout to `../core-restore.ps1`. After merge, replace `main` in that URL with
+the merge commit SHA. Any later edit on `main` changes the checksum. A missing
+download and a file whose SHA-256 differs both fail closed by throwing
+`Recipe checksum mismatch`.
+
 ```powershell
 git clone https://github.com/jryski/sovereign-memory-core.git core-alpha
 Set-Location core-alpha
@@ -54,8 +61,22 @@ git rev-parse HEAD 'HEAD^{tree}'
 # expect c96b9da749b2d95661973485b2a026897329c8cd
 #        b4373e379f79afe68cf2b21c3483c66ecfd9601a
 
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/jryski/sovereign-memory-core/main/docs/history-restore/core-restore.ps1 -OutFile ../core-restore.ps1
-if ((Get-FileHash -Algorithm SHA256 ../core-restore.ps1).Hash.ToLowerInvariant() -ne 'ebf7359fdb230a141bed4d71942b2e82f89c1b3e096dfc977ab1733df8cfd5aa') { throw 'Recipe checksum mismatch' }
+# Before merge, the main raw URL below returns 404. Copy
+# docs/history-restore/core-restore.ps1 from the reviewed checkout instead.
+# After merge, replace main with the merge commit SHA. A later edit on main
+# changes the checksum. A missing file and a mismatched file both fail closed
+# by throwing 'Recipe checksum mismatch'.
+$recipePath = '../core-restore.ps1'
+try {
+  Invoke-WebRequest -Uri https://raw.githubusercontent.com/jryski/sovereign-memory-core/main/docs/history-restore/core-restore.ps1 -OutFile $recipePath
+} catch {
+  Remove-Item -LiteralPath $recipePath -ErrorAction SilentlyContinue
+}
+$recipeHash = ''
+if (Test-Path -LiteralPath $recipePath) {
+  $recipeHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $recipePath).Hash.ToLowerInvariant()
+}
+if ($recipeHash -ne 'ebf7359fdb230a141bed4d71942b2e82f89c1b3e096dfc977ab1733df8cfd5aa') { throw 'Recipe checksum mismatch' }
 
 pwsh -File ../core-restore.ps1
 ```
@@ -129,6 +150,63 @@ for that run id. Do not continue past a thrown error, a non-zero rehearsal or
 validator exit, or a missing `PASS` line. Do not point the recipe at a live
 database; it refuses any checkout other than the pinned alpha commit, and it
 creates only new disposable clusters.
+
+## Negative controls
+
+These two checks use `scripts/validate_sovereignty_bundle.py` from the alpha
+checkout and the bundle the recipe left in `core-proof/`. They do not restore
+data. Run them from `core-alpha` after a passing recipe. Each one must exit 1.
+
+### Wrong checksum
+
+```powershell
+python3 scripts/validate_sovereignty_bundle.py core-proof/sovereign-memory-c2.bundle.tar --expected-sha256 0000000000000000000000000000000000000000000000000000000000000000
+# exit 1
+# stderr: {"code": "ARCHIVE_SHA256_MISMATCH", "message": "archive SHA-256 does not match the external checksum"}
+```
+
+The flag is the same `--expected-sha256` the recipe passes to
+`scripts/validate_sovereignty_bundle.py`.
+
+### Tampered member
+
+Copy the bundle and change one payload byte of
+`data/060-public.attention_events.jsonl` without resizing it or rewriting the
+ustar header. Omit `--expected-sha256` so the check is the member hash, not
+the archive hash.
+
+```powershell
+python3 -c @'
+import pathlib
+source = pathlib.Path("core-proof/sovereign-memory-c2.bundle.tar")
+raw = bytearray(source.read_bytes())
+member = b"data/060-public.attention_events.jsonl"
+offset = 0
+found = False
+while offset + 512 <= len(raw):
+    header = bytes(raw[offset:offset + 512])
+    if header == bytes(512):
+        break
+    name = header[0:100].split(b"\0", 1)[0]
+    size_field = header[124:136].rstrip(b"\0 ").lstrip(b" ")
+    size = int(size_field or b"0", 8)
+    if name == member and size > 0:
+        raw[offset + 512] ^= 1
+        found = True
+        break
+    offset += 512 + ((size + 511) // 512) * 512
+if not found:
+    raise SystemExit("member missing or empty")
+pathlib.Path("core-proof/tampered-member.bundle.tar").write_bytes(raw)
+'@
+python3 scripts/validate_sovereignty_bundle.py core-proof/tampered-member.bundle.tar
+# exit 1
+# stderr code: MEMBER_SHA256_MISMATCH
+```
+
+A repack that is not canonical ustar stops earlier with exit 1 and
+`ARCHIVE_INVALID`. Passing the original archive checksum on a changed file
+stops at `ARCHIVE_SHA256_MISMATCH` before the member hash is checked.
 
 ## Cleanup
 
@@ -213,6 +291,15 @@ user names, absolute paths, container ids or anything outside `core-proof/`.
 - Not full independent source-fingerprint binding.
 - Not a new signed release, and not a byte-for-byte recreation of the
   2026-08-15 release archive. Checksums are not signatures.
+- Known limit: a container created by `docker run --detach` that fails to
+  start is not added to the tracked list, so the `finally` cleanup does not
+  remove it. After a failed run, check `docker ps -a` and remove any leftover
+  container by hand.
+- Known limit: `postgres:16-bookworm` is a floating tag, and Debian `python3`
+  is unpinned. The recorded run used PostgreSQL 16.15 and Python 3.11.2, so
+  later runs may differ. No minimum Docker version is asserted.
+- Known limit: the recipe removes the helper image tag only. The Docker build
+  cache is not pruned.
 
 ## Related
 
