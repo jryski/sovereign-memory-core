@@ -84,6 +84,16 @@ approved edit; every boot compares. Policy on mismatch is warn-and-confirm, neve
 hard-refuse; the failure mode of locking the owner out of their own system is worse than
 the attack.
 
+## Candidates and promoted records
+
+A `proposed` memory or wiki page is a candidate. Editing its content is review work.
+
+An `active` memory or wiki page is a promoted record. Do not treat its content, source, or provenance as a scratch pad. Corrections go through `supersede_memory` or `supersede_wiki`, which keep the previous row. Changing `due_status` or a hot-touch flag is operational. It does not correct the promoted fact.
+
+This tree still accepts a silent in-place rewrite of a promoted memory, and it stores no content-hash receipt for memories. No receipt is `unaudited`: not a match and not a mismatch. `verify_doc_integrity` can report `mismatch` when a blessed active wiki page's content changes, and `no-blessing` when no receipt exists. `bless_doc` overwrites that hash. A matching hash is not a signature and not a truth verdict. Mismatch on the operating contract remains warn-and-confirm, not a lockout.
+
+[ADR-0008](adr/0008-promoted-record-mutation-audit.md) records the decision and what is deferred. CNF4, A2, and I5.1 stay open.
+
 ## Delete posture
 
 Hard deletes on Tier 1 are trigger-blocked (supersede instead). The override
