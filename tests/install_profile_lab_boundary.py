@@ -161,7 +161,15 @@ def main():
     clusters = []
     results = []
     fake_proc = None
+    raised = None
+    failed = 0
+    alive = []
     try:
+        if os.environ.get("E02_BOUNDARY_RAISE") == "1":
+            dummy = work / "raise-cluster"
+            (dummy / "data").mkdir(parents=True)
+            clusters.append(dummy)
+            raise RuntimeError("synthetic unexpected")
         positive_ok, positive = disposable_apply(work, 55490)
         results.append((
             "positive-disposable",
@@ -331,6 +339,8 @@ def main():
             and delta_ops == 0
         )
         results.append(("m1-fake-exe", code or "rejected", delta_ops, ok, writer.returncode))
+    except Exception as exc:
+        raised = exc
     finally:
         if fake_proc is not None and fake_proc.poll() is None:
             fake_proc.kill()
@@ -355,7 +365,11 @@ def main():
         left = sum(path.exists() for path in clusters)
         shutil.rmtree(work, ignore_errors=True)
         print(f"clusters_alive={len(alive)} directories_left={left} work_left={int(work.exists())}")
-        return 1 if failed or alive or work.exists() else 0
+    if raised is not None:
+        print(f"unexpected={type(raised).__name__}")
+    if raised is not None or failed or alive or work.exists():
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

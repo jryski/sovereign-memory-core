@@ -8,12 +8,14 @@ Fails closed with JSON errors. The DSN is read from an environment variable
 for this invocation. A loopback address, a lab-looking database name, an
 environment flag, an inherited PG* variable, or a URL fragment is not that
 proof. Fragments and other syntax this checker does not validate are rejected:
-libpq reads them even when url parsing does not. Client tools run with every
-PG* variable removed. The connection string is built from the validated host,
-port, database, and user, with an empty hostaddr. The original DSN is not
-passed through. The parent-process check is a same-user guard only: it accepts
-bash with this script as argv[1], and it does not stop a different local user
-or a rewritten script. Refusal performs no database operation and writes no
+libpq reads them even when url parsing does not. A decoded host that contains
+whitespace, '=', quotes, a backslash, or a '.' or '..' segment is rejected
+before any database gateway. Client tools run with every PG* variable removed.
+The connection string is built from the lab directory recorded for this
+invocation, with each value quoted, and not from the decoded host text. The
+original DSN is not passed through. The parent-process check is a same-user
+guard only: it accepts bash with this script as argv[1], and it does not stop
+a different local user or a rewritten script. Refusal performs no database operation and writes no
 success receipt. A session probe that does not match this lab's nonce and
 data directory stops before the role and privilege preamble.
 """
@@ -43,6 +45,7 @@ PATH_RE = re.compile(r"^sql/[0-9]{2}_[a-z0-9_]+\.sql$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 IDENT_RE = re.compile(r"^[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)?$")
 DBNAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+SOCKET_DIR_RE = re.compile(r"^/(?:[A-Za-z0-9._-]+)(?:/[A-Za-z0-9._-]+)*$")
 LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0"})
 LAB_PROOF_ENV = "E02_LAB_PROOF"
 
@@ -262,6 +265,22 @@ def _tcp_class(host: str):
     return "LAB_TARGET_REMOTE", "named or remote host"
 
 
+def _plain_socket_dir(host) -> bool:
+    """Absolute lab directory. No conninfo metacharacters and no dot segments.
+
+    This is a character allowlist, not a conninfo parser. Percent-decoding
+    happens before this check, so encoded whitespace or '..' cannot hide.
+    """
+    if not isinstance(host, str) or not SOCKET_DIR_RE.fullmatch(host):
+        return False
+    return all(part not in {".", ".."} for part in host.split("/"))
+
+
+def _quote_conninfo(value: str) -> str:
+    """Single-quote a value. '\\' and \"'\" are escaped the way libpq reads them."""
+    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
 def _canonical_port(port_text):
     """Return an integer port, or None. Never raises. ASCII digits only."""
     if not isinstance(port_text, str) or not port_text.isascii() or not port_text.isdigit():
@@ -279,8 +298,9 @@ def _parse_dsn(dsn):
     """Classify a DSN without resolving it and without opening a socket.
 
     A fragment is rejected even when the part before '#' would match a lab.
-    libpq parses that fragment as extra connection parameters. The caller
-    connects with pinned_conninfo of the returned fields, not with this string.
+    libpq parses that fragment as extra connection parameters. A host is
+    rejected when its decoded text is not a plain absolute directory. The
+    caller connects with pinned_conninfo of the lab directory, not this string.
     """
     malformed = ("LAB_TARGET_MALFORMED", "unusable dsn")
     if not isinstance(dsn, str) or not dsn or any(ch.isspace() or ch == "\x00" for ch in dsn):
@@ -311,6 +331,8 @@ def _parse_dsn(dsn):
         return None, malformed
     if not host.startswith("/"):
         return None, _tcp_class(host)
+    if not _plain_socket_dir(host):
+        return None, malformed
     dbname = parts.path[1:] if parts.path.startswith("/") else parts.path
     if not DBNAME_RE.fullmatch(dbname or ""):
         return None, malformed
@@ -502,11 +524,20 @@ def client_env(base=None):
     return {key: value for key, value in source.items() if not key.startswith("PG")}
 
 
-def pinned_conninfo(parsed) -> str:
-    """Explicit conninfo. hostaddr is empty so an address cannot replace the socket."""
+def pinned_conninfo(socket_dir, port, dbname) -> str:
+    """Conninfo for the lab directory created for this invocation.
+
+    socket_dir is that directory's real path, not the decoded DSN host.
+    Values are single-quoted so a metacharacter cannot add another keyword.
+    """
+    if not _plain_socket_dir(socket_dir) or not DBNAME_RE.fullmatch(dbname or ""):
+        raise ValueError("unusable conninfo")
+    number = _canonical_port(str(port))
+    if number is None:
+        raise ValueError("unusable conninfo")
     return (
-        f"host={parsed['host']} port={parsed['port']} dbname={parsed['dbname']} "
-        "user=postgres hostaddr=''"
+        f"host={_quote_conninfo(socket_dir)} port={number} "
+        f"dbname={_quote_conninfo(dbname)} user='postgres' hostaddr=''"
     )
 
 
@@ -536,11 +567,15 @@ def apply(root, prof, dsn, errors, proof_path=None, view=None, gateway=None):
         proof = json.loads(view.read_regular(proof_path))
         nonce = str(proof["nonce"])
         data_dir = view.realpath(proof["data_dir"])
+        socket_dir = view.realpath(proof["socket_dir"])
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
         err(errors, "LAB_TARGET_UNRELATED_LOCAL", "not this invocation's lab")
         return applied
+    if not _plain_socket_dir(socket_dir) or socket_dir != view.realpath(parsed["host"]):
+        err(errors, "LAB_TARGET_UNRELATED_LOCAL", "not this invocation's lab")
+        return applied
     gateway = gateway or psql
-    conn = pinned_conninfo(parsed)
+    conn = pinned_conninfo(socket_dir, parsed["port"], parsed["dbname"])
     probe = (
         "select current_setting('e02.invocation', true) || '|' || "
         "current_setting('data_directory');\n"

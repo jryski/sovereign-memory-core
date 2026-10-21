@@ -252,7 +252,7 @@ class LabGateTests(unittest.TestCase):
         mod.apply(ROOT, {"migrations": []}, dsn, errors, proof, view, gateway)
         self.assertEqual(gateway.operations, 2)
         self.assertIn("current_setting", gateway.calls[0][2])
-        self.assertEqual(gateway.calls[0][0], mod.pinned_conninfo(mod._parse_dsn(dsn)[0]))
+        self.assertEqual(gateway.calls[0][0], mod.pinned_conninfo("/invocation/lab", 55432, "e02_pos"))
         self.assertNotIn("postgresql://", gateway.calls[0][0])
         self.assertNotIn("#", gateway.calls[0][0])
         self.assertEqual(errors[0]["code"], "LAB_SHIM_FAILED")
@@ -368,6 +368,45 @@ class LabGateTests(unittest.TestCase):
             for name in names:
                 os.environ.pop(name, None)
 
+    def test_encoded_host_is_refused_before_the_gateway(self):
+        """A collapsing realpath must not turn the decoded host into a conninfo keyword."""
+        vectors = [
+            ("encoded-space-host", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab/junk%20host=203.0.113.10%20application_name=x/.."),
+            ("encoded-tab-host", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab/junk%09x/.."),
+            ("encoded-newline-host", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab/junk%0ax/.."),
+            ("encoded-quote-host", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab/junk%27x"),
+            ("encoded-backslash-host", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab/junk%5cx"),
+            ("encoded-equals-host", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab/junk%3dhostaddr"),
+        ]
+        for name, dsn in vectors:
+            view, _dsn, proof = live_lab()
+            view.realpath = lambda path: str(Path(path).resolve())
+            self.check(name, dsn, "LAB_TARGET_MALFORMED", view=view, proof=proof)
+        safe = mod.pinned_conninfo("/invocation/lab", 55432, "e02_pos")
+        self.assertNotIn("203.0.113.10", safe)
+        parsed = _pq_parse(safe)
+        self.assertEqual(parsed.get("host"), "/invocation/lab")
+        self.assertFalse(parsed.get("hostaddr"))
+        injected = _pq_parse(
+            "host=/invocation/lab/junk host=203.0.113.10 application_name=x/.. "
+            "port=55432 dbname=e02_pos user=postgres hostaddr=''"
+        )
+        self.assertEqual(injected.get("host"), "203.0.113.10")
+
+    def test_boundary_unexpected_exception_still_cleans_up(self):
+        env = os.environ.copy()
+        env["E02_BOUNDARY_RAISE"] = "1"
+        proc = subprocess.run(
+            [sys.executable, str(ROOT / "tests" / "install_profile_lab_boundary.py")],
+            env=env, text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertIn("unexpected=RuntimeError", proc.stdout)
+        self.assertIn("work_left=0", proc.stdout)
+        self.assertIn("clusters_alive=0", proc.stdout)
+        self.assertFalse(Path("/tmp/e02-boundary").exists())
+        note("boundary-unexpected", "RuntimeError", 0, True)
+
     def test_shell_scrubs_libpq_env_before_setup_and_cleanup(self):
         text = (ROOT / "scripts" / "validate_install_profile.sh").read_text()
         for line in text.splitlines():
@@ -438,6 +477,12 @@ class LabGateTests(unittest.TestCase):
             ("cli-fragment-hostaddr", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab#&hostaddr=203.0.113.10&host=/invocation/lab", "LAB_TARGET_MALFORMED", None),
             ("cli-authority-port", "postgresql://postgres@:bad/e02_pos?host=/invocation/lab", "LAB_TARGET_MALFORMED", None),
             ("cli-superscript-port", "postgresql://postgres@/e02_pos?host=/invocation/lab&port=\u00b2", "LAB_TARGET_MALFORMED", None),
+            ("cli-encoded-space-host", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab/junk%20host=203.0.113.10%20application_name=x/..", "LAB_TARGET_MALFORMED", None),
+            ("cli-encoded-tab-host", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab/junk%09x/..", "LAB_TARGET_MALFORMED", None),
+            ("cli-encoded-newline-host", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab/junk%0ax/..", "LAB_TARGET_MALFORMED", None),
+            ("cli-encoded-quote-host", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab/junk%27x", "LAB_TARGET_MALFORMED", None),
+            ("cli-encoded-backslash-host", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab/junk%5cx", "LAB_TARGET_MALFORMED", None),
+            ("cli-encoded-equals-host", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab/junk%3dhostaddr", "LAB_TARGET_MALFORMED", None),
         ]
         with tempfile.TemporaryDirectory() as tmp:
             stub_dir = Path(tmp) / "bin"
@@ -472,6 +517,41 @@ class LabGateTests(unittest.TestCase):
                 operations = len(log.read_text().splitlines()) if log.exists() else 0
                 self.assertEqual(operations, 0, name)
                 note(name, code, operations, True)
+
+
+def _pq_parse(conninfo):
+    """Read keyword values with PQconninfoParse. This does not connect."""
+    import ctypes, glob
+    library = next(iter(glob.glob("/usr/lib/*/libpq.so.5") + glob.glob("/usr/lib/libpq.so.5")), None)
+    if library is None:
+        raise AssertionError("libpq is not available for a no-connection parse")
+
+    class Option(ctypes.Structure):
+        _fields_ = [
+            ("keyword", ctypes.c_char_p), ("envvar", ctypes.c_char_p),
+            ("compiled", ctypes.c_char_p), ("val", ctypes.c_char_p),
+            ("label", ctypes.c_char_p), ("dispchar", ctypes.c_char_p),
+            ("dispsize", ctypes.c_int),
+        ]
+
+    lib = ctypes.CDLL(library)
+    lib.PQconninfoParse.argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_char_p)]
+    lib.PQconninfoParse.restype = ctypes.POINTER(Option)
+    lib.PQconninfoFree.argtypes = [ctypes.POINTER(Option)]
+    error = ctypes.c_char_p()
+    options = lib.PQconninfoParse(conninfo.encode(), ctypes.byref(error))
+    if error.value:
+        message = error.value.decode()
+        lib.PQfreemem(error)
+        raise AssertionError(message)
+    found = {}
+    index = 0
+    while options[index].keyword:
+        if options[index].val:
+            found[options[index].keyword.decode()] = options[index].val.decode()
+        index += 1
+    lib.PQconninfoFree(options)
+    return found
 
 
 def _bash_function(name, text):
