@@ -2,7 +2,9 @@
 """Refusal tests for the disposable-lab apply boundary.
 
 Synthetic DSNs and an in-process gateway only. These tests must not open a
-database connection. The older 20/20 lab runner does not cover this boundary.
+database connection. The older 20/20 lab runner does not cover inherited PG*
+variables, socket identity, or argv spoofing. tests/install_profile_lab_boundary.py
+covers those on a throwaway local cluster.
 """
 import importlib.util, json, os, subprocess, sys, tempfile, unittest
 from pathlib import Path
@@ -24,14 +26,16 @@ class Result:
 
 
 class Gateway:
-    def __init__(self, result=None):
+    def __init__(self, results=None):
         self.operations = 0
-        self.result = result
+        self.calls = []
+        self.results = list(results or [])
 
     def __call__(self, dsn, args, stdin=None):
         self.operations += 1
-        if self.result is not None:
-            return self.result
+        self.calls.append((dsn, tuple(args), stdin))
+        if self.results:
+            return self.results.pop(0)
         raise AssertionError("database operation")
 
 
@@ -41,8 +45,10 @@ class FakeView:
         self.symlinks = set()
         self.cmds = {}
         self.starts = {}
+        self.exes = {}
         self.ppid = 10
         self.script_path = "/invocation/validate_install_profile.sh"
+        self.socket_ok = False
         self.database_operations = 0
 
     def read_regular(self, path):
@@ -65,16 +71,29 @@ class FakeView:
             raise OSError("no process")
         return self.starts[int(pid)]
 
+    def exe(self, pid):
+        if int(pid) not in self.exes:
+            raise OSError("no process")
+        return self.exes[int(pid)]
+
+    def socket_bound(self, socket_dir, port, pid):
+        return bool(self.socket_ok)
+
 
 def live_lab(database="e02_pos", creator_start="100"):
     socket = "/invocation/lab"
     data = socket + "/data"
     view = FakeView()
+    nonce = "ab" * 32
     view.starts[10] = creator_start
     view.cmds[10] = ["bash", view.script_path]
+    view.exes[10] = "/usr/bin/bash"
+    view.exes[50] = "/usr/lib/postgresql/16/bin/postgres"
+    view.socket_ok = True
     view.cmds[50] = [
         "/usr/lib/postgresql/16/bin/postgres",
         "-D", data, "-p", "55432", "-k", socket, "-c", "listen_addresses=",
+        "-c", f"e02.invocation={nonce}",
     ]
     view.files[data + "/postmaster.pid"] = "\n".join([
         "50", data, "1700000000", "55432", socket, "", "1 2",
@@ -195,18 +214,55 @@ class LabGateTests(unittest.TestCase):
         view.cmds[10] = ["bash"]
         self.check("stale-parent", dsn, "LAB_TARGET_STALE", view=view, proof=proof)
 
-    def test_gate_opens_only_for_matching_invocation(self):
+    def test_argv_spoof_does_not_match_invocation(self):
         view, dsn, proof = live_lab()
-        gateway = Gateway(Result(1, err="stopped"))
+        view.cmds[10] = ["bash", "-c", "driver", view.script_path]
+        view.exes[10] = "/usr/bin/bash"
+        self.check("m2-argv-spoof", dsn, "LAB_TARGET_STALE", view=view, proof=proof)
+
+    def test_symlink_socket_is_not_the_lab(self):
+        view, dsn, proof = live_lab()
+        view.socket_ok = False
+        self.check("m1-socket-not-held", dsn, "LAB_TARGET_UNRELATED_LOCAL", view=view, proof=proof)
+
+    def test_fake_postgres_exe_is_rejected(self):
+        view, dsn, proof = live_lab()
+        view.exes[50] = "/usr/bin/python3"
+        view.cmds[50][0] = "/fake/bin/postgres"
+        self.check("m1-fake-exe", dsn, "LAB_TARGET_UNRELATED_LOCAL", view=view, proof=proof)
+
+    def test_session_mismatch_stops_before_shim(self):
+        view, dsn, proof = live_lab()
+        gateway = Gateway([Result(0, out="other|/somewhere/data\n")])
         errors = []
         mod.apply(ROOT, {"migrations": []}, dsn, errors, proof, view, gateway)
         self.assertEqual(gateway.operations, 1)
+        self.assertEqual(errors[0]["code"], "LAB_SESSION_MISMATCH")
+        self.assertTrue(all(call[2] is None or "create schema" not in (call[2] or "") for call in gateway.calls))
+        note("session-mismatch", errors[0]["code"], gateway.operations, True)
+
+    def test_gate_opens_only_for_matching_invocation(self):
+        view, dsn, proof = live_lab()
+        nonce = "ab" * 32
+        gateway = Gateway([
+            Result(0, out=f"{nonce}|/invocation/lab/data\n"),
+            Result(1, err="stopped"),
+        ])
+        errors = []
+        mod.apply(ROOT, {"migrations": []}, dsn, errors, proof, view, gateway)
+        self.assertEqual(gateway.operations, 2)
+        self.assertIn("current_setting", gateway.calls[0][2])
+        self.assertIn("hostaddr=''", gateway.calls[0][0])
         self.assertEqual(errors[0]["code"], "LAB_SHIM_FAILED")
         note("matching-invocation-opens-gateway", "LAB_SHIM_FAILED", gateway.operations, True)
 
     def test_apply_failure_writes_no_success_receipt(self):
         view, dsn, proof = live_lab()
-        gateway = Gateway(Result(1, err="stopped"))
+        nonce = "ab" * 32
+        gateway = Gateway([
+            Result(0, out=f"{nonce}|/invocation/lab/data\n"),
+            Result(1, err="stopped"),
+        ])
         errors = []
         with tempfile.TemporaryDirectory() as tmp:
             receipt = Path(tmp) / "receipt.json"
@@ -215,8 +271,39 @@ class LabGateTests(unittest.TestCase):
             if receipt and out["ok"]:
                 receipt.write_text("success")
             self.assertFalse(receipt.exists())
-        self.assertGreaterEqual(gateway.operations, 1)
+        self.assertEqual(gateway.operations, 2)
         note("apply-failure-no-receipt", errors[0]["code"], gateway.operations, True)
+
+    def test_each_pg_variable_is_removed_from_the_client_environment(self):
+        names = [
+            "PGHOSTADDR", "PGSERVICE", "PGSERVICEFILE", "PGHOST", "PGPORT",
+            "PGDATABASE", "PGUSER", "PGPASSFILE", "PGPASSWORD", "PGSSLMODE",
+            "PGSSLCERT", "PGSSLKEY", "PGSSLROOTCERT", "PGSSLCRL", "PGOPTIONS",
+            "PGTARGETSESSIONATTRS", "PGAPPNAME", "PGREQUIREAUTH", "PGCHANNELBINDING",
+            "PGCONNECT_TIMEOUT", "PGREALM", "PGKRBSRVNAME", "PGPASSFILE",
+        ]
+        captured = {}
+
+        def fake_run(cmd, **kwargs):
+            captured["cmd"] = cmd
+            captured["env"] = kwargs.get("env") or {}
+            return Result(0, out="")
+
+        original = mod.subprocess.run
+        mod.subprocess.run = fake_run
+        try:
+            for name in names:
+                os.environ[name] = "synthetic-value"
+                mod.psql("host=/invocation/lab port=55432 dbname=postgres user=postgres hostaddr=''", ["-c", "select 1"])
+                self.assertTrue(captured["env"], name)
+                self.assertFalse(any(key.startswith("PG") for key in captured["env"]), name)
+                self.assertNotIn(name, captured["env"], name)
+                note(f"pg-scrub-{name}", "scrubbed", 0, True)
+                del os.environ[name]
+        finally:
+            mod.subprocess.run = original
+            for name in names:
+                os.environ.pop(name, None)
 
     def test_cli_refusals_do_not_invoke_psql_or_write_receipt(self):
         cases = [

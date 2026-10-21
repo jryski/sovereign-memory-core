@@ -3,6 +3,19 @@
 # Starts a throwaway local Postgres cluster (initdb in a temp dir), runs one
 # positive plus static/apply negatives, then tears everything down. Never touches remotes.
 set -euo pipefail
+# Inherited libpq variables (PGHOSTADDR, PGSERVICE, PGSERVICEFILE, and every
+# other PG* name) must not steer createdb, dropdb, or psql. Drop them before
+# any client tool runs, then pin host and port on each invocation.
+scrub_libpq() {
+  local name
+  while IFS= read -r name; do
+    if [[ "$name" == PG* ]]; then
+      unset "$name"
+    fi
+  done < <(compgen -e)
+}
+scrub_libpq
+client() { scrub_libpq; "$@"; }
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PGBIN="${PGBIN:-$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1)}"
 if [[ -n "${OUT_DIR:-}" ]]; then OUT="$OUT_DIR"; mkdir -p "$OUT"; OUT_TMP=""; else OUT="$(mktemp -d)"; OUT_TMP="$OUT"; fi
@@ -10,24 +23,25 @@ LAB="$(mktemp -d)"; PORT="${LAB_PORT:-55432}"
 cleanup(){ "$PGBIN/pg_ctl" -D "$LAB/data" -m fast stop >/dev/null 2>&1 || true; rm -rf "$LAB"; if [[ -n "$OUT_TMP" && "${KEEP_OUT:-0}" != 1 ]]; then rm -rf "$OUT_TMP"; fi; }
 trap cleanup EXIT
 "$PGBIN/initdb" -D "$LAB/data" -U postgres -A trust >/dev/null
-"$PGBIN/pg_ctl" -D "$LAB/data" -o "-p $PORT -k $LAB -c listen_addresses=''" -l "$LAB/log" -w start >/dev/null
+NONCE="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+"$PGBIN/pg_ctl" -D "$LAB/data" -o "-p $PORT -k $LAB -c listen_addresses='' -c e02.invocation=$NONCE" -l "$LAB/log" -w start >/dev/null
 echo "$LAB" > "$OUT/lab_dir.txt"
 head -1 "$LAB/data/postmaster.pid" > "$OUT/postmaster.pid"
 unset E02_LAB_PROOF
 base="postgresql://postgres@/%s?host=$LAB&port=$PORT"
-mkdb(){ "$PGBIN/createdb" -h "$LAB" -p "$PORT" -U postgres "$1"; }
+mkdb(){ client "$PGBIN/createdb" -h "$LAB" -p "$PORT" -U postgres "$1"; }
 bind_proof(){ # dbname — record this invocation's lab before any validator SQL
-  python3 - "$ROOT" "$LAB" "$PORT" "$$" "$1" <<'PY'
+  python3 - "$ROOT" "$LAB" "$PORT" "$$" "$1" "$NONCE" <<'PY'
 import importlib.util, sys
-root, lab, port, creator, db = sys.argv[1:6]
+root, lab, port, creator, db, nonce = sys.argv[1:7]
 spec = importlib.util.spec_from_file_location("validate_install_profile", f"{root}/scripts/validate_install_profile.py")
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
-mod.write_invocation_proof(f"{lab}/invocation.json", f"{lab}/data", lab, int(port), db, int(creator))
+mod.write_invocation_proof(f"{lab}/invocation.json", f"{lab}/data", lab, int(port), db, int(creator), nonce)
 PY
   export E02_LAB_PROOF="$LAB/invocation.json"
 }
-dropdb_(){ "$PGBIN/dropdb" -h "$LAB" -p "$PORT" -U postgres --if-exists "$1"; }
+dropdb_(){ client "$PGBIN/dropdb" -h "$LAB" -p "$PORT" -U postgres --if-exists "$1"; }
 fail=0
 
 echo "==> POSITIVE: apply minimal_portable to disposable DB"
@@ -98,10 +112,10 @@ bind_proof e02_rb
 DSN="$(printf "$base" e02_rb)"
 if DATABASE_URL="$DSN" python3 "$ROOT/scripts/validate_install_profile.py" --root "$T" --apply --receipt "$OUT/neg2-receipt.json" > "$OUT/neg-rollback.json"; then echo "FAIL neg2 (accepted)"; fail=1
 else
-  r=$(psql -X -tA -d "$DSN" -c "select to_regclass('public.perimeter_acl_policy') is null and to_regclass('public.attention_events') is not null")
+  r=$(client "$PGBIN/psql" -X -tA -h "$LAB" -p "$PORT" -U postgres -d e02_rb -c "select to_regclass('public.perimeter_acl_policy') is null and to_regclass('public.attention_events') is not null")
   if grep -q APPLY_FAILED "$OUT/neg-rollback.json" && [[ "$r" == t ]] && [[ ! -e "$OUT/neg2-receipt.json" ]]; then echo "PASS neg2 APPLY_FAILED, 09 rolled back, no receipt"; else echo "FAIL neg2 r=$r"; fail=1; fi
 fi
 dropdb_ e02_rb; rm -rf "$T"
-left=$(psql -X -tA -d "$(printf "$base" postgres)" -c "select count(*) from pg_database where datname like 'e02_%'")
+left=$(client "$PGBIN/psql" -X -tA -h "$LAB" -p "$PORT" -U postgres -d postgres -c "select count(*) from pg_database where datname like 'e02_%'")
 echo "==> disposable DBs remaining: $left"; [[ "$left" == 0 ]] || fail=1
 echo "==> outputs in $OUT${OUT_TMP:+ (temp; removed on exit unless KEEP_OUT=1)}"; exit $fail

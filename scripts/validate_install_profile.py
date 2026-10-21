@@ -5,10 +5,16 @@ Fails closed with JSON errors. The DSN is read from an environment variable
 (--dsn-env, default DATABASE_URL); it is never accepted on argv.
 
 --apply runs SQL only after the DSN is shown to be the disposable lab created
-for this invocation. A loopback address, a lab-looking database name, or an
-environment flag is not that proof. Refusal performs no database operation.
+for this invocation. A loopback address, a lab-looking database name, an
+environment flag, or an inherited PG* variable is not that proof. Client
+tools run with every PG* variable removed and with host, port, database,
+user, and an empty hostaddr pinned in the conninfo. The parent-process
+check is a same-user guard only: it accepts bash with this script as argv[1],
+and it does not stop a different local user or a rewritten script. Refusal
+performs no database operation. A session probe that does not match this
+lab's nonce and data directory stops before the role and privilege preamble.
 """
-import argparse, hashlib, hmac, json, os, re, secrets, stat, subprocess, sys, urllib.parse
+import argparse, hashlib, hmac, json, os, re, stat, subprocess, sys, urllib.parse
 from pathlib import Path
 
 SHIM_SQL = """
@@ -161,6 +167,61 @@ def _proc_cmdline(pid: int) -> list:
     return [part.decode() for part in raw.split(b"\0") if part]
 
 
+def _proc_exe(pid: int) -> str:
+    target = os.readlink(f"/proc/{int(pid)}/exe")
+    suffix = " (deleted)"
+    if target.endswith(suffix):
+        target = target[:-len(suffix)]
+    return target
+
+
+def _exe_is_postgres(exe: str) -> bool:
+    return bool(exe) and Path(exe).name == "postgres"
+
+
+def _socket_bound(socket_dir, port, pid) -> bool:
+    """True when .s.PGSQL.<port> is this user's real socket and that postmaster holds it."""
+    directory = Path(socket_dir)
+    sock = directory / f".s.PGSQL.{int(port)}"
+    try:
+        dir_stat = os.lstat(directory)
+        sock_stat = os.lstat(sock)
+    except OSError:
+        return False
+    if stat.S_ISLNK(dir_stat.st_mode) or not stat.S_ISDIR(dir_stat.st_mode):
+        return False
+    if stat.S_ISLNK(sock_stat.st_mode) or not stat.S_ISSOCK(sock_stat.st_mode):
+        return False
+    if sock_stat.st_uid != os.getuid() or dir_stat.st_uid != os.getuid():
+        return False
+    if directory.resolve() != Path(socket_dir).resolve():
+        return False
+    kernel_inode = None
+    try:
+        with open("/proc/net/unix", encoding="utf-8") as handle:
+            next(handle, None)
+            for line in handle:
+                fields = line.split()
+                if len(fields) >= 8 and fields[-1] == str(sock) and fields[6].isdigit():
+                    kernel_inode = fields[6]
+                    break
+    except OSError:
+        return False
+    if kernel_inode is None:
+        return False
+    needle = f"socket:[{kernel_inode}]"
+    try:
+        for entry in Path(f"/proc/{int(pid)}/fd").iterdir():
+            try:
+                if os.readlink(entry) == needle:
+                    return True
+            except OSError:
+                continue
+    except OSError:
+        return False
+    return False
+
+
 class OsView:
     """Filesystem and process view. This object never opens a database."""
 
@@ -183,6 +244,12 @@ class OsView:
 
     def starttime(self, pid):
         return _proc_starttime(int(pid))
+
+    def exe(self, pid):
+        return _proc_exe(int(pid))
+
+    def socket_bound(self, socket_dir, port, pid):
+        return _socket_bound(socket_dir, int(port), int(pid))
 
 
 def _tcp_class(host: str):
@@ -241,19 +308,32 @@ def _parse_dsn(dsn):
     return {"host": host, "port": port, "dbname": dbname}, None
 
 
-def _parent_is_lab_script(view) -> bool:
+def _resolves_to(arg, script) -> bool:
     try:
-        args = view.cmdline(view.ppid)
+        return str(Path(arg).resolve()) == script
     except OSError:
         return False
-    script = view.script_path
-    for arg in args:
-        try:
-            if str(Path(arg).resolve()) == script:
-                return True
-        except OSError:
-            continue
-    return False
+
+
+def _parent_is_lab_script(view) -> bool:
+    """Same-user guard only.
+
+    The parent executable must be bash, argv[0] must be bash, and argv[1]
+    must be this lab script. Later arguments do not count, so
+    bash -c '<driver>' <script> is not this invocation. This check does not
+    constrain any other user, and it does not stop someone who can rewrite
+    the script itself.
+    """
+    try:
+        args = view.cmdline(view.ppid)
+        exe = view.exe(view.ppid)
+    except OSError:
+        return False
+    if not exe or len(args) < 2:
+        return False
+    if Path(exe).name != "bash" or Path(args[0]).name != "bash":
+        return False
+    return _resolves_to(args[1], view.script_path)
 
 
 def _proof_matches_postmaster(proof, view):
@@ -264,6 +344,8 @@ def _proof_matches_postmaster(proof, view):
         pid_text = view.read_regular(str(Path(data_dir) / "postmaster.pid"))
         nonce = view.read_regular(str(Path(data_dir) / "e02_invocation")).strip()
         cmdline = view.cmdline(proof["postmaster_pid"])
+        exe = view.exe(proof["postmaster_pid"])
+        socket_ok = view.socket_bound(socket_dir, proof["port"], proof["postmaster_pid"])
     except (OSError, KeyError, TypeError, ValueError):
         return "LAB_TARGET_UNRELATED_LOCAL", "not this invocation's lab"
     lines = pid_text.splitlines()
@@ -298,7 +380,7 @@ def _proof_matches_postmaster(proof, view):
                 return "LAB_TARGET_UNRELATED_LOCAL", "not this invocation's lab"
     if seen != expected or "listen_addresses=" not in cmdline:
         return "LAB_TARGET_UNRELATED_LOCAL", "not this invocation's lab"
-    if not cmdline or not cmdline[0].endswith("/postgres"):
+    if f"e02.invocation={nonce}" not in cmdline or not _exe_is_postgres(exe) or not socket_ok:
         return "LAB_TARGET_UNRELATED_LOCAL", "not this invocation's lab"
     return None
 
@@ -308,6 +390,7 @@ def assess_apply_target(dsn, proof_path, view):
 
     Caller-supplied flags are ignored. Only a unix-socket DSN whose live
     postmaster is the lab process created by this invocation's lab script matches.
+    The parent check is a same-user guard, not a barrier against other users.
     """
     parsed, failure = _parse_dsn(dsn)
     if failure:
@@ -351,9 +434,11 @@ def _write_private(path: Path, text: str):
         handle.write(text)
 
 
-def write_invocation_proof(proof_path, data_dir, socket_dir, port, database, creator_pid):
+def write_invocation_proof(proof_path, data_dir, socket_dir, port, database, creator_pid, nonce):
     """Record the lab this process's parent just created. Does not connect."""
     if os.getppid() != int(creator_pid):
+        raise SystemExit(1)
+    if not isinstance(nonce, str) or len(nonce) != 64 or any(ch not in "0123456789abcdef" for ch in nonce):
         raise SystemExit(1)
     data = Path(data_dir).resolve()
     socket = Path(socket_dir).resolve()
@@ -364,10 +449,14 @@ def write_invocation_proof(proof_path, data_dir, socket_dir, port, database, cre
         raise SystemExit(1)
     if Path(lines[1]).resolve() != data or Path(lines[4]).resolve() != socket or int(lines[3]) != int(port):
         raise SystemExit(1)
-    cmdline = _proc_cmdline(int(lines[0]))
-    if "listen_addresses=" not in cmdline or not cmdline[0].endswith("/postgres"):
+    postmaster_pid = int(lines[0])
+    cmdline = _proc_cmdline(postmaster_pid)
+    if "listen_addresses=" not in cmdline or f"e02.invocation={nonce}" not in cmdline:
         raise SystemExit(1)
-    nonce = secrets.token_hex(32)
+    if not _exe_is_postgres(_proc_exe(postmaster_pid)):
+        raise SystemExit(1)
+    if not _socket_bound(socket, port, postmaster_pid):
+        raise SystemExit(1)
     _write_private(data / "e02_invocation", nonce + "\n")
     proof = {
         "nonce": nonce,
@@ -386,32 +475,73 @@ def write_invocation_proof(proof_path, data_dir, socket_dir, port, database, cre
     _write_private(destination, json.dumps(proof) + "\n")
 
 
+def client_env(base=None):
+    """Environment for libpq clients: every PG* variable removed."""
+    source = os.environ if base is None else base
+    return {key: value for key, value in source.items() if not key.startswith("PG")}
+
+
+def pinned_conninfo(parsed) -> str:
+    """Explicit conninfo. hostaddr is empty so an address cannot replace the socket."""
+    return (
+        f"host={parsed['host']} port={parsed['port']} dbname={parsed['dbname']} "
+        "user=postgres hostaddr=''"
+    )
+
+
 def psql(dsn, args, stdin=None):
-    return subprocess.run(["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-d", dsn, *args],
-                          input=stdin, capture_output=True, text=True)
+    return subprocess.run(
+        ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-d", dsn, *args],
+        input=stdin, capture_output=True, text=True, env=client_env(),
+    )
+
+
+def _session_matches(stdout, nonce, data_dir) -> bool:
+    return _eq(stdout.strip(), f"{nonce}|{data_dir}")
 
 
 def apply(root, prof, dsn, errors, proof_path=None, view=None, gateway=None):
     applied = []
-    code, detail = assess_apply_target(dsn, proof_path, view or OsView())
+    view = view or OsView()
+    code, detail = assess_apply_target(dsn, proof_path, view)
     if code:
         err(errors, code, detail)
         return applied
+    parsed, failure = _parse_dsn(dsn)
+    if failure:
+        err(errors, failure[0], failure[1])
+        return applied
+    try:
+        proof = json.loads(view.read_regular(proof_path))
+        nonce = str(proof["nonce"])
+        data_dir = view.realpath(proof["data_dir"])
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        err(errors, "LAB_TARGET_UNRELATED_LOCAL", "not this invocation's lab")
+        return applied
     gateway = gateway or psql
-    r = gateway(dsn, [], SHIM_SQL)
+    conn = pinned_conninfo(parsed)
+    probe = (
+        "select current_setting('e02.invocation', true) || '|' || "
+        "current_setting('data_directory');\n"
+    )
+    checked = gateway(conn, ["-tA"], probe)
+    if checked.returncode or not _session_matches(checked.stdout, nonce, data_dir):
+        err(errors, "LAB_SESSION_MISMATCH", "session is not this invocation's lab")
+        return applied
+    r = gateway(conn, [], SHIM_SQL)
     if r.returncode:
         err(errors, "LAB_SHIM_FAILED", r.stderr.strip()[-500:]); return applied
     for m in prof["migrations"]:
-        r = gateway(dsn, ["-1", "-f", str(root / m["path"])])
+        r = gateway(conn, ["-1", "-f", str(root / m["path"])])
         if r.returncode:
             err(errors, "APPLY_FAILED", f"{m['path']}: {r.stderr.strip()[-500:]}"); return applied
         applied.append(m["path"])
     for ext in prof.get("dependencies", {}).get("extensions", []):
-        r = gateway(dsn, ["-tA", "-v", f"v={ext}"], "select 1 from pg_extension where extname = :'v';\n")
+        r = gateway(conn, ["-tA", "-v", f"v={ext}"], "select 1 from pg_extension where extname = :'v';\n")
         if r.stdout.strip() != "1":
             err(errors, "EXTENSION_MISSING", ext)
     for t in prof.get("post_checks", {}).get("tables", []):
-        r = gateway(dsn, ["-tA", "-v", f"v={t}"], "select to_regclass(:'v') is not null;\n")
+        r = gateway(conn, ["-tA", "-v", f"v={t}"], "select to_regclass(:'v') is not null;\n")
         if r.stdout.strip() != "t":
             err(errors, "POSTCHECK_FAILED", t)
     return applied
