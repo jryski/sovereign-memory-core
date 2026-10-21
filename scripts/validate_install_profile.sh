@@ -11,13 +11,28 @@ cleanup(){ "$PGBIN/pg_ctl" -D "$LAB/data" -m fast stop >/dev/null 2>&1 || true; 
 trap cleanup EXIT
 "$PGBIN/initdb" -D "$LAB/data" -U postgres -A trust >/dev/null
 "$PGBIN/pg_ctl" -D "$LAB/data" -o "-p $PORT -k $LAB -c listen_addresses=''" -l "$LAB/log" -w start >/dev/null
+echo "$LAB" > "$OUT/lab_dir.txt"
+head -1 "$LAB/data/postmaster.pid" > "$OUT/postmaster.pid"
+unset E02_LAB_PROOF
 base="postgresql://postgres@/%s?host=$LAB&port=$PORT"
 mkdb(){ "$PGBIN/createdb" -h "$LAB" -p "$PORT" -U postgres "$1"; }
+bind_proof(){ # dbname — record this invocation's lab before any validator SQL
+  python3 - "$ROOT" "$LAB" "$PORT" "$$" "$1" <<'PY'
+import importlib.util, sys
+root, lab, port, creator, db = sys.argv[1:6]
+spec = importlib.util.spec_from_file_location("validate_install_profile", f"{root}/scripts/validate_install_profile.py")
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+mod.write_invocation_proof(f"{lab}/invocation.json", f"{lab}/data", lab, int(port), db, int(creator))
+PY
+  export E02_LAB_PROOF="$LAB/invocation.json"
+}
 dropdb_(){ "$PGBIN/dropdb" -h "$LAB" -p "$PORT" -U postgres --if-exists "$1"; }
 fail=0
 
 echo "==> POSITIVE: apply minimal_portable to disposable DB"
 mkdb e02_pos
+bind_proof e02_pos
 DATABASE_URL="$(printf "$base" e02_pos)" python3 "$ROOT/scripts/validate_install_profile.py" --root "$ROOT" --apply --receipt "$OUT/receipt.json" > "$OUT/positive.json" && echo "PASS positive" || { echo "FAIL positive"; fail=1; }
 dropdb_ e02_pos
 
@@ -79,6 +94,7 @@ for x in m["migrations"]:
 json.dump(m,open(p,"w"))
 PY
 mkdb e02_rb
+bind_proof e02_rb
 DSN="$(printf "$base" e02_rb)"
 if DATABASE_URL="$DSN" python3 "$ROOT/scripts/validate_install_profile.py" --root "$T" --apply --receipt "$OUT/neg2-receipt.json" > "$OUT/neg-rollback.json"; then echo "FAIL neg2 (accepted)"; fail=1
 else
