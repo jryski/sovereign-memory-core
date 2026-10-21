@@ -1,0 +1,85 @@
+{
+  "profile_id": "minimal_portable",
+  "schema_version": 1,
+  "migrations": [
+    {
+      "path": "sql/01_core.sql",
+      "sha256": "8a535733fd5805308f0399430139ee57ff6508649dbd7d10afd3b6d53786ccd5"
+    },
+    {
+      "path": "sql/07_work_lessons.sql",
+      "sha256": "4bf112bf6fedb8ef101a14f48b5bc3b83fba732fe661e434aa534f5932f85b0e"
+    },
+    {
+      "path": "sql/08_attention_events.sql",
+      "sha256": "a821d3c88b135b9089e72c3675cb1e92a62ec9b4a44eaa55a657dc7b6b1b2877"
+    },
+    {
+      "path": "sql/09_perimeter_refresh.sql",
+      "sha256": "32e4618e9eae4ab85847af9985730274abe477592ff052b93c88de83d71bfd0d"
+    },
+    {
+      "path": "sql/10_security_definer_hardening.sql",
+      "sha256": "45d21adca61d856326430ee35c25f4fde6e000cd61f034b5d077a54dd53ce2b8"
+    },
+    {
+      "path": "sql/11_perimeter_evaluability.sql",
+      "sha256": "99d35fc3126a2e908a47b9e397a495046f1e1648ae7067cafeba18114bf42058"
+    }
+  ],
+  "excluded_optional": [
+    "sql/02_vault.sql",
+    "sql/03_provenance_guards.sql",
+    "sql/04_source_import.sql",
+    "sql/05_candidate_locators.sql",
+    "sql/06_cutover_probe_categories.sql"
+  ],
+  "order_constraints": [
+    {
+      "before": [
+        "sql/07_work_lessons.sql",
+        "sql/08_attention_events.sql",
+        "sql/09_perimeter_refresh.sql"
+      ],
+      "after": "sql/10_security_definer_hardening.sql"
+    },
+    {
+      "last": "sql/11_perimeter_evaluability.sql"
+    },
+    {
+      "first": "sql/01_core.sql"
+    }
+  ],
+  "dependencies": {
+    "extensions": [
+      "pgcrypto"
+    ],
+    "schemas": [
+      "extensions"
+    ],
+    "roles": [
+      "anon",
+      "authenticated",
+      "service_role"
+    ],
+    "lab_shim": "Supabase-compatible extensions schema and nologin roles are created only in disposable local labs",
+    "operator_preconditions": [
+      "Owner-global default EXECUTE on functions revoked from PUBLIC for the installing owner(s) (docs/perimeter.md 'Owner-global default privileges'); stock Postgres fails 09_perimeter_refresh without it"
+    ]
+  },
+  "post_checks": {
+    "tables": [
+      "public.memories",
+      "public.trusted_agents",
+      "public.work_lessons",
+      "public.attention_events",
+      "public.perimeter_acl_policy"
+    ]
+  },
+  "non_claims": [
+    "Does not include optional migrations 02-06",
+    "Not a one-command installer",
+    "Does not certify live Supabase, Auth, grants, or data",
+    "sql/validation/ helpers are not part of the ordered install list"
+  ]
+}
