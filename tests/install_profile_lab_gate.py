@@ -3,10 +3,10 @@
 
 Synthetic DSNs and an in-process gateway only. These tests must not open a
 database connection. The older 20/20 lab runner does not cover inherited PG*
-variables, socket identity, or argv spoofing. tests/install_profile_lab_boundary.py
-covers those on a throwaway local cluster.
+variables, socket identity, argv spoofing, URL fragments, or malformed ports.
+tests/install_profile_lab_boundary.py covers the cluster cases.
 """
-import importlib.util, json, os, subprocess, sys, tempfile, unittest
+import contextlib, importlib.util, io, json, os, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -252,27 +252,90 @@ class LabGateTests(unittest.TestCase):
         mod.apply(ROOT, {"migrations": []}, dsn, errors, proof, view, gateway)
         self.assertEqual(gateway.operations, 2)
         self.assertIn("current_setting", gateway.calls[0][2])
-        self.assertIn("hostaddr=''", gateway.calls[0][0])
+        self.assertEqual(gateway.calls[0][0], mod.pinned_conninfo(mod._parse_dsn(dsn)[0]))
+        self.assertNotIn("postgresql://", gateway.calls[0][0])
+        self.assertNotIn("#", gateway.calls[0][0])
         self.assertEqual(errors[0]["code"], "LAB_SHIM_FAILED")
         note("matching-invocation-opens-gateway", "LAB_SHIM_FAILED", gateway.operations, True)
 
-    def test_apply_failure_writes_no_success_receipt(self):
-        view, dsn, proof = live_lab()
-        nonce = "ab" * 32
-        gateway = Gateway([
-            Result(0, out=f"{nonce}|/invocation/lab/data\n"),
-            Result(1, err="stopped"),
-        ])
-        errors = []
+    def test_fragment_cannot_add_hostaddr_to_a_matching_lab(self):
+        view, _dsn, proof = live_lab()
+        dsn = (
+            "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab"
+            "#&hostaddr=203.0.113.10&host=/invocation/lab"
+        )
+        self.check("fragment-hostaddr", dsn, "LAB_TARGET_MALFORMED", view=view, proof=proof)
+
+    def test_encoded_hash_cannot_smuggle_parameters(self):
+        view, _dsn, proof = live_lab()
+        dsn = "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab%23&hostaddr=203.0.113.10"
+        self.check("encoded-fragment", dsn, "LAB_TARGET_MALFORMED", view=view, proof=proof)
+
+    def test_bad_authority_port_is_malformed_without_connecting(self):
+        self.check(
+            "authority-port",
+            "postgresql://postgres@:bad/e02_pos?host=/invocation/lab",
+            "LAB_TARGET_MALFORMED",
+        )
+
+    def test_superscript_query_port_is_malformed_without_connecting(self):
+        self.check(
+            "superscript-port",
+            "postgresql://postgres@/e02_pos?host=/invocation/lab&port=\u00b2",
+            "LAB_TARGET_MALFORMED",
+        )
+
+    def test_main_writes_a_receipt_only_when_ok(self):
+        """Production main() decides the receipt. This does not reimplement that condition."""
         with tempfile.TemporaryDirectory() as tmp:
-            receipt = Path(tmp) / "receipt.json"
-            mod.apply(ROOT, {"migrations": []}, dsn, errors, proof, view, gateway)
-            out = {"ok": not errors, "errors": errors}
-            if receipt and out["ok"]:
-                receipt.write_text("success")
-            self.assertFalse(receipt.exists())
-        self.assertEqual(gateway.operations, 2)
-        note("apply-failure-no-receipt", errors[0]["code"], gateway.operations, True)
+            fail_receipt = Path(tmp) / "fail.json"
+            ok_receipt = Path(tmp) / "ok.json"
+            calls = []
+            original = mod.subprocess.run
+
+            def trap(*_args, **_kwargs):
+                calls.append(1)
+                raise AssertionError("database operation")
+
+            mod.subprocess.run = trap
+            argv = sys.argv
+            saved = {key: os.environ.get(key) for key in ("DATABASE_URL", "E02_LAB_PROOF", "PGHOSTADDR")}
+            try:
+                os.environ["DATABASE_URL"] = "postgresql://postgres@:bad/e02_pos?host=/invocation/lab"
+                os.environ["PGHOSTADDR"] = "203.0.113.10"
+                os.environ.pop("E02_LAB_PROOF", None)
+                sys.argv = [str(SCRIPT), "--root", str(ROOT), "--apply", "--receipt", str(fail_receipt)]
+                stdout = io.StringIO()
+                with contextlib.redirect_stdout(stdout):
+                    rc = mod.main()
+                self.assertEqual(rc, 1)
+                self.assertFalse(fail_receipt.exists())
+                body = json.loads(stdout.getvalue())
+                self.assertEqual(body["errors"][0]["code"], "LAB_TARGET_MALFORMED")
+                self.assertNotIn("Traceback", stdout.getvalue())
+                note("main-bad-port-no-receipt", body["errors"][0]["code"], len(calls), True)
+
+                os.environ.pop("DATABASE_URL", None)
+                os.environ.pop("PGHOSTADDR", None)
+                sys.argv = [str(SCRIPT), "--root", str(ROOT), "--receipt", str(ok_receipt)]
+                stdout = io.StringIO()
+                with contextlib.redirect_stdout(stdout):
+                    rc = mod.main()
+                printed = json.loads(stdout.getvalue())
+                self.assertEqual(rc, 0)
+                self.assertTrue(ok_receipt.is_file())
+                self.assertEqual(json.loads(ok_receipt.read_text()), printed)
+                self.assertTrue(printed["ok"])
+                note("main-static-receipt", "ok", len(calls), True)
+            finally:
+                mod.subprocess.run = original
+                sys.argv = argv
+                for key, value in saved.items():
+                    if value is None:
+                        os.environ.pop(key, None)
+                    else:
+                        os.environ[key] = value
+        self.assertEqual(calls, [])
 
     def test_each_pg_variable_is_removed_from_the_client_environment(self):
         names = [
@@ -305,12 +368,76 @@ class LabGateTests(unittest.TestCase):
             for name in names:
                 os.environ.pop(name, None)
 
+    def test_shell_scrubs_libpq_env_before_setup_and_cleanup(self):
+        text = (ROOT / "scripts" / "validate_install_profile.sh").read_text()
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            if any(tool in stripped for tool in ("$PGBIN/createdb", "$PGBIN/dropdb", "$PGBIN/psql")):
+                self.assertIn("client ", stripped, stripped)
+        self.assertIn("scrub_libpq", _bash_function("cleanup", text))
+
+        names = [
+            "PGHOSTADDR", "PGSERVICE", "PGSERVICEFILE", "PGHOST", "PGPORT",
+            "PGDATABASE", "PGUSER", "PGPASSFILE", "PGPASSWORD", "PGSSLMODE",
+            "PGSSLCERT", "PGSSLKEY", "PGSSLROOTCERT", "PGSSLCRL", "PGOPTIONS",
+            "PGTARGETSESSIONATTRS", "PGAPPNAME", "PGREQUIREAUTH", "PGCHANNELBINDING",
+            "PGCONNECT_TIMEOUT", "PGREALM", "PGKRBSRVNAME",
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bindir = root / "bin"
+            bindir.mkdir()
+            log = root / "calls.log"
+            recorder = root / "record.py"
+            recorder.write_text(
+                "import json, os, sys\n"
+                "seen = {k: os.environ[k] for k in os.environ if k.startswith('PG')}\n"
+                f"open({str(log)!r}, 'a').write(json.dumps({{'tool': sys.argv[1], 'pg': seen}}) + '\\n')\n"
+            )
+            for tool in ("createdb", "dropdb", "psql", "pg_ctl"):
+                path = bindir / tool
+                path.write_text(f"#!/bin/sh\nexec python3 {recorder} {tool}\n")
+                path.chmod(0o755)
+            functions = "\n".join(_bash_function(name, text) for name in ("scrub_libpq", "client", "cleanup"))
+            lab = root / "lab"
+            (lab / "data").mkdir(parents=True)
+            (lab / "data" / "postmaster.pid").write_text("999999\n")
+            exports = "\n".join(f"export {name}=synthetic-value" for name in names)
+            script = "\n".join([
+                "set -euo pipefail",
+                exports,
+                functions,
+                f"PGBIN={bindir}",
+                f"LAB={lab}",
+                "OUT_TMP=",
+                "KEEP_OUT=0",
+                f"OUT={root / 'out'}",
+                'mkdir -p "$OUT"',
+                'client "$PGBIN/createdb" -h /invocation/lab -p 1 -U postgres e02_pos',
+                'client "$PGBIN/dropdb" -h /invocation/lab -p 1 -U postgres --if-exists e02_pos',
+                'client "$PGBIN/psql" -X -tA -h /invocation/lab -p 1 -U postgres -d postgres -c select',
+                "cleanup",
+            ])
+            proc = subprocess.run(["bash", "-c", script], text=True, capture_output=True, check=False)
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            rows = [json.loads(line) for line in log.read_text().splitlines()]
+            tools = [row["tool"] for row in rows]
+            self.assertEqual(tools, ["createdb", "dropdb", "psql", "pg_ctl"])
+            for row in rows:
+                self.assertEqual(row["pg"], {}, row["tool"])
+                note(f"shell-scrub-{row['tool']}", "scrubbed", 0, True)
+
     def test_cli_refusals_do_not_invoke_psql_or_write_receipt(self):
         cases = [
             ("cli-remote", "postgresql://postgres@db.example.invalid:5432/app", "LAB_TARGET_REMOTE", None),
             ("cli-malformed", "host=localhost dbname=e02_pos", "LAB_TARGET_MALFORMED", None),
             ("cli-loopback-lab-name", "postgresql://postgres@127.0.0.1:5432/e02_pos", "LAB_TARGET_UNRELATED_LOCAL", None),
             ("cli-unix-unrelated", "postgresql://postgres@/e02_pos?host=/var/run/postgresql&port=5432", "LAB_TARGET_UNRELATED_LOCAL", None),
+            ("cli-fragment-hostaddr", "postgresql://postgres@/e02_pos?port=55432&host=/invocation/lab#&hostaddr=203.0.113.10&host=/invocation/lab", "LAB_TARGET_MALFORMED", None),
+            ("cli-authority-port", "postgresql://postgres@:bad/e02_pos?host=/invocation/lab", "LAB_TARGET_MALFORMED", None),
+            ("cli-superscript-port", "postgresql://postgres@/e02_pos?host=/invocation/lab&port=\u00b2", "LAB_TARGET_MALFORMED", None),
         ]
         with tempfile.TemporaryDirectory() as tmp:
             stub_dir = Path(tmp) / "bin"
@@ -326,6 +453,9 @@ class LabGateTests(unittest.TestCase):
                 env["DATABASE_URL"] = dsn
                 env["E02_LAB_OK"] = "1"
                 env["E02_STUB_LOG"] = str(log)
+                env["PGHOSTADDR"] = "203.0.113.10"
+                env["PGSERVICE"] = "labsvc"
+                env["PGSERVICEFILE"] = str(Path(tmp) / "services.conf")
                 env.pop("E02_LAB_PROOF", None)
                 if proof:
                     env["E02_LAB_PROOF"] = proof
@@ -342,6 +472,19 @@ class LabGateTests(unittest.TestCase):
                 operations = len(log.read_text().splitlines()) if log.exists() else 0
                 self.assertEqual(operations, 0, name)
                 note(name, code, operations, True)
+
+
+def _bash_function(name, text):
+    lines = text.splitlines()
+    start = next(index for index, line in enumerate(lines) if line.startswith(name + "()"))
+    if lines[start].count("{") == lines[start].count("}") and lines[start].rstrip().endswith("}"):
+        return lines[start]
+    body = [lines[start]]
+    for line in lines[start + 1:]:
+        body.append(line)
+        if line == "}":
+            return "\n".join(body)
+    raise AssertionError(f"unclosed function {name}")
 
 
 if __name__ == "__main__":

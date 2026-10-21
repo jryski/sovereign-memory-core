@@ -3,8 +3,10 @@
 
 The stand-in listens on 127.0.0.1 or its own unix socket. Nothing here dials
 a remote or hosted database. The older 20/20 runner does not cover these cases.
+Cleanup is checked from the pid, socket, and directory left behind, because
+the runner does not fail the process when pg_ctl stop reports an error.
 """
-import importlib.util, os, shutil, subprocess, sys, textwrap, time
+import importlib.util, json, os, shutil, subprocess, sys, textwrap, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,6 +61,89 @@ def marks(path):
     return text.count("connection received"), text.count("statement:")
 
 
+def procs_mentioning(token):
+    hits = []
+    if not token:
+        return hits
+    needle = token.encode()
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            raw = (entry / "cmdline").read_bytes()
+        except OSError:
+            continue
+        if needle in raw:
+            hits.append(entry.name)
+    return hits
+
+
+def disposable_apply(work, port):
+    """Run the production lab script and inspect what it left behind."""
+    out = work / f"positive-{port}"
+    env = os.environ.copy()
+    for name in PG_NAMES:
+        env.pop(name, None)
+    env["OUT_DIR"] = str(out)
+    env["KEEP_OUT"] = "1"
+    env["LAB_PORT"] = str(port)
+    proc = run(["bash", str(SH)], env=env, capture_output=True)
+    lab_text = (out / "lab_dir.txt").read_text().strip() if (out / "lab_dir.txt").exists() else ""
+    pid_text = (out / "postmaster.pid").read_text().strip() if (out / "postmaster.pid").exists() else ""
+    lab = Path(lab_text) if lab_text else None
+    pid_alive = False
+    if pid_text.isdigit():
+        try:
+            os.kill(int(pid_text), 0)
+            pid_alive = True
+        except OSError:
+            pid_alive = False
+    socket_left = bool(lab and (lab / f".s.PGSQL.{port}").exists())
+    dir_left = bool(lab and lab.exists())
+    mentioned = procs_mentioning(lab_text)
+    receipt = {}
+    positive = {}
+    if (out / "receipt.json").is_file():
+        receipt = json.loads((out / "receipt.json").read_text())
+    if (out / "positive.json").is_file():
+        positive = json.loads((out / "positive.json").read_text())
+    remaining_line = "disposable DBs remaining: 0" in proc.stdout
+    ok = (
+        proc.returncode == 0
+        and receipt.get("ok") is True
+        and positive.get("ok") is True
+        and len(positive.get("applied") or []) == 6
+        and remaining_line
+        and not pid_alive
+        and not socket_left
+        and not dir_left
+        and not mentioned
+    )
+    evidence = {
+        "rc": proc.returncode,
+        "applied": len(positive.get("applied") or []),
+        "receipt": receipt.get("ok"),
+        "databases_remaining_before_stop": 0 if remaining_line else None,
+        "pid": pid_text,
+        "pid_alive": pid_alive,
+        "socket_left": socket_left,
+        "directory_left": dir_left,
+        "processes": mentioned,
+    }
+    if pid_alive:
+        for pid_name in mentioned or ([pid_text] if pid_text.isdigit() else []):
+            try:
+                os.kill(int(pid_name), 15)
+            except OSError:
+                pass
+        evidence["killed_after_inspection"] = True
+    if not ok:
+        (work / "positive.err").write_text(
+            proc.stdout[-4000:] + "\n" + proc.stderr[-4000:] + "\n" + json.dumps(evidence)
+        )
+    return ok, evidence
+
+
 def foreign_roles(socket_dir, port):
     proc = run([
         str(PGBIN / "psql"), "-X", "-tA", "-h", str(socket_dir), "-p", str(port),
@@ -77,6 +162,16 @@ def main():
     results = []
     fake_proc = None
     try:
+        positive_ok, positive = disposable_apply(work, 55490)
+        results.append((
+            "positive-disposable",
+            f"applied={positive['applied']}" if positive_ok else "failed",
+            0,
+            positive_ok,
+            positive["rc"],
+        ))
+        print("POSITIVE_CLEANUP " + json.dumps(positive, sort_keys=True))
+
         standin = work / "standin"
         port = 55481
         start_cluster(standin, port, "127.0.0.1")

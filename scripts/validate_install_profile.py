@@ -6,13 +6,16 @@ Fails closed with JSON errors. The DSN is read from an environment variable
 
 --apply runs SQL only after the DSN is shown to be the disposable lab created
 for this invocation. A loopback address, a lab-looking database name, an
-environment flag, or an inherited PG* variable is not that proof. Client
-tools run with every PG* variable removed and with host, port, database,
-user, and an empty hostaddr pinned in the conninfo. The parent-process
-check is a same-user guard only: it accepts bash with this script as argv[1],
-and it does not stop a different local user or a rewritten script. Refusal
-performs no database operation. A session probe that does not match this
-lab's nonce and data directory stops before the role and privilege preamble.
+environment flag, an inherited PG* variable, or a URL fragment is not that
+proof. Fragments and other syntax this checker does not validate are rejected:
+libpq reads them even when url parsing does not. Client tools run with every
+PG* variable removed. The connection string is built from the validated host,
+port, database, and user, with an empty hostaddr. The original DSN is not
+passed through. The parent-process check is a same-user guard only: it accepts
+bash with this script as argv[1], and it does not stop a different local user
+or a rewritten script. Refusal performs no database operation and writes no
+success receipt. A session probe that does not match this lab's nonce and
+data directory stops before the role and privilege preamble.
 """
 import argparse, hashlib, hmac, json, os, re, stat, subprocess, sys, urllib.parse
 from pathlib import Path
@@ -259,51 +262,69 @@ def _tcp_class(host: str):
     return "LAB_TARGET_REMOTE", "named or remote host"
 
 
+def _canonical_port(port_text):
+    """Return an integer port, or None. Never raises. ASCII digits only."""
+    if not isinstance(port_text, str) or not port_text.isascii() or not port_text.isdigit():
+        return None
+    try:
+        value = int(port_text)
+    except ValueError:
+        return None
+    if str(value) != port_text or not 1 <= value <= 65535:
+        return None
+    return value
+
+
 def _parse_dsn(dsn):
-    """Classify a DSN without resolving it and without opening a socket."""
+    """Classify a DSN without resolving it and without opening a socket.
+
+    A fragment is rejected even when the part before '#' would match a lab.
+    libpq parses that fragment as extra connection parameters. The caller
+    connects with pinned_conninfo of the returned fields, not with this string.
+    """
+    malformed = ("LAB_TARGET_MALFORMED", "unusable dsn")
     if not isinstance(dsn, str) or not dsn or any(ch.isspace() or ch == "\x00" for ch in dsn):
-        return None, ("LAB_TARGET_MALFORMED", "unusable dsn")
-    if "://" not in dsn:
-        return None, ("LAB_TARGET_MALFORMED", "unusable dsn")
+        return None, malformed
+    if "://" not in dsn or "#" in dsn or "%23" in dsn.lower():
+        return None, malformed
     try:
         parts = urllib.parse.urlsplit(dsn)
-    except ValueError:
-        return None, ("LAB_TARGET_MALFORMED", "unusable dsn")
-    if parts.scheme not in {"postgresql", "postgres"}:
-        return None, ("LAB_TARGET_MALFORMED", "unusable dsn")
-    try:
         query = urllib.parse.parse_qs(parts.query, keep_blank_values=True, strict_parsing=True)
+        authority_port = parts.port
+        net_host = parts.hostname
+        username = parts.username
+        password = parts.password
     except ValueError:
-        return None, ("LAB_TARGET_MALFORMED", "unusable dsn")
+        return None, malformed
+    if parts.fragment or parts.scheme not in {"postgresql", "postgres"}:
+        return None, malformed
     if "hostaddr" in query:
         values = query.get("hostaddr") or [""]
         return None, _tcp_class(values[0] if values else "")
     if any(key not in {"host", "port"} for key in query) or any(len(values) != 1 for values in query.values()):
-        return None, ("LAB_TARGET_MALFORMED", "unusable dsn")
-    net_host = parts.hostname
+        return None, malformed
     query_host = query.get("host", [None])[0]
     if net_host and query_host:
-        return None, ("LAB_TARGET_MALFORMED", "unusable dsn")
+        return None, malformed
     host = net_host or query_host
     if not host:
-        return None, ("LAB_TARGET_MALFORMED", "unusable dsn")
+        return None, malformed
     if not host.startswith("/"):
         return None, _tcp_class(host)
     dbname = parts.path[1:] if parts.path.startswith("/") else parts.path
     if not DBNAME_RE.fullmatch(dbname or ""):
-        return None, ("LAB_TARGET_MALFORMED", "unusable dsn")
+        return None, malformed
     port_text = query.get("port", [None])[0]
-    if parts.port and port_text:
-        return None, ("LAB_TARGET_MALFORMED", "unusable dsn")
-    if parts.port and not query_host:
-        return None, ("LAB_TARGET_MALFORMED", "unusable dsn")
-    port_text = port_text or (str(parts.port) if parts.port else None)
-    if not port_text or not port_text.isdigit() or port_text != str(int(port_text)):
-        return None, ("LAB_TARGET_MALFORMED", "unusable dsn")
-    port = int(port_text)
-    if not 1 <= port <= 65535:
-        return None, ("LAB_TARGET_MALFORMED", "unusable dsn")
-    if parts.password or parts.username != "postgres":
+    if authority_port and port_text:
+        return None, malformed
+    if authority_port and not query_host:
+        return None, malformed
+    if port_text is None and authority_port is not None:
+        port_text = str(authority_port)
+    port = _canonical_port(port_text)
+    if port is None:
+        return None, malformed
+    if password or username != "postgres":
         return None, ("LAB_TARGET_UNRELATED_LOCAL", "not this invocation's lab")
     return {"host": host, "port": port, "dbname": dbname}, None
 

@@ -4,8 +4,9 @@
 # positive plus static/apply negatives, then tears everything down. Never touches remotes.
 set -euo pipefail
 # Inherited libpq variables (PGHOSTADDR, PGSERVICE, PGSERVICEFILE, and every
-# other PG* name) must not steer createdb, dropdb, or psql. Drop them before
-# any client tool runs, then pin host and port on each invocation.
+# other PG* name) must not steer createdb, dropdb, or psql. Drop them again
+# immediately before every one of those tools, including setup and cleanup,
+# then pin host and port on each invocation.
 scrub_libpq() {
   local name
   while IFS= read -r name; do
@@ -20,10 +21,32 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PGBIN="${PGBIN:-$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1)}"
 if [[ -n "${OUT_DIR:-}" ]]; then OUT="$OUT_DIR"; mkdir -p "$OUT"; OUT_TMP=""; else OUT="$(mktemp -d)"; OUT_TMP="$OUT"; fi
 LAB="$(mktemp -d)"; PORT="${LAB_PORT:-55432}"
-cleanup(){ "$PGBIN/pg_ctl" -D "$LAB/data" -m fast stop >/dev/null 2>&1 || true; rm -rf "$LAB"; if [[ -n "$OUT_TMP" && "${KEEP_OUT:-0}" != 1 ]]; then rm -rf "$OUT_TMP"; fi; }
+cleanup(){
+  scrub_libpq
+  local pid=""
+  if [[ -f "$LAB/data/postmaster.pid" ]]; then
+    pid="$(head -n 1 "$LAB/data/postmaster.pid" 2>/dev/null || true)"
+  fi
+  if [[ -d "$LAB/data" ]]; then
+    if ! "$PGBIN/pg_ctl" -D "$LAB/data" -m fast stop >/dev/null 2>&1; then
+      "$PGBIN/pg_ctl" -D "$LAB/data" -m immediate stop >/dev/null 2>&1 || true
+    fi
+  fi
+  if [[ -n "$pid" && -r "/proc/$pid/cmdline" ]]; then
+    local cmd
+    cmd="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+    if [[ "$cmd" == *"$LAB"* ]]; then
+      kill "$pid" 2>/dev/null || true
+    fi
+  fi
+  rm -rf "$LAB"
+  if [[ -n "$OUT_TMP" && "${KEEP_OUT:-0}" != 1 ]]; then rm -rf "$OUT_TMP"; fi
+}
 trap cleanup EXIT
+scrub_libpq
 "$PGBIN/initdb" -D "$LAB/data" -U postgres -A trust >/dev/null
 NONCE="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+scrub_libpq
 "$PGBIN/pg_ctl" -D "$LAB/data" -o "-p $PORT -k $LAB -c listen_addresses='' -c e02.invocation=$NONCE" -l "$LAB/log" -w start >/dev/null
 echo "$LAB" > "$OUT/lab_dir.txt"
 head -1 "$LAB/data/postmaster.pid" > "$OUT/postmaster.pid"
@@ -47,6 +70,7 @@ fail=0
 echo "==> POSITIVE: apply minimal_portable to disposable DB"
 mkdb e02_pos
 bind_proof e02_pos
+scrub_libpq
 DATABASE_URL="$(printf "$base" e02_pos)" python3 "$ROOT/scripts/validate_install_profile.py" --root "$ROOT" --apply --receipt "$OUT/receipt.json" > "$OUT/positive.json" && echo "PASS positive" || { echo "FAIL positive"; fail=1; }
 dropdb_ e02_pos
 
@@ -110,6 +134,7 @@ PY
 mkdb e02_rb
 bind_proof e02_rb
 DSN="$(printf "$base" e02_rb)"
+scrub_libpq
 if DATABASE_URL="$DSN" python3 "$ROOT/scripts/validate_install_profile.py" --root "$T" --apply --receipt "$OUT/neg2-receipt.json" > "$OUT/neg-rollback.json"; then echo "FAIL neg2 (accepted)"; fail=1
 else
   r=$(client "$PGBIN/psql" -X -tA -h "$LAB" -p "$PORT" -U postgres -d e02_rb -c "select to_regclass('public.perimeter_acl_policy') is null and to_regclass('public.attention_events') is not null")
