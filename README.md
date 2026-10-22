@@ -190,21 +190,26 @@ sql/08_attention_events.sql
 sql/09_perimeter_refresh.sql
 sql/10_security_definer_hardening.sql
 sql/11_perimeter_evaluability.sql
+sql/12_topology_scope.sql
 ```
 
-Three ordering rules that will bite you otherwise:
+Four ordering rules that will bite you otherwise:
 
 - `07` through `09` are re-runnable fix-forward migrations. If you need to
   reapply them, do it **before** `10`.
 - `10` is the SECURITY DEFINER hardening boundary. Do not reapply `07` through
   `09` after crossing it.
-- `11` is the perimeter-evaluability/report boundary and must remain **last**.
-  It is itself re-runnable. If an operator deliberately reapplies `10`, reapply
-  `11` immediately afterward before treating the perimeter as evaluated.
+- `11` is the perimeter-evaluability/report boundary. It is itself re-runnable.
+  If an operator deliberately reapplies `10`, reapply `11` immediately afterward
+  before treating the perimeter as evaluated.
+- `12` runs after `11` and is independently re-runnable. It adds the versioned
+  topology/search-scope contract. If `10` is reapplied, reapply `11` and then
+  `12` so the evaluability wrapper stays wired and session boot keeps its
+  topology projection.
 
 `sql/validation/` is not in the ordered list. It holds
 `source_import_readiness.sql` and `load_chat_mine_package.sql`. Those are
-validation helpers. Applying `01` through `11` does not run them.
+validation helpers. Applying `01` through `12` does not run them.
 
 `09` closes schema creation, table grants, function execution, default
 privileges, RLS and FORCE RLS, ownership, and trigger-only boundaries. `10`
@@ -213,7 +218,10 @@ with protected names schema-qualified and `pg_temp` listed last. `11` preserves
 that reviewed assertion body as an internal violation primitive, adds the
 versioned `public.perimeter_report()` evaluability seam, and makes
 `public.assert_perimeter_closed()` fail closed when required evaluation
-population is unavailable.
+population is unavailable. `12` exposes deployment-neutral, viewer-filtered
+topology evidence and validated client-reported search-coverage receipts. It
+contains no routing endpoints or credentials. See
+[`docs/topology-and-search-scope.md`](docs/topology-and-search-scope.md).
 
 Permission profiles, allowlists, and perimeter policy inputs live in
 [`docs/perimeter.md`](docs/perimeter.md). The report-state contract is in

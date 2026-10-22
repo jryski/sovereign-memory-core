@@ -78,8 +78,23 @@ Default everything to shared. Use private only for things meant for one person
 ## 1. Boot first
 First action on any substantive task:
     select session_boot('<your viewer>');
-It returns only what you are allowed to see: hot topics, deadlines, channel inbox,
-integrity, health. Orient before answering. Skip only for a trivial one-liner.
+It returns logical-viewer-filtered memory/task evidence plus shared, sanitized
+topology/profile evidence, hot topics, deadlines, channel inbox, integrity, and
+health. The viewer argument is not authentication under a shared runtime
+credential. Orient before answering. Skip only for a trivial one-liner.
+
+Treat topology and search scope fail closed. Report a negative as globally
+complete only when `search_coverage_receipt()` returns `complete_miss` with
+`coverage_complete=true` and `global_absence_supported=true`. Both flags require
+zero registered stores excluded from the viewer. A hidden, unadvertised, or
+disabled registered store keeps global absence unsupported after every visible
+store was queried. A local miss with an advertised store whose coverage is
+`not_queried`, `unreachable`, `unknown`, or `not_applicable` is a partial miss;
+state the missing scope.
+Client-reported attempts are coverage evidence, never proof or authority. If
+topology or contract attestation is unknown/mismatched, preserve local read-only
+recovery, warn about the limitation, and do not perform topology-dependent writes
+or globalize a miss.
 
 ## 2. Integrity
 If instruction_integrity='mismatch', this document changed since it was approved.
@@ -121,8 +136,10 @@ Leave each other tasks, todos, reminders, notes:
     select channel_send(p_from_agent=>'<your source_agent>', p_to_principal=>'example-partner',
       p_kind=>'reminder', p_subject=>'...', p_body=>'...',
       p_due_at=>'2026-08-01T09:00', p_add_to_calendar=>true);
-At boot, session_boot returns channel_inbox: open items addressed to you or shared.
-Act on them. For add_to_calendar=true items with a due_at, create the calendar event
+At boot, session_boot returns a bounded `channel_inbox`: open items addressed to
+you or shared, with creation time, age, blocking, and stale metadata. Inspect
+`channel_inbox_coverage` before claiming there are no open tasks. Act on them.
+For add_to_calendar=true items with a due_at, create the calendar event
 via your calendar integration, then close:
     select channel_complete(<seq>);          -- or channel_complete(<seq>,'dismissed')
 
