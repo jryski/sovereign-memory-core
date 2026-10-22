@@ -350,16 +350,19 @@ Rollback triggers:
 - failed backup/restore;
 - repeated agent confusion about authoritative store.
 
-## Repo work required
+## Repository status
 
-To make this repeatable, the repo needs:
+The source-import and cutover controls that make this plan repeatable are repo-owned SQL. They are not pending reconciliation.
 
-1. SQL migration for manifest, freeze/watermark control, export views, readiness view, and cutover probes.
-2. A validation SQL bundle that produces a pass/fail cutover report.
-3. Export/import examples for at least two different source types, such as JSONL rows and Markdown files.
-4. A cutover evidence template.
-5. A release tag after repo/live parity is restored.
+1. Manifest, freeze and watermark control, export views, readiness, and cutover probes are `sql/04_source_import.sql`. Candidate locators and quote hashes are `sql/05_candidate_locators.sql`. Richer cutover probe categories are `sql/06_cutover_probe_categories.sql`.
+2. `sql/validation/source_import_readiness.sql` records pass/fail checks. A fatal failing check raises an exception.
+3. [`docs/10-chat-mine-source-import-exporter.md`](10-chat-mine-source-import-exporter.md) is the first internal Chat-Mine producer slice. Chat-Mine export is internal producer alignment, not a public interchange protocol.
 
-## Current warning
+Still required before this plan is operationally complete:
 
-The live production system may contain migration/cutover objects not yet captured in this repository. Until they are reconciled, the repo is a strong baseline but not a complete reproduction of that active deployment.
+1. Export and import examples for at least two different real source types, such as JSONL rows and Markdown files. The synthetic Chat-Mine fixture is not those examples.
+2. A cutover evidence template filled by an operational dry run.
+3. Review UI, Hermes orchestration, and adapters for real source exports.
+4. Independent live acceptance of a deployment. A release tag does not by itself establish repo and live parity. See [`STATUS.md`](../STATUS.md).
+
+A deployment can still contain objects this repository does not carry. Record that difference in the deployment's own drift ledger. This file does not inventory a live deployment and does not accept one.

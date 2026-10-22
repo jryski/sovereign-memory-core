@@ -63,7 +63,7 @@ is a migration, not live acceptance.
 Also in the repository:
 
 - Source-import validation with fatal blocker enforcement and rollback fixtures
-- First internal Chat-Mine producer slice with deterministic package validation and a rollback loader smoke path
+- First internal Chat-Mine producer slice, [`docs/10-chat-mine-source-import-exporter.md`](docs/10-chat-mine-source-import-exporter.md), with deterministic package validation and a rollback loader smoke path. Chat-Mine export is internal producer alignment, not a public interchange protocol.
 - Architecture, security, agent operations, implementation, operations, and pattern docs
 - Roadmap, ADR, contribution, security, support, issue template, and PR template scaffolding
 - [`PROGRAM-ROLE.md`](PROGRAM-ROLE.md) and [`docs/ecosystem/`](docs/ecosystem/)
@@ -74,6 +74,16 @@ Also in the repository:
 That list is repository contents. It is not a deployment inventory and it is
 not an independent live-acceptance receipt. Synthetic package/restore for the
 v0.3-alpha rehearsal profile is the known-limitations record named above.
+
+### Source-import current status
+
+- **Merged core foundation.** `sql/04_source_import.sql`, `sql/05_candidate_locators.sql`, and `sql/06_cutover_probe_categories.sql` are repo-owned SQL. Source-import and cutover controls are not pending reconciliation.
+- **Internal producer slice.** [`docs/10-chat-mine-source-import-exporter.md`](docs/10-chat-mine-source-import-exporter.md) is the first internal Chat-Mine producer slice. It is internal producer alignment, not a public interchange protocol.
+- **Future work.** Review UI, Hermes orchestration, real source adapters, and operational dry runs remain outside this foundation.
+
+### Verified baseline
+
+Work-memory conformance on PostgreSQL 15 and 16 covers the lifecycle, history, authority perimeter, and upgrade checks described in the README. Source-import and cutover validation, on a disposable database, checks required objects, security-definer search paths, grant posture, and fixture rollback. Fatal validation failure behavior raises an exception when a fatal check fails. The same gate covers candidate locators and quote hashes, and all five richer cutover probe categories. Chat-Mine exporter validation checks deterministic package output and, when `DATABASE_URL` is set, a rollback-only load. This baseline is repository validation. It is not independent live acceptance.
 
 ## Drift policy
 
@@ -130,11 +140,14 @@ result:
 
 ## Interpretation
 
-The reusable source-import/cutover foundation is represented as versioned SQL, validation,
-and docs. It remains generic across source types. The Chat-Mine package exporter is the first
-internal producer aligned with that contract, not a public interchange protocol.
+The merged core foundation is versioned SQL, validation, and docs:
+`sql/04_source_import.sql`, `sql/05_candidate_locators.sql`, and
+`sql/06_cutover_probe_categories.sql`. It remains generic across source types.
+The internal producer slice is the Chat-Mine package exporter in
+[`docs/10-chat-mine-source-import-exporter.md`](docs/10-chat-mine-source-import-exporter.md).
+Chat-Mine export is internal producer alignment, not a public interchange protocol.
 
-The next product gap is operational adoption: real source adapters, review UI, Hermes orchestration,
+Future work is operational adoption: real source adapters, review UI, Hermes orchestration,
 and dry runs against representative exports. Those layers must preserve the core review and
 conflict posture rather than bypassing it. Separately, live and production export,
 clean restore of private data, and independent live acceptance stay open and blocked
