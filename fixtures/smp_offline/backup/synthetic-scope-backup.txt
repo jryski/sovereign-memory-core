@@ -1,0 +1,3 @@
+Synthetic offline backup for scope synthetic-example-scope.
+This artifact contains no credentials and no private records.
+Primary Users

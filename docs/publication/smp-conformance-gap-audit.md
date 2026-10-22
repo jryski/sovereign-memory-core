@@ -85,11 +85,11 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 | CNF3 | Store-conformant enforces I1, I3, I5 on ingest. | Partial | I1 mostly covered; I3/I5 general enforcement gaps remain. |
 | CNF4 | Promoted-record in-place mutation structurally impossible or content-hash audited. | Gap | A prior review identified silent content-update risk in deployment-style wiki pages; repo needs source-import/store audit decision. |
 | CNF5 | Cutover-conformant executes full lifecycle and records probe results, review decisions, cutover declaration. | Gap | Full lifecycle beyond dry-run/readiness not complete. |
-| CT1 | Third-party verification can confirm all source items accounted for. | Partial | Fixture/readiness validation covers current source-import package paths; full third-party/offline verification is not complete. |
-| CT2 | Third-party verification can confirm consequential imported facts trace to evidence. | Partial | Evidence tracing exists; consequential-domain enforcement is partial. |
-| CT3 | Third-party verification can confirm conflicts/stale claims preserved. | Partial | Probe categories exist; fixture coverage should be expanded. |
-| CT4 | Third-party verification can confirm agent-generated content not promoted as human authority. | Gap | Needs explicit attribution/provenance fixture and negative test. |
-| CT5 | Verification possible offline without source/emitter cooperation. | Partial | Package/evidence/rollback fixtures move in this direction; full offline verifier not complete. |
+| CT1 | Third-party verification can confirm all source items accounted for. | Partial | The synthetic offline fixture checks accounting for one small scope. It does not cover live destination stores or every package path. |
+| CT2 | Third-party verification can confirm consequential imported facts trace to evidence. | Partial | The synthetic fixture traces one promoted identity claim and rejects an agent financial claim. Generalized write-time domain enforcement remains open. |
+| CT3 | Third-party verification can confirm conflicts/stale claims preserved. | Partial | The synthetic fixture preserves one conflict and one stale claim. Broader store coverage remains open. |
+| CT4 | Third-party verification can confirm agent-generated content not promoted as human authority. | Partial | The synthetic fixture and its negative injection cover one agent-authored case. Store write-time enforcement remains open. |
+| CT5 | Verification possible offline without source/emitter cooperation. | Partial | `fixtures/smp_offline/` validates one synthetic scope offline. Live restored-instance probes and a full verifier remain open. |
 | A1 | Agents may propose durable source-of-record changes but not promote without review. | Gap | Policy issue exists; repo docs and/or protected-path proposal posture needed. |
 | A2 | In-place source-of-record changes by an agent are content-hash audited when proposed/authoritative split is unavailable. | Gap | Possible phase-2 trigger; not implemented. |
 
@@ -121,7 +121,7 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
    - Add negative tests for silent post-promotion edit.
 
 7. **Define offline verifier fixture**
-   - Given only package, manifest, evidence hashes, probe definitions/results, and cutover record, verify SMP-complete for a small scope.
+   - A synthetic offline fixture and validator now exist for one small scope (`fixtures/smp_offline/`, `docs/offline-smp-verifier-fixture.md`). They do not close Draft 0.3 conformance. Remaining gaps include live restored-instance probes, generalized consequential-domain enforcement, and the installer custody path.
 
 ## Practical alpha interpretation
 
@@ -142,5 +142,5 @@ It should not yet claim:
 - production-grade review workflow;
 - generalized consequential-domain enforcement;
 - complete adapter-profile support;
-- offline third-party verifier;
+- a live restored-instance verifier (the synthetic offline fixture does not close this);
 - solved Chat-Mine mining quality.
