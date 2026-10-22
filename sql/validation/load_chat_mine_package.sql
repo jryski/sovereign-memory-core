@@ -340,6 +340,41 @@ begin
       candidate_locator_gaps;
   end if;
 
+  if exists (
+    select 1
+    from memories memory
+    join source_manifest manifest
+      on manifest.id::text = memory.metadata->>'source_manifest_id'
+    join chat_mine_source_item_map item_map
+      on item_map.id = manifest.source_item_id
+  ) then
+    raise exception
+      'Chat-Mine loader smoke promoted a candidate from a structurally valid package';
+  end if;
+
+  if exists (
+    select 1
+    from source_import_batches batch
+    join chat_mine_batch_map batch_map on batch_map.id = batch.id
+    where batch.status in ('ready', 'cutover')
+  ) then
+    raise exception
+      'Chat-Mine loader smoke marked a structurally valid package authoritative';
+  end if;
+
+  if exists (
+    select 1
+    from source_manifest manifest
+    join chat_mine_source_item_map item_map on item_map.id = manifest.source_item_id
+    where manifest.target_id is not null
+       or manifest.reviewed_by is not null
+       or manifest.reviewed_at is not null
+       or manifest.review_state = 'approved'
+  ) then
+    raise exception
+      'Chat-Mine loader smoke recorded review or promotion without an explicit review decision';
+  end if;
+
   select count(distinct probe.probe_category)
   into active_probe_categories
   from cutover_probes probe

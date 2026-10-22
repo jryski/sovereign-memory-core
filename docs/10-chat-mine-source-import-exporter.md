@@ -97,7 +97,10 @@ package into `source_systems`, `source_import_batches`, `source_items`,
 `source_payload_evidence`, `source_manifest`, and `cutover_probes`, verifies the expected
 row counts, payload hashes, manifest uniqueness, one-to-many candidate relationship,
 locator/hash posture, five probe categories, and expected `source_readiness` states. It
-then rolls back and verifies no fixture rows remain.
+also verifies that this structurally valid package does not create memory rows, does not
+move the batch to `ready` or `cutover`, and does not record a reviewer, review time,
+approved review state, or promotion target. It then rolls back and verifies no fixture
+rows remain.
 
 Run the complete local/disposable path after applying the core schema:
 
