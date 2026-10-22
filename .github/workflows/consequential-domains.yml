@@ -1,0 +1,66 @@
+name: Consequential domains
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  PGPASSWORD: postgres
+
+jobs:
+  declared-domains:
+    name: Declared domains (${{ matrix.pg }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ["15", "16"]
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sovereign_memory
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sovereign_memory"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_memory
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Bootstrap and apply
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          create schema if not exists extensions;
+          do $$ begin
+            if not exists(select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
+            if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
+            if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role nologin; end if;
+          end $$;
+          alter database sovereign_memory set sovereign_memory.perimeter_profile='supabase';
+          alter default privileges for role postgres revoke execute on functions from public;
+          alter default privileges for role pg_database_owner revoke execute on functions from public;
+          SQL
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/01_core.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/03_provenance_guards.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/12_consequential_domains.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/12_consequential_domains.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/07_work_lessons.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/08_attention_events.sql
+      - name: Rollback conformance
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/12_consequential_domains.sql
+      - name: Perimeter tail still closes
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/09_perimeter_refresh.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/10_security_definer_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/11_perimeter_evaluability.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/12_consequential_domains.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select public.assert_perimeter_closed()"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/12_consequential_domains.sql
