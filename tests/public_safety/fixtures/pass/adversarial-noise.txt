@@ -1,0 +1,10 @@
+# SYNTHETIC NEAR-MISS. Ordinary words and public checksum shapes must not fire.
+test
+main
+TEST
+MAIN
+api_key: REDACTED
+password: postgres
+schema_sha256: 558a6fd49609928992abe2533326489c20e52d855634e626b86751058a8954d5
+conversation_count: 1
+The shell builtin test is not a codename hit.

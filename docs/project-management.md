@@ -98,6 +98,8 @@ Issues should state:
 - public-safety or live-state guardrails
 - related docs, scripts, fixtures, or ADRs
 
+Issue titles, bodies, and comments are publication surfaces. Use the public-safety checklist in the issue templates before publishing them. See [public-safety.md](public-safety.md).
+
 Research issues should also state what evidence would make the research actionable.
 
 ## PR practice
@@ -105,6 +107,8 @@ Research issues should also state what evidence would make the research actionab
 Use [.github/pull_request_template.md](../.github/pull_request_template.md) as the source of truth for PR body structure.
 
 Draft PRs are appropriate for coordination. Ready-for-review means the author believes validation is complete for the stated scope.
+
+Changed files are scanned with `scripts/public_safety_scan.sh`. Issue text, pull-request text, reviews, release notes, workflow logs, and uploaded artifacts are publication surfaces and use the checklist in the templates. See [public-safety.md](public-safety.md).
 
 ## ADR practice
 
@@ -118,6 +122,5 @@ Documented but intentionally deferred:
 
 - create actual GitHub labels, milestones, and the `SMP Roadmap` Project board;
 - decide LICENSE and contribution terms;
-- add `scripts/public_safety_check.sh`;
 - add a markdown link-check script or CI job;
 - add an ADR index later if ADR count grows.

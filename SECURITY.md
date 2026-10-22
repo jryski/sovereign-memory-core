@@ -30,3 +30,7 @@ Never commit:
 - real exports containing private memory or conversation data
 
 Use `REDACTED` or generic examples in documentation and fixtures.
+
+## Publication check
+
+Changed files can be scanned locally with `bash scripts/public_safety_scan.sh`. Issue text, pull requests, reviews, release notes, workflow logs, and uploaded artifacts are publication surfaces the file scan does not read. Use the checklist in the issue and pull-request templates and [docs/public-safety.md](docs/public-safety.md). A green scan is not clearance.

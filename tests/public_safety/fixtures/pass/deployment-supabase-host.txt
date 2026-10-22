@@ -1,0 +1,8 @@
+# SYNTHETIC NEAR-MISS. This file must not produce a public-safety finding.
+# covers-rule: deployment-supabase-host
+https://<project-ref>.supabase.co
+https://example-project.supabase.co
+db.<project-ref>.supabase.co
+pooler.supabase.com
+project_ref: example-project-ref
+project_ref: REDACTED
