@@ -152,29 +152,45 @@ Expected behavior:
 - fixture rows are rolled back;
 - any required validation failure raises an error so CI fails.
 
+`scripts/validate_source_import.sh` also runs
+`sql/validation/candidate_span_contract.sql` after this bundle.
+
 ## Step 9A: Candidate locators and quote hashes
 Apply `05_candidate_locators.sql` as migration `candidate_locators_v1` after Step 9.
 
 This step hardens `source_manifest` so each manifest candidate can be tied back to the
-specific source span that supports it. Whole-item payload preservation is still required,
-but it is not enough for large containers such as AI conversation exports where one source
-item can yield multiple candidate memories, wiki pages, tasks, decisions, or evidence rows.
+specific source span that supports it. Whole-item payload preservation remains required.
+One source item can yield multiple candidate memories, wiki pages, tasks, decisions, or
+evidence rows, and each candidate carries its own span.
 
 Candidate locator fields:
 
 | Field | Purpose |
 |---|---|
-| `source_locator` | Structured pointer into the source item, stored as JSONB so adapters can describe paths, message ids, turn ranges, byte offsets, or other source-specific spans. |
-| `source_quote` | Optional extracted support text for human review. Keep it short; use locator + hash when storing raw text would be excessive. |
-| `source_quote_hash` | Hash of the extracted supporting quote/span so offset or encoding drift can be detected. |
-| `source_quote_hash_algorithm` | Hash algorithm label, default `sha256`. |
+| `source_locator` | JSON object. A span is a half-open code-point range in `span` (`unit` = `codepoint`, `start`, `end`) or in `character_start` / `character_end`. When both forms are present they match. Optional `path`, `scheme`, `message_id`, `message_index`, `turn`, `turn_start`, and `turn_end` keys are adapter metadata and do not identify a span on their own. |
+| `source_quote` | Optional excerpt of at most 512 characters. Omit it when a locator and hash are enough. |
+| `source_quote_hash` | Lowercase SHA-256 hex of the span under `source_quote_hash_encoding`. |
+| `source_quote_hash_algorithm` | Hash algorithm label. The checked algorithm is `sha256`. |
+| `source_quote_hash_encoding` | Stored rows use `utf-8`. |
+| `source_content_hash` | Optional lowercase SHA-256 hex of the UTF-8 addressed text, the text the offsets index. `source_items.payload_hash` remains the container hash. |
+
+Write-time and verification:
+
+- import and hold rows require a span and a SHA-256 quote hash;
+- a stored quote must match that hash, and the span width must match the quote;
+- a quote longer than 512 characters is rejected;
+- `source_unique_quote_span(source, quote)` returns one half-open range and rejects a quote that is missing or that occurs more than once;
+- `source_verify_stored_candidate(manifest_id, addressed_text)` recomputes the span and reports `match`, `offset_drift`, `encoding_drift`, or `source_changed`;
+- when the same transaction creates `pg_temp.source_span_check_text(addressed_text text)` with one row, the manifest trigger runs that check before insert or update. The temp table is dropped at the end of the transaction;
+- the addressed text is the unit the offsets index. A message-relative adapter passes that message. A whole-item adapter passes the item text.
+
+The check reports the text presented to it. `source_items` keeps the container hash and location. A later change to the preserved bytes shows up as payload drift or, when `source_content_hash` is set, as `source_changed`. Preserved bytes that can be replaced in place need that hash comparison; the span fields alone describe the offsets.
 
 Readiness effect:
 
-- active import/HOLD candidates must carry a non-empty `source_locator` and a
-  `source_quote_hash`;
+- active import/HOLD candidates must carry a span and a `source_quote_hash`;
 - excluded candidates may still be evidence-preserved without becoming importable truth;
-- `source_manifest_review_queue` exposes locator/hash posture for reviewers.
+- `source_manifest_review_queue` exposes locator/hash posture and whether a quote is stored. It does not include the quote text.
 
 - DONE, candidate locator checks:
 ```sql
@@ -189,9 +205,10 @@ Expect: source_locator 1 / source_quote_hash 1 / locator_gate >= 0 on an empty s
 
 Run the validation helper again after this migration. Expected behavior adds:
 
-- candidate locator columns pass;
-- fixture import/HOLD candidates carry locator + quote hash;
-- readiness includes `candidate_locators_and_quote_hashes`.
+- candidate locator columns and span functions pass;
+- fixture import/HOLD candidates carry a span and quote hash;
+- readiness includes `candidate_locators_and_quote_hashes`;
+- `sql/validation/candidate_span_contract.sql` passes: one synthetic source item produces an import candidate and a hold candidate with distinct locators and manifest keys; the hold candidate stores a hash without a quote; a shifted span, an encoding change, an addressed-text change, a hash mismatch, a missing span, an overlong quote, and an ambiguous quote are rejected; fixture rows roll back.
 
 ## Step 9B: Richer cutover probe categories
 Apply `06_cutover_probe_categories.sql` as migration `cutover_probe_categories_v1` after

@@ -68,6 +68,12 @@ its own:
 - `source_quote_hash`;
 - `source_quote_hash_algorithm`.
 
+`character_start` and `character_end` are the generic half-open code-point span from
+`sql/05_candidate_locators.sql`, measured inside the message text. `message_id` and
+`message_index` are optional metadata for this producer. The core schema also accepts
+`span.unit = codepoint` and optional turn or path keys. Quote hashes are SHA-256 of the
+quote's UTF-8 bytes.
+
 The Friday deployment statement remains an unreviewed import suggestion. The older
 Thursday statement remains a `HOLD` candidate with `needs_review`; the exporter does not
 select a winner. Candidate quote hashes and the whole-conversation payload hash are

@@ -43,7 +43,16 @@ from (
   values
     ('source_freeze_batch',            to_regprocedure('public.source_freeze_batch(uuid,text,jsonb,text)') is not null, 'Run sql/04_source_import.sql'),
     ('source_manifest_payload_drift',  to_regprocedure('public.source_manifest_payload_drift(uuid)') is not null,       'Run sql/04_source_import.sql'),
-    ('source_mark_batch_ready',        to_regprocedure('public.source_mark_batch_ready(uuid,text)') is not null,        'Run sql/04_source_import.sql')
+    ('source_mark_batch_ready',        to_regprocedure('public.source_mark_batch_ready(uuid,text)') is not null,        'Run sql/04_source_import.sql'),
+    ('source_quote_max_chars',         to_regprocedure('public.source_quote_max_chars()') is not null,                'Run sql/05_candidate_locators.sql'),
+    ('source_quote_pg_encoding',       to_regprocedure('public.source_quote_pg_encoding(text)') is not null,          'Run sql/05_candidate_locators.sql'),
+    ('source_locator_codepoint_span',  to_regprocedure('public.source_locator_codepoint_span(jsonb)') is not null,    'Run sql/05_candidate_locators.sql'),
+    ('source_locator_has_span',        to_regprocedure('public.source_locator_has_span(jsonb)') is not null,           'Run sql/05_candidate_locators.sql'),
+    ('source_quote_digest',            to_regprocedure('public.source_quote_digest(text,text,text)') is not null,     'Run sql/05_candidate_locators.sql'),
+    ('source_unique_quote_span',       to_regprocedure('public.source_unique_quote_span(text,text)') is not null,     'Run sql/05_candidate_locators.sql'),
+    ('source_verify_candidate_span',   to_regprocedure('public.source_verify_candidate_span(text,jsonb,text,text,text,text,text)') is not null, 'Run sql/05_candidate_locators.sql'),
+    ('source_verify_stored_candidate', to_regprocedure('public.source_verify_stored_candidate(uuid,text)') is not null,'Run sql/05_candidate_locators.sql'),
+    ('guard_source_manifest_span',     to_regprocedure('public.guard_source_manifest_span()') is not null,            'Run sql/05_candidate_locators.sql')
 ) as v(function_name, ok, remediation)
 cross join lateral (select case when ok then 'pass' else 'fail' end as state) s;
 
@@ -63,8 +72,21 @@ from (values
   ('source_locator'),
   ('source_quote'),
   ('source_quote_hash'),
-  ('source_quote_hash_algorithm')
+  ('source_quote_hash_algorithm'),
+  ('source_quote_hash_encoding'),
+  ('source_content_hash')
 ) as v(column_name);
+
+insert into source_import_validation_results(check_group, object_name, state, severity, fatal, remediation)
+select 'required_object',
+       'trg_source_manifest_span',
+       case when exists (
+         select 1 from pg_trigger
+         where tgname='trg_source_manifest_span' and not tgisinternal
+       ) then 'pass' else 'fail' end,
+       'required',
+       true,
+       'Run sql/05_candidate_locators.sql';
 
 insert into source_import_validation_results(check_group, object_name, state, severity, fatal, remediation)
 select 'required_column',
@@ -91,11 +113,16 @@ select 'function_posture',
        case when array_to_string(coalesce(p.proconfig,'{}'::text[]), ',') like '%search_path=public%' then 'pass' else 'fail' end,
        'required',
        true,
-       'SECURITY DEFINER functions must pin search_path.'
+       'Checked functions must pin search_path to public.'
 from pg_proc p
 join pg_namespace n on n.oid=p.pronamespace
 where n.nspname='public'
-  and p.proname in ('source_freeze_batch','source_manifest_payload_drift','source_mark_batch_ready');
+  and p.proname in (
+    'source_freeze_batch','source_manifest_payload_drift','source_mark_batch_ready',
+    'source_quote_max_chars','source_quote_pg_encoding','source_locator_codepoint_span',
+    'source_locator_has_span','source_quote_digest','source_unique_quote_span',
+    'source_verify_candidate_span','source_verify_stored_candidate','guard_source_manifest_span'
+  );
 
 -- ---- grant posture -----------------------------------------------------------
 insert into source_import_validation_results(check_group, object_name, state, severity, fatal, remediation)
@@ -124,7 +151,12 @@ select 'grant_posture',
 from pg_proc p
 join pg_namespace n on n.oid=p.pronamespace and n.nspname='public'
 cross join lateral aclexplode(coalesce(p.proacl, acldefault('f',p.proowner))) acl
-where p.proname in ('source_freeze_batch','source_manifest_payload_drift','source_mark_batch_ready')
+where p.proname in (
+  'source_freeze_batch','source_manifest_payload_drift','source_mark_batch_ready',
+  'source_quote_max_chars','source_quote_pg_encoding','source_locator_codepoint_span',
+  'source_locator_has_span','source_quote_digest','source_unique_quote_span',
+  'source_verify_candidate_span','source_verify_stored_candidate','guard_source_manifest_span'
+)
   and acl.privilege_type='EXECUTE'
   and acl.grantee::regrole::text in ('anon','authenticated','-');
 
@@ -176,7 +208,7 @@ with agent as (
   select id, 'raw_payload', 'fixture://'||source_item_key||'.json', payload_hash, 128, source_item_key
   from items
   returning id
-), manifest_source as (
+), quote_source as (
   select
     id,
     source_item_key,
@@ -187,13 +219,26 @@ with agent as (
       when 'item-hold' then 'status: probably current?'
       when 'item-evidence' then 'note: model review'
       when 'item-exclude' then 'duplicate: true'
-    end as quote_text,
-    jsonb_build_object(
-      'scheme','fixture-json',
-      'path', jsonb_build_array('fixture', source_item_key),
-      'span', jsonb_build_object('kind','synthetic-fixture')
-    ) as locator
+    end as quote_text
   from items
+), manifest_source as (
+  select
+    id,
+    source_item_key,
+    payload_hash,
+    quote_text,
+    jsonb_build_object(
+      'scheme','fixture-text',
+      'path', jsonb_build_array('fixture', source_item_key),
+      'character_start', 0,
+      'character_end', char_length(quote_text),
+      'span', jsonb_build_object(
+        'unit','codepoint',
+        'start', 0,
+        'end', char_length(quote_text)
+      )
+    ) as locator
+  from quote_source
 ), manifest as (
   insert into source_manifest(
     source_item_id,
@@ -202,6 +247,7 @@ with agent as (
     source_quote,
     source_quote_hash,
     source_quote_hash_algorithm,
+    source_quote_hash_encoding,
     action,
     target_zone,
     review_state,
@@ -216,8 +262,9 @@ with agent as (
          'candidate:'||source_item_key,
          locator,
          quote_text,
-         encode(digest(quote_text,'sha256'),'hex'),
+         public.source_quote_digest(quote_text, 'sha256', 'utf-8'),
          'sha256',
+         'utf-8',
          case source_item_key
            when 'item-house' then 'import'::source_item_action
            when 'item-vault' then 'import'::source_item_action
@@ -352,7 +399,7 @@ select 'smoke_test',
        'candidate_locator_fixture',
        case when count(*) filter (
           where action in ('import','hold')
-            and source_locator <> '{}'::jsonb
+            and public.source_locator_has_span(source_locator)
             and source_quote_hash is not null
        ) = 3 then 'pass' else 'fail' end,
        'required',
