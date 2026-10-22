@@ -202,6 +202,14 @@ Three ordering rules that will bite you otherwise:
   It is itself re-runnable. If an operator deliberately reapplies `10`, reapply
   `11` immediately afterward before treating the perimeter as evaluated.
 
+Before a migration that removes or changes a public function signature, run
+`python3 scripts/check_agent_operations_contract.py`. It recomputes the
+digest of the sanitized contract in `docs/03-agent-operations.md` and compares
+the ordered SQL signatures in this repository with
+`docs/contracts/agent-operations-surface.json`. It does not contact a live
+database. Agents must not assume identical `session_boot` signatures across
+deployments. See that contract for the deferred runtime mismatch gate.
+
 `sql/validation/` is not in the ordered list. It holds
 `source_import_readiness.sql` and `load_chat_mine_package.sql`. Those are
 validation helpers. Applying `01` through `11` does not run them.

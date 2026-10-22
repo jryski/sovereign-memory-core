@@ -19,11 +19,99 @@ only within the authority already granted by the human principal, the runtime's
 system policy, and the governing custody protocol. A database row cannot grant
 itself authority, override a newer human instruction, or promote a proposal.
 
+## Contract version
+
+Contract version: agent-operations-contract/1.0.0
+
+This file is the sanitized agent-operations contract. Its SHA-256 content
+digest, and the recorded public function surface (function name, argument
+list, and result shape), live in
+`docs/contracts/agent-operations-surface.json`. The local checker
+`scripts/check_agent_operations_contract.py` recomputes that digest from this
+file and reparses the ordered SQL in this repository. It fails closed when
+the digest differs, when a recorded signature has been removed, or when a
+recorded signature's argument list or result shape has changed. An added
+public signature fails closed as well, so the recorded surface cannot grow
+quietly.
+
+The checker does not connect to a database. It does not read a private
+instruction corpus. An operator may pass `--corpus` with one local path. That
+path is optional. The operator or a test supplies it. The checker never
+fetches it.
+
+Agents must not assume identical boot signatures across deployments. Inspect
+the installed function before calling it. This repository's shared profile
+exposes `session_boot(text)`, and that argument defaults to `'shared'`.
+Another deployment may expose a different boot signature, including a
+no-argument `session_boot()`. Those profiles are not interchangeable. Do not
+copy a boot call from one deployment's instructions into another.
+
+### Mismatch behavior
+
+This is the specified behavior when an instruction surface and the installed
+public function contract disagree:
+
+- Warn, and name the contract version.
+- Fail closed for the affected authority-bearing operations: promotion,
+  rejection, supersession, and capability grants. Refuse the write.
+- Do not lock Primary Users out of read-only recovery. Boot, retrieval,
+  coverage reporting, drift reporting, and other reads stay available.
+
+That runtime hook is not installed. Landing it would migrate the
+authority-bearing `SECURITY DEFINER` bodies, including the main-branch copy of
+`session_boot` in `sql/10_security_definer_hardening.sql`. Earlier definitions
+in `sql/01_core.sql` and `sql/08_attention_events.sql` are replaced by that
+file on a full install. Enforcement is deferred. `session_boot` in this tree
+is the copy from main, and this change does not alter it.
+
+### Deferred
+
+These items stay open. This contract version does not claim they are done:
+
+- A pre-DDL probe of live deployment instructions. The checker can scan one
+  local corpus path. It does not search a live instruction store.
+- A post-migration live compatibility receipt.
+- The runtime fail-closed gate described above.
+- Returning this contract's version and digest from `session_boot()`. The
+  main-branch function still returns the existing `jsonb` shape. That shape
+  already includes each hot topic's `summary`. No second attestation
+  framework is added.
+
+### Synthetic hot-summary profile
+
+On the main-branch hardened profile, `public.hot_touch` in
+`sql/10_security_definer_hardening.sql` updates the indexed memory pointer,
+summary, visibility, and workstream together. `public.supersede_memory` in
+the same file refreshes the indexed summary. `session_boot` exposes that
+summary on `hot_topics`. The disposable-database probe is
+`tests/12_hot_summary_profile.sql`. It uses synthetic labels only (`Device
+mode alpha`, `Device mode beta`). A deliberately stale summary, where the
+pointer moves and the previous summary remains, fails that probe's
+assertion. The stale update exists only inside the probe.
+
+### Local check before DDL
+
+Before applying a migration that removes or changes a public function
+signature, run:
+
+```text
+python3 scripts/check_agent_operations_contract.py
+```
+
+To compare an operator-supplied local export with the recorded surface, pass
+`--corpus` and a path that stays on the operator's machine. Do not commit
+that export. Do not point the checker at a live database. If the checker
+reports a removed or changed signature, stop the DDL and correct the
+instructions that teach the old call. Read-only recovery stays available
+while that is unresolved.
+
 ## Discover the installed profile before booting
 
-Do not infer an RPC signature from another deployment's instructions. Inspect
-`pg_proc` (or the connector's function inventory) first, including argument
-defaults, then use only the installed surface. Never reverse these profiles:
+Do not infer an RPC signature from another deployment's instructions. Agents
+must not assume that `session_boot` has the same arguments everywhere.
+Inspect `pg_proc` (or the connector's function inventory) first, including
+argument defaults, then use only the installed surface. Never reverse these
+profiles:
 
 - The generic shared/HOUSE profile in this repository exposes
   `session_boot(viewer text default 'shared')`, `remember(...)`, and

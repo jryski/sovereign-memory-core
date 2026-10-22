@@ -1,0 +1,1108 @@
+{
+  "contract": "agent-operations-contract/1",
+  "functions": [
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_id",
+          "type": "uuid"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_accepted_by",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_authority_ref",
+          "type": "text"
+        }
+      ],
+      "identity": "accept_work_lesson(uuid, text, text)",
+      "name": "accept_work_lesson",
+      "result": "uuid",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_predecessor_event_id",
+          "type": "uuid"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_source_revision",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_occurred_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_source_evidence_ref",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_observation_method",
+          "type": "text"
+        },
+        {
+          "default": "'{}'",
+          "mode": "in",
+          "name": "p_metadata",
+          "type": "jsonb"
+        }
+      ],
+      "identity": "append_attention_event_revision(uuid, text, timestamp with time zone, text, text, jsonb)",
+      "name": "append_attention_event_revision",
+      "result": "uuid",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_lesson_id",
+          "type": "uuid"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_evidence_kind",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_locator",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_source_authority",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_actor",
+          "type": "text"
+        },
+        {
+          "default": "'unverified'",
+          "mode": "in",
+          "name": "p_resolution_state",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_integrity_hash",
+          "type": "text"
+        }
+      ],
+      "identity": "append_work_lesson_evidence(uuid, text, text, text, text, text, text)",
+      "name": "append_work_lesson_evidence",
+      "result": "uuid",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "assert_perimeter_closed()",
+      "name": "assert_perimeter_closed",
+      "result": "text",
+      "source": "11_perimeter_evaluability.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_viewer",
+          "type": "text"
+        },
+        {
+          "default": "12000",
+          "mode": "in",
+          "name": "p_char_budget",
+          "type": "integer"
+        },
+        {
+          "default": "240",
+          "mode": "in",
+          "name": "p_summary_chars",
+          "type": "integer"
+        }
+      ],
+      "identity": "attention_boot_projection_v2(text, integer, integer)",
+      "name": "attention_boot_projection_v2",
+      "result": "jsonb",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_viewer",
+          "type": "text"
+        },
+        {
+          "default": "12000",
+          "mode": "in",
+          "name": "p_char_budget",
+          "type": "integer"
+        },
+        {
+          "default": "240",
+          "mode": "in",
+          "name": "p_summary_chars",
+          "type": "integer"
+        }
+      ],
+      "identity": "attention_budget_conformance_v2(text, integer, integer)",
+      "name": "attention_budget_conformance_v2",
+      "result": "jsonb",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_base_chars",
+          "type": "integer"
+        }
+      ],
+      "identity": "attention_fixed_point_chars(integer)",
+      "name": "attention_fixed_point_chars",
+      "result": "integer",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "variadic",
+          "name": "p_parts",
+          "type": "text[]"
+        }
+      ],
+      "identity": "attention_hash_parts(variadic text[])",
+      "name": "attention_hash_parts",
+      "result": "text",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_payload",
+          "type": "jsonb"
+        }
+      ],
+      "identity": "attention_set_rendered_chars(jsonb)",
+      "name": "attention_set_rendered_chars",
+      "result": "jsonb",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_text",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_max_chars",
+          "type": "integer"
+        }
+      ],
+      "identity": "attention_summary_at_word_boundary(text, integer)",
+      "name": "attention_summary_at_word_boundary",
+      "result": "text",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_workstream",
+          "type": "text"
+        }
+      ],
+      "identity": "attention_workstream_key(text)",
+      "name": "attention_workstream_key",
+      "result": "text",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "audit_status_changes()",
+      "name": "audit_status_changes",
+      "result": "trigger",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_path",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_note",
+          "type": "text"
+        }
+      ],
+      "identity": "bless_doc(text, text)",
+      "name": "bless_doc",
+      "result": "text",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "capture_memory_activation_after_update()",
+      "name": "capture_memory_activation_after_update",
+      "result": "trigger",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "capture_memory_attention_after_insert()",
+      "name": "capture_memory_attention_after_insert",
+      "result": "trigger",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_seq",
+          "type": "bigint"
+        },
+        {
+          "default": "'done'",
+          "mode": "in",
+          "name": "p_status",
+          "type": "text"
+        }
+      ],
+      "identity": "channel_complete(bigint, text)",
+      "name": "channel_complete",
+      "result": "text",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_from_agent",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_to_principal",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_kind",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_subject",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_body",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_due_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "default": "false",
+          "mode": "in",
+          "name": "p_add_to_calendar",
+          "type": "boolean"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_re_seq",
+          "type": "bigint"
+        }
+      ],
+      "identity": "channel_send(text, text, text, text, text, timestamp with time zone, boolean, bigint)",
+      "name": "channel_send",
+      "result": "bigint",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_evidence_id",
+          "type": "uuid"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_evidence_kind",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_locator",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_source_authority",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_actor",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_correction_reason",
+          "type": "text"
+        },
+        {
+          "default": "'unverified'",
+          "mode": "in",
+          "name": "p_resolution_state",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_integrity_hash",
+          "type": "text"
+        }
+      ],
+      "identity": "correct_work_lesson_evidence(uuid, text, text, text, text, text, text, text)",
+      "name": "correct_work_lesson_evidence",
+      "result": "uuid",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_path",
+          "type": "text"
+        }
+      ],
+      "identity": "current_doc_hash(text)",
+      "name": "current_doc_hash",
+      "result": "text",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "enforce_financial_provenance()",
+      "name": "enforce_financial_provenance",
+      "result": "trigger",
+      "source": "03_provenance_guards.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "enforce_wiki_financial_provenance()",
+      "name": "enforce_wiki_financial_provenance",
+      "result": "trigger",
+      "source": "03_provenance_guards.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "guard_attention_append_only()",
+      "name": "guard_attention_append_only",
+      "result": "trigger",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "guard_attention_truncate()",
+      "name": "guard_attention_truncate",
+      "result": "trigger",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "guard_hard_delete()",
+      "name": "guard_hard_delete",
+      "result": "trigger",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "guard_work_lesson_custody_write_path()",
+      "name": "guard_work_lesson_custody_write_path",
+      "result": "trigger",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "guard_work_lesson_truncate()",
+      "name": "guard_work_lesson_truncate",
+      "result": "trigger",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "guard_work_lessons_write_path()",
+      "name": "guard_work_lessons_write_path",
+      "result": "trigger",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_topic_key",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_memory_id",
+          "type": "uuid"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_summary",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_workstream",
+          "type": "text"
+        }
+      ],
+      "identity": "hot_touch(text, uuid, text, text)",
+      "name": "hot_touch",
+      "result": "text",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_kind",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_locator",
+          "type": "text"
+        }
+      ],
+      "identity": "is_canonical_work_lesson_locator(text, text)",
+      "name": "is_canonical_work_lesson_locator",
+      "result": "boolean",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "perimeter_acl_violations()",
+      "name": "perimeter_acl_violations",
+      "result": "table(boundary text, object_identity text, grantee text, privilege_type text, privilege_source text)",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "perimeter_authority_functions()",
+      "name": "perimeter_authority_functions",
+      "result": "table(function_oid oid, function_identity text, is_internal boolean)",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_kind",
+          "type": "text"
+        }
+      ],
+      "identity": "perimeter_policy_roles(text)",
+      "name": "perimeter_policy_roles",
+      "result": "text[]",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "perimeter_protected_schemas()",
+      "name": "perimeter_protected_schemas",
+      "result": "table(schema_oid oid, schema_name text)",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "perimeter_report()",
+      "name": "perimeter_report",
+      "result": "jsonb",
+      "source": "11_perimeter_evaluability.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_setting",
+          "type": "text"
+        }
+      ],
+      "identity": "perimeter_setting_roles(text)",
+      "name": "perimeter_setting_roles",
+      "result": "text[]",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_id",
+          "type": "uuid"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_note",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_actor",
+          "type": "text"
+        }
+      ],
+      "identity": "promote_memory(uuid, text, text)",
+      "name": "promote_memory",
+      "result": "text",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_predecessor_id",
+          "type": "uuid"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_claim",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_detail",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_evidence_kind",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_evidence_locator",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_source_authority",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_created_by",
+          "type": "text"
+        },
+        {
+          "default": "'unverified'",
+          "mode": "in",
+          "name": "p_resolution_state",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_integrity_hash",
+          "type": "text"
+        }
+      ],
+      "identity": "propose_lesson_supersession(uuid, text, text, text, text, text, text, text, text)",
+      "name": "propose_lesson_supersession",
+      "result": "uuid",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_kind",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_claim",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_detail",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_evidence_kind",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_evidence_locator",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_source_authority",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_created_by",
+          "type": "text"
+        },
+        {
+          "default": "'unverified'",
+          "mode": "in",
+          "name": "p_resolution_state",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_integrity_hash",
+          "type": "text"
+        }
+      ],
+      "identity": "propose_work_lesson(text, text, text, text, text, text, text, text, text)",
+      "name": "propose_work_lesson",
+      "result": "uuid",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_memory_id",
+          "type": "uuid"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_actor",
+          "type": "text"
+        }
+      ],
+      "identity": "record_native_memory_activation(uuid, text)",
+      "name": "record_native_memory_activation",
+      "result": "uuid",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_memory_id",
+          "type": "uuid"
+        }
+      ],
+      "identity": "record_native_memory_attention(uuid)",
+      "name": "record_native_memory_attention",
+      "result": "uuid",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_id",
+          "type": "uuid"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_actor",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_authority_ref",
+          "type": "text"
+        }
+      ],
+      "identity": "reject_work_lesson(uuid, text, text)",
+      "name": "reject_work_lesson",
+      "result": "uuid",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "remediate_perimeter_acl()",
+      "name": "remediate_perimeter_acl",
+      "result": "text",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_content",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_workstream",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_topic_key",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_source_agent",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_owner",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_summary",
+          "type": "text"
+        },
+        {
+          "default": "'{}'",
+          "mode": "in",
+          "name": "p_tags",
+          "type": "text[]"
+        },
+        {
+          "default": "'shared'",
+          "mode": "in",
+          "name": "p_visibility",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_due_date",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "identity": "remember(text, text, text, text, text, text, text[], text, timestamp with time zone)",
+      "name": "remember",
+      "result": "uuid",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": "'shared'",
+          "mode": "in",
+          "name": "p_viewer",
+          "type": "text"
+        }
+      ],
+      "identity": "session_boot(text)",
+      "name": "session_boot",
+      "result": "jsonb",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "set_updated_at()",
+      "name": "set_updated_at",
+      "result": "trigger",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_batch_id",
+          "type": "uuid"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_agent",
+          "type": "text"
+        },
+        {
+          "default": "'{}'",
+          "mode": "in",
+          "name": "p_watermark",
+          "type": "jsonb"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_note",
+          "type": "text"
+        }
+      ],
+      "identity": "source_freeze_batch(uuid, text, jsonb, text)",
+      "name": "source_freeze_batch",
+      "result": "text",
+      "source": "04_source_import.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_batch_id",
+          "type": "uuid"
+        }
+      ],
+      "identity": "source_manifest_payload_drift(uuid)",
+      "name": "source_manifest_payload_drift",
+      "result": "table(source_manifest_id uuid, source_item_id uuid, source_item_key text, manifest_key text, reviewed_hash text, current_hash text, review_state source_review_state)",
+      "source": "04_source_import.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_batch_id",
+          "type": "uuid"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_agent",
+          "type": "text"
+        }
+      ],
+      "identity": "source_mark_batch_ready(uuid, text)",
+      "name": "source_mark_batch_ready",
+      "result": "text",
+      "source": "04_source_import.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_old_id",
+          "type": "uuid"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_new_content",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_source_agent",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_summary",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_tags",
+          "type": "text[]"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_due_date",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "identity": "supersede_memory(uuid, text, text, text, text[], timestamp with time zone)",
+      "name": "supersede_memory",
+      "result": "uuid",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_path",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_new_content",
+          "type": "text"
+        },
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_source_agent",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_title",
+          "type": "text"
+        },
+        {
+          "default": "null",
+          "mode": "in",
+          "name": "p_frontmatter",
+          "type": "jsonb"
+        }
+      ],
+      "identity": "supersede_wiki(text, text, text, text, jsonb)",
+      "name": "supersede_wiki",
+      "result": "uuid",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "validate_attention_event_revision_lineage()",
+      "name": "validate_attention_event_revision_lineage",
+      "result": "trigger",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [
+        {
+          "default": null,
+          "mode": "in",
+          "name": "p_path",
+          "type": "text"
+        }
+      ],
+      "identity": "verify_doc_integrity(text)",
+      "name": "verify_doc_integrity",
+      "result": "table(path text, state text, blessed_sha256 text, current_sha256 text, blessed_at timestamp with time zone)",
+      "source": "10_security_definer_hardening.sql"
+    },
+    {
+      "arguments": [],
+      "identity": "work_lessons_boot_fragment()",
+      "name": "work_lessons_boot_fragment",
+      "result": "jsonb",
+      "source": "10_security_definer_hardening.sql"
+    }
+  ],
+  "ordered_sql": [
+    "01_core.sql",
+    "02_vault.sql",
+    "03_provenance_guards.sql",
+    "04_source_import.sql",
+    "05_candidate_locators.sql",
+    "06_cutover_probe_categories.sql",
+    "07_work_lessons.sql",
+    "08_attention_events.sql",
+    "09_perimeter_refresh.sql",
+    "10_security_definer_hardening.sql",
+    "11_perimeter_evaluability.sql"
+  ],
+  "signature_fields": [
+    "name",
+    "arguments",
+    "result"
+  ],
+  "source": "docs/03-agent-operations.md",
+  "source_sha256": "bb106c751304c3bd5eb8f9571f7c300b94aae577c06c197dd56a352fb4b47b45",
+  "version": "1.0.0"
+}
