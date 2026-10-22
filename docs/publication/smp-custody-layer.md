@@ -217,9 +217,27 @@ Candidate source families include vendor AI memory exports, assistant chat expor
 
 Conformance is demonstrated by passing a defined probe suite, never by branding. A system **MUST NOT** claim conformance merely because it stores fields named "provenance" or "memory."
 
+A suite supports a conformance claim only when its criteria have the shape in [Criterion shape](#criterion-shape). The report contract for that shape is in [`conformance-criteria-shape.md`](conformance-criteria-shape.md).
+
 - **Emitter-conformant** — produces packages satisfying I1 and I2. This says nothing about whether its candidates are true or useful.
 - **Store-conformant** — enforces I1, I3, and I5 on ingest, including write-time rejection of unsourced consequential facts. A store **MUST** make in-place mutation of a promoted record either structurally impossible or content-hash audited, so silent post-promotion edits cannot occur undetected.
 - **Cutover-conformant** — executes the full [§7](#7-lifecycle-normative) lifecycle and records probe results, review decisions, and the cutover declaration.
+
+### Criterion shape
+
+These requirements apply to every suite used as conformance evidence, including a third-party or offline verifier fixture.
+
+- **Paired grant.** Every denial criterion **MUST** be paired with a grant criterion in the same suite and against the same fixture. Where the suite requires that an action be rejected, it **MUST** also require that the entitled action be accepted on that fixture. An authorized principal **MUST** be shown to receive exactly the record they are entitled to.
+- **Grants gate denials.** Grant criteria **MUST** run before denial criteria. When a grant criterion on a fixture fails, denial results from that fixture **MUST** be reported as `NOT_EVIDENCE`. Those results **MUST NOT** be counted as passes, and the run **MUST NOT** report conformance.
+- **Fixture construction.** If fixture construction fails, or the fixture is only partially constructed, the run **MUST** abort before denial criteria are scored.
+- **Demonstrated failure.** Every check that can pass **MUST** ship with a deliberately broken input, and the conformance run **MUST** execute that demonstration. The demonstration **MUST** produce the failure the check owns. A falsification instruction that the run does not execute is not a check.
+- **Failure reason.** A demonstration that fails for a reason other than the reason the check owns **MUST** fail the run. Where a corruption case is specific to one check, the case **MUST** name that check.
+- **Host-specific identifiers.** A check that filters on host-specific identifiers (role names, extension names, schema names, platform default privileges, or any other identifier that is not present on every host) **MUST** declare those identifiers and **MUST** assert that they are present before it filters. If a declared identifier is absent, the check **MUST** report `UNSUPPORTED` or raise a hard error. An empty filter result **MUST NOT** be reported as `PASS`.
+- **Skips.** A check that does not run **MUST** be reported as `SKIPPED`. `SKIPPED` is a distinct status from `PASS`. A run that contains a skip **MUST NOT** report full conformance. The process exit status **MUST** distinguish "every defined criterion passed" from "every criterion that was evaluated passed."
+- **Coverage.** Every run **MUST** report three separate numbers: criteria defined, criteria evaluated, and criteria passed. A criterion that is `SKIPPED`, `UNSUPPORTED`, `NOT_EVIDENCE`, or aborted is defined and is not evaluated.
+- **Disjunctive predicates.** Where an access predicate is disjunctive, the suite **MUST** exercise each disjunct with its own criterion. A denial that isolates one disjunct **MUST** fail when a precondition required to isolate that disjunct is absent, so the denial cannot pass for a different disjunct.
+- **Examined record.** A passing check **MUST** record what it examined. A result that does not record what it examined **MUST NOT** be reported as `PASS`.
+- **Characterizing counts.** A count offered as conformance evidence **MUST** come from a run whose grant criteria passed. A count taken while a grant criterion is failing **MUST** be reported as non-characterizing.
 
 ---
 

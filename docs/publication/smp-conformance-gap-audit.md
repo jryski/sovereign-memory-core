@@ -31,7 +31,8 @@ The merged foundation is known to include:
 - negative package mutation tests;
 - negative SQL corruption tests;
 - non-local database refusal;
-- current tracked-file public-readiness scrub.
+- current tracked-file public-readiness scrub;
+- criterion-shape runner for paired grants, executed demonstrations, and separate coverage numbers.
 
 This foundation strongly covers custody rails. It does **not** yet cover the entire Draft 0.3 normative surface.
 
@@ -92,6 +93,16 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 | CT5 | Verification possible offline without source/emitter cooperation. | Partial | Package/evidence/rollback fixtures move in this direction; full offline verifier not complete. |
 | A1 | Agents may propose durable source-of-record changes but not promote without review. | Gap | Policy issue exists; repo docs and/or protected-path proposal posture needed. |
 | A2 | In-place source-of-record changes by an agent are content-hash audited when proposed/authoritative split is unavailable. | Gap | Possible phase-2 trigger; not implemented. |
+| SH1 | Every denial criterion is paired with a grant criterion against the same fixture. | Covered | `fixtures/conformance/criterion_shape_suite.json` with `scripts/conformance_criteria.py`. |
+| SH2 | Grant criteria run first and gate denial evidence. | Covered | Failed grants mark denials `NOT_EVIDENCE` and block a conformance report. |
+| SH3 | Fixture construction failure aborts the run. | Covered | A missing identity-binding review field aborts before denial scoring. |
+| SH4 | Every passing check has a broken input the conformance run executes. | Covered | A missing demonstration fails the suite. An unexecuted instruction is not accepted. |
+| SH5 | A demonstration that fails for the wrong reason fails the run. | Covered | The expected reason is compared with the reason the executed check produced. |
+| SH6 | Host-specific filters assert identifier presence. Absence is `UNSUPPORTED`, and an empty filter is not `PASS`. | Covered | Zero grant rows pass only after the declared identifier is present. |
+| SH7 | `SKIPPED` is reported, and a run with a skip cannot report full conformance. | Covered | Exit status separates full coverage from evaluated-only passage. |
+| SH8 | Coverage is reported as criteria defined, evaluated, and passed. | Covered | Every runner report prints the three numbers. |
+| SH9 | A disjunctive access predicate exercises each disjunct, and an isolating denial fails when its preconditions are absent. | Covered | Owner and shared grants are separate criteria. The visibility denial names its preconditions. |
+| SH10 | A pass records what it examined. Counts are characterizing only after grant criteria pass. | Covered | An empty examined record cannot pass. `COUNTS characterizing` follows the grant results. |
 
 ## Immediate follow-up issues recommended
 
@@ -122,10 +133,13 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 
 7. **Define offline verifier fixture**
    - Given only package, manifest, evidence hashes, probe definitions/results, and cutover record, verify SMP-complete for a small scope.
+   - Include an authorized-receive case on the same fixture as the denial cases, a host that lacks platform-specific identifiers and expects `UNSUPPORTED`, and a broken input the verifier run executes and must reject for a named reason. Criterion shape for that fixture is specified in [`conformance-criteria-shape.md`](conformance-criteria-shape.md). The local criterion-shape suite does not itself close this fixture.
 
 ## Practical alpha interpretation
 
 Draft 0.3 is ahead of the current implementation, but in a useful way. It should be treated as the target custody specification, while this audit prevents overclaiming.
+
+SH1–SH10 constrain how conformance evidence is produced. Coverage there does not make the store, the cutover, or an offline verifier conformant. The offline verifier fixture remains follow-up 7.
 
 The current repo can credibly claim:
 
@@ -134,7 +148,8 @@ The current repo can credibly claim:
 - candidate locators and quote hashes;
 - readiness/probe categories;
 - rollback loader proof;
-- negative package and SQL validation.
+- negative package and SQL validation;
+- criterion-shape rules for conformance evidence (paired grants, executed demonstrations, separate coverage numbers).
 
 It should not yet claim:
 
