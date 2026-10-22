@@ -5,6 +5,8 @@ This repository is an early reference implementation. Review the security model 
 Relevant doc:
 
 - [docs/02-security-model.md](docs/02-security-model.md)
+- [LEAK-01 operator guide](docs/security/LEAK-01.md)
+- [LEAK-01 adoption guide](docs/security/LEAK-01-adoption.md)
 
 ## Sensitive reports
 
