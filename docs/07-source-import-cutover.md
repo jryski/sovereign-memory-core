@@ -356,7 +356,7 @@ To make this repeatable, the repo needs:
 
 1. SQL migration for manifest, freeze/watermark control, export views, readiness view, and cutover probes.
 2. A validation SQL bundle that produces a pass/fail cutover report.
-3. Export/import examples for at least two different source types, such as JSONL rows and Markdown files.
+3. Export/import examples for at least two different source types, such as JSONL rows and Markdown files. Synthetic manifest drafts for five source shapes are in [`examples/source-adapters/`](../examples/source-adapters/README.md). They illustrate the contract only. They are not a production importer, and they do not mark a batch ready for cutover.
 4. A cutover evidence template.
 5. A release tag after repo/live parity is restored.
 

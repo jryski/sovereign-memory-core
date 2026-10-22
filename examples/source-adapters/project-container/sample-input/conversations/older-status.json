@@ -1,0 +1,15 @@
+{
+  "conversation_id": "conv-older-status",
+  "created_at": "2026-01-15T12:00:00Z",
+  "messages": [
+    {
+      "author": "person-1",
+      "content": "Historical status: Example Project cutover is complete and the listener is port 8080.",
+      "created_at": "2026-01-15T12:00:00Z",
+      "message_id": "msg-older-1",
+      "role": "user"
+    }
+  ],
+  "title": "Older Example Project status",
+  "updated_at": "2026-01-15T12:00:00Z"
+}

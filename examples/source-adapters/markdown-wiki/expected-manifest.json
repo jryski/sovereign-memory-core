@@ -1,0 +1,331 @@
+{
+  "adapter_profile": {
+    "evidence_posture": "SHA-256 covers the raw file bytes, including the trailing newline. The file path is the source identity.",
+    "is_default_import_path": false,
+    "lossiness": "These Markdown files have no native timestamps or stable status field beyond prose. Items use the export watermark time.",
+    "mapping": "The file path is the source item key. Pages suggest a zone. They do not approve truth.",
+    "profile_id": "example-markdown-wiki-v1",
+    "source_identity": "synthetic markdown file wiki",
+    "unsupported": [
+      "approval",
+      "deduplication",
+      "conflict resolution",
+      "authoritative cutover"
+    ]
+  },
+  "batch": {
+    "batch_key": "example-markdown-wiki-2026-07-08",
+    "export_completed_at": "2026-07-08T16:00:01Z",
+    "export_started_at": "2026-07-08T16:00:00Z",
+    "exported_by": "agent-1",
+    "exported_item_count": 4,
+    "metadata": {
+      "producer": "example-source-adapter-draft",
+      "ready_for_cutover": false
+    },
+    "payload_hash_algorithm": "sha256",
+    "source_item_count": 4,
+    "status": "open",
+    "watermark": {
+      "max_updated_at": "2026-07-08T16:00:00Z",
+      "source_item_count": 4
+    }
+  },
+  "cutover_probe_candidates": [
+    {
+      "expected_behavior": "Do not answer from operations/demo-port-history.md as current truth. That page stays in HOLD.",
+      "expected_source_item_key": "operations/demo-port-history.md",
+      "probe_category": "stale_state",
+      "probe_key": "example-wiki-stale-port",
+      "probe_type": "stale-avoidance",
+      "prompt": "Is port 8080 the current listener according to the wiki?",
+      "severity": "critical"
+    },
+    {
+      "expected_behavior": "restricted/demo-subject-pointer.md is a VAULT suggestion and still needs review.",
+      "expected_source_item_key": "restricted/demo-subject-pointer.md",
+      "probe_category": "negative",
+      "probe_key": "example-wiki-vault-boundary",
+      "probe_type": "sensitive-boundary",
+      "prompt": "Which wiki page must stay out of HOUSE?",
+      "severity": "critical"
+    }
+  ],
+  "draft_format": "source-adapter.manifest-draft.v1",
+  "draft_note": "Synthetic manifest draft. Suggestions are not approved truth. This draft does not mark a batch ready for cutover.",
+  "hash_algorithm": "sha256",
+  "source_items": [
+    {
+      "content_type": "text/markdown",
+      "manifest_candidates": [
+        {
+          "action": "import",
+          "lifecycle_status": "proposed",
+          "manifest_key": "wiki-demo-rollback",
+          "metadata": {
+            "producer_posture": "candidate_only"
+          },
+          "preservation_class": "durable",
+          "review_notes": "Ordinary operating page. HOUSE wiki import suggestion. File path stays the source identity. Review state stays unreviewed.",
+          "review_state": "unreviewed",
+          "sensitivity": "ordinary",
+          "source_quote": "Example Project keeps the current rollback checklist on this page.",
+          "source_quote_hash": "b45bdd7ce8d9ac6f793da0340311704a3a56873773dfab60b19f4bb8e4833e8e",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "Example Project keeps the current rollback checklist on this page.",
+          "suggested_summary": "Durable wiki page for the synthetic rollback checklist.",
+          "target_table": "wiki_pages",
+          "target_zone": "HOUSE",
+          "topic_key": "projects/example-project/rollback",
+          "transformation_version": "example-markdown-wiki-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "export_watermark"
+      },
+      "payload": {
+        "basis": "file_bytes",
+        "file": "sample-input/operations/demo-rollback.md"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input/operations/demo-rollback.md",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "8d3137bbb3c6116d8973ca5ea1f67b01b50c1149c559cb3befbd5ed9de8d3216",
+          "size_bytes": 196
+        }
+      ],
+      "payload_hash": "8d3137bbb3c6116d8973ca5ea1f67b01b50c1149c559cb3befbd5ed9de8d3216",
+      "payload_size_bytes": 196,
+      "raw_payload_location": "sample-input/operations/demo-rollback.md",
+      "source_author": "person-1",
+      "source_container": "markdown-wiki",
+      "source_created_at": "2026-07-08T16:00:00Z",
+      "source_item_key": "operations/demo-rollback.md",
+      "source_kind": "page",
+      "source_ref": "operations/demo-rollback.md",
+      "source_updated_at": "2026-07-08T16:00:00Z",
+      "title": "Demo rollback"
+    },
+    {
+      "content_type": "text/markdown",
+      "manifest_candidates": [
+        {
+          "action": "hold",
+          "lifecycle_status": "stale",
+          "manifest_key": "wiki-port-8080-stale",
+          "metadata": {
+            "producer_posture": "stale_state_quarantine",
+            "quarantine_reason": "stale_state"
+          },
+          "preservation_class": "quarantine",
+          "review_notes": "Stale-state quarantine. The page marks itself superseded and states port 8080 as historical status. Keep it in HOLD. This export has no replacement page, so the successor stays unresolved.",
+          "review_state": "needs_review",
+          "sensitivity": "ordinary",
+          "source_quote": "Historical status: Example Project listener is port 8080.",
+          "source_quote_hash": "3bc6eceb6265d4d3b610731d6f9a161edb4cbef928f6139105152fafee03e245",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "Historical status: Example Project listener is port 8080.",
+          "suggested_summary": "Superseded wiki page says the listener is port 8080.",
+          "target_zone": "HOLD",
+          "topic_key": "projects/example-project/listener",
+          "transformation_version": "example-markdown-wiki-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "export_watermark"
+      },
+      "payload": {
+        "basis": "file_bytes",
+        "file": "sample-input/operations/demo-port-history.md"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input/operations/demo-port-history.md",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "a838858767435b37a8e85cc98de1f56c5f37defa53c2fcc1a0ffccb720ec7b9f",
+          "size_bytes": 235
+        }
+      ],
+      "payload_hash": "a838858767435b37a8e85cc98de1f56c5f37defa53c2fcc1a0ffccb720ec7b9f",
+      "payload_size_bytes": 235,
+      "raw_payload_location": "sample-input/operations/demo-port-history.md",
+      "source_author": "person-1",
+      "source_container": "markdown-wiki",
+      "source_created_at": "2026-07-08T16:00:00Z",
+      "source_item_key": "operations/demo-port-history.md",
+      "source_kind": "page",
+      "source_ref": "operations/demo-port-history.md",
+      "source_updated_at": "2026-07-08T16:00:00Z",
+      "title": "Demo port history"
+    },
+    {
+      "content_type": "text/markdown",
+      "manifest_candidates": [
+        {
+          "action": "evidence",
+          "lifecycle_status": "evidence",
+          "manifest_key": "wiki-session-notebook",
+          "metadata": {
+            "producer_posture": "process_evidence"
+          },
+          "preservation_class": "process",
+          "review_notes": "Scratch and model-authored notes stay EVIDENCE. They are not promoted to wiki truth or active memory.",
+          "review_state": "unreviewed",
+          "sensitivity": "ordinary",
+          "source_quote": "Model-authored planning notes are process evidence.",
+          "source_quote_hash": "7cfaa217b0625aefdc01c969d45f6c55ea292dbe5e49cdaa1b229b72234b0721",
+          "source_quote_hash_algorithm": "sha256",
+          "suggested_content": "Model-authored planning notes are process evidence.",
+          "suggested_summary": "Scratch notebook from agent-1.",
+          "target_zone": "EVIDENCE",
+          "topic_key": "projects/example-project/scratch",
+          "transformation_version": "example-markdown-wiki-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "export_watermark"
+      },
+      "payload": {
+        "basis": "file_bytes",
+        "file": "sample-input/scratch/session-notebook.md"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input/scratch/session-notebook.md",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "55a322c787e354b2bad0eded98b1f026ef7aa0f39cb8566676e6513f1b6c3ae3",
+          "size_bytes": 254
+        }
+      ],
+      "payload_hash": "55a322c787e354b2bad0eded98b1f026ef7aa0f39cb8566676e6513f1b6c3ae3",
+      "payload_size_bytes": 254,
+      "raw_payload_location": "sample-input/scratch/session-notebook.md",
+      "source_author": "agent-1",
+      "source_container": "markdown-wiki",
+      "source_created_at": "2026-07-08T16:00:00Z",
+      "source_item_key": "scratch/session-notebook.md",
+      "source_kind": "page",
+      "source_ref": "scratch/session-notebook.md",
+      "source_updated_at": "2026-07-08T16:00:00Z",
+      "title": "Session notebook"
+    },
+    {
+      "content_type": "text/markdown",
+      "manifest_candidates": [
+        {
+          "action": "import",
+          "custodian": "person-1",
+          "lifecycle_status": "proposed",
+          "manifest_key": "wiki-restricted-pointer",
+          "metadata": {
+            "producer_posture": "restricted_review"
+          },
+          "preservation_class": "restricted",
+          "review_notes": "Restricted wiki page. VAULT import suggestion. Needs review before normalization. The page path is not a reason to use HOUSE.",
+          "review_state": "needs_review",
+          "sensitivity": "restricted",
+          "source_quote": "Keep it in VAULT.",
+          "source_quote_hash": "2db01b5635a636e915eea011f731aab125bb64ec9496082b830c8d039c0c1d68",
+          "source_quote_hash_algorithm": "sha256",
+          "subject_ref": "vault-subject-demo-1",
+          "suggested_content": "Keep it in VAULT.",
+          "suggested_summary": "Restricted wiki pointer for synthetic subject vault-subject-demo-1.",
+          "target_zone": "VAULT",
+          "topic_key": "subjects/vault-subject-demo-1",
+          "transformation_version": "example-markdown-wiki-v1",
+          "workstream": "example-project"
+        }
+      ],
+      "metadata": {
+        "timestamp_source": "export_watermark"
+      },
+      "payload": {
+        "basis": "file_bytes",
+        "file": "sample-input/restricted/demo-subject-pointer.md"
+      },
+      "payload_evidence": [
+        {
+          "evidence_kind": "raw_payload",
+          "hash_algorithm": "sha256",
+          "location": "sample-input/restricted/demo-subject-pointer.md",
+          "metadata": {
+            "encoding": "utf-8"
+          },
+          "payload_hash": "4e6ec3cd5c409b24a58dbbf914011a514d662857655e507aad2f4778dafddf57",
+          "size_bytes": 236
+        }
+      ],
+      "payload_hash": "4e6ec3cd5c409b24a58dbbf914011a514d662857655e507aad2f4778dafddf57",
+      "payload_size_bytes": 236,
+      "raw_payload_location": "sample-input/restricted/demo-subject-pointer.md",
+      "source_author": "person-1",
+      "source_container": "markdown-wiki",
+      "source_created_at": "2026-07-08T16:00:00Z",
+      "source_item_key": "restricted/demo-subject-pointer.md",
+      "source_kind": "page",
+      "source_ref": "restricted/demo-subject-pointer.md",
+      "source_updated_at": "2026-07-08T16:00:00Z",
+      "title": "Demo subject pointer"
+    }
+  ],
+  "source_system": {
+    "adapter_name": "example-markdown-wiki",
+    "adapter_version": "example-v1",
+    "description": "Synthetic Markdown file wiki. This source shape is not the default import path.",
+    "display_name": "Example Markdown Wiki",
+    "owner": "shared",
+    "source_key": "example-markdown-wiki",
+    "source_type": "file-wiki",
+    "visibility": "shared"
+  },
+  "verification": {
+    "candidate_count": 4,
+    "evidence_count": 1,
+    "exclude_count": 0,
+    "exported_item_count": 4,
+    "held_excluded_or_rejected_count": 1,
+    "hold_count": 1,
+    "import_count": 2,
+    "payload_hash_algorithm": "sha256",
+    "raw_input_files": [
+      {
+        "path": "sample-input/operations/demo-port-history.md",
+        "sha256": "a838858767435b37a8e85cc98de1f56c5f37defa53c2fcc1a0ffccb720ec7b9f",
+        "size_bytes": 235
+      },
+      {
+        "path": "sample-input/operations/demo-rollback.md",
+        "sha256": "8d3137bbb3c6116d8973ca5ea1f67b01b50c1149c559cb3befbd5ed9de8d3216",
+        "size_bytes": 196
+      },
+      {
+        "path": "sample-input/restricted/demo-subject-pointer.md",
+        "sha256": "4e6ec3cd5c409b24a58dbbf914011a514d662857655e507aad2f4778dafddf57",
+        "size_bytes": 236
+      },
+      {
+        "path": "sample-input/scratch/session-notebook.md",
+        "sha256": "55a322c787e354b2bad0eded98b1f026ef7aa0f39cb8566676e6513f1b6c3ae3",
+        "size_bytes": 254
+      }
+    ],
+    "rejected_count": 0,
+    "source_item_count": 4
+  }
+}

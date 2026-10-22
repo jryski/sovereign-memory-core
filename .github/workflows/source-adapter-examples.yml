@@ -1,0 +1,26 @@
+name: Source Adapter Examples
+
+on:
+  pull_request:
+    paths:
+      - "examples/source-adapters/**"
+      - "scripts/validate_source_adapter_examples.py"
+      - ".github/workflows/source-adapter-examples.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-source-adapter-examples:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quiet checkout
+        run: |
+          git init -q .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
+
+      - name: Validate synthetic source-adapter examples
+        run: python3 scripts/validate_source_adapter_examples.py
