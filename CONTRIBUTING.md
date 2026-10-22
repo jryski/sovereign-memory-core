@@ -46,13 +46,15 @@ Use [.github/pull_request_template.md](.github/pull_request_template.md) as the 
 Run the checks appropriate to the files changed:
 
 - Always: `git diff --check`
-- Docs: markdown/link checks if available
+- Docs: `python3 scripts/check_markdown_links.py`
 - SQL: source-import validation and relevant local/disposable database checks
 - Python: syntax checks and relevant test scripts
 - Shell: shell syntax checks
 - Fixtures: deterministic regeneration and validation
 
 Do not weaken existing validation to make a PR pass.
+
+From the repository root, `python3 scripts/check_markdown_links.py` checks links that point at files or directories inside this repository. With no arguments it checks every tracked Markdown file and every untracked Markdown file that is not gitignored. Pass Markdown paths to check only those files. A missing target is printed with the source file, line number, destination, and the repository path that did not exist. A link that would resolve outside the repository is reported as well. External URLs are not fetched, and same-file heading fragments are not validated. There is no exception list; existing documents are expected to pass. Pull requests run the same command in GitHub Actions.
 
 ## Public-safety expectations
 
