@@ -26,6 +26,7 @@ The merged foundation is known to include:
 - source systems, import batches, source items, payload evidence, and manifest review;
 - candidate-level source locators and quote hashes;
 - richer cutover probe categories;
+- scope-bound authority declarations for two synthetic scopes, with rollback before declaration and recorded rollback after it;
 - deterministic Chat-Mine package fixture;
 - rollback-only loader proof;
 - negative package mutation tests;
@@ -41,7 +42,7 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 |---|---|---|---|
 | T1 | Package MUST declare `smp_version`. | Gap | Add package schema field and validation if not already present. |
 | T2 | Principal or authorized delegate MAY declare authority. | Partial | Current cutover concepts exist, but authorization/delegation model is not fully specified or tested. |
-| T3 | Scope names the subset of memory a cutover covers. | Partial | Cutover machinery exists; explicit scope model and scope-by-scope migration should be checked. |
+| T3 | Scope names the subset of memory a cutover covers. | Covered | `sql/12_scope_bound_authority.sql` stores `cutover_scope` and a closed scope registry. The validation fixture uses two scopes. No global kind exists. Hierarchy and older read paths are not part of this contract. |
 | I1.1 | Raw source payload preserved before normalization/trust. | Covered | Source payload evidence and hashes are core to `sql/04_source_import.sql` and validation. |
 | I1.2 | Derived record references evidence by locator and hash. | Covered | Candidate locator and quote-hash work covers import/HOLD posture. |
 | I1.3 | Claims without preserved source are not counted as migrated facts. | Partial | HOLD/evidence posture exists; explicit orphaned assertion handling should be tested. |
@@ -55,14 +56,14 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
 | I3.3 | Agent-authored content MUST NOT be silently promoted to human authority. | Partial | Doctrine and review posture exist; add explicit negative test for agent-authored promotion. |
 | I3.4 | Deployment declares consequential domains. | Gap | Current provenance guards appear domain-specific; no general domain declaration mechanism yet. |
 | I3.5 | Unsourced or agent-authored consequential facts rejected at write time. | Partial | Existing provenance guards cover financial-style facts; general legal/medical/identity domain enforcement is not complete. |
-| I4.1 | Store becomes candidate-authoritative only after required probe suite passes. | Partial | Probe suite and scorecards exist; candidate-authoritative state model should be verified. |
+| I4.1 | Store becomes candidate-authoritative only after required probe suite passes. | Covered | `declare_scope_authority` refuses unless the batch is ready and each critical probe category has a latest passing run bound to that scope. Unbound passes do not count. A batch cannot enter `cutover` without that declaration. |
 | I4.2 | Probe suite includes positive, negative, conflict, stale-state, evidence-request categories. | Covered | `sql/06_cutover_probe_categories.sql` introduced these categories and validation coverage. |
 | I4.3 | Critical probes all pass before cutover. | Partial | Critical probe tracking exists; direct cutover-blocking behavior should be tested. |
 | I4.4 | Normative claims are backed by passing probes. | Gap | This audit starts the mapping; not all claims are covered. |
 | I5.1 | Corrections append; history is not silently rewritten. | Partial | Supersession doctrine and core audit patterns exist; source-import promoted-record mutation rules need direct tests. |
 | I5.2 | Earlier contradictory record preserved and may be marked stale/superseded/conflicted/historical. | Partial | Conflict/stale probes exist; explicit record preservation under contradiction needs fixture coverage. |
-| I5.3 | Cutover remains reversible until authority declaration recorded. | Gap | Needs explicit cutover-state model and rollback/reversibility test. |
-| I5.4 | Authority declaration is recorded and evidenced. | Partial | Cutover concepts exist; declaration evidence fields should be audited. |
+| I5.3 | Cutover remains reversible until authority declaration recorded. | Covered | `rollback_scope_before_authority` reverses a batch until a declaration exists. After that, `rollback_scope_authority` keeps the row and returns the batch to ready. One scope's rollback does not change the other. |
+| I5.4 | Authority declaration is recorded and evidenced. | Covered | `scope_authority_declarations` stores principal, scope, batch, declaring agent, evidence reference, and review note. The two-scope fixture asserts both rows. |
 | L1 | Each lifecycle transition records a durable artifact. | Partial | Early lifecycle artifacts exist; REVIEWED/PARALLEL/AUTHORITATIVE artifacts not fully implemented. |
 | L2 | Failure at any gate returns to prior safe state. | Partial | Rollback-only loader proof covers load path; all lifecycle gates need broader tests. |
 | L3 | No lifecycle gate may be skipped. | Gap | Needs state-transition guard/probe. |
@@ -107,9 +108,9 @@ This foundation strongly covers custody rails. It does **not** yet cover the ent
    - Move beyond domain-specific guards into a declared consequential-domain model.
    - Add negative tests for unsourced or agent-authored consequential facts.
 
-4. **Define scope-bound authority model**
-   - Store cutover scope explicitly.
-   - Add tests for scope-by-scope authority.
+4. **Scope-bound authority contract**
+   - Public contract is `sql/12_scope_bound_authority.sql` with the local two-scope fixture.
+   - Still open: wiring that contract into read paths that predate it, and any declared scope hierarchy. This audit does not treat those as done.
 
 5. **Add review/promotion guard tests**
    - HOLD/EXCLUDE/EVIDENCE must not promote.
